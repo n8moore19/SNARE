@@ -24,7 +24,8 @@
   const ROAD_FACTOR = 1.35;   // straight line distance to rough road distance
   const TIME_VALUE = 15;      // dollars per hour, used to pick the balanced option
   const MIN_SWAP_SAVING = 0.25;
-  const MAX_RADIUS = 30;      // km
+  const SLIDER_MAX = 30;      // km; the slider is a quick picker, the box takes any distance
+  const MIN_RADIUS = 0.1;     // km
   const LOADING_MS = 2900;    // length of the "finding your trip" animation
   const EXACT_ROUTE_LIMIT = 7; // above this many stops, use a quick nearest stop route
 
@@ -597,11 +598,12 @@
         <div class="card">
           <h2>How far will you go?</h2>
           <div class="dial">
-            <input id="radius" type="range" min="0.5" max="${MAX_RADIUS}" step="0.5" value="${state.radius}" style="--fill:${state.radius / MAX_RADIUS * 100}%">
-            <label class="unit-input"><input id="radius-num" type="number" min="0.5" max="${MAX_RADIUS}" step="0.5" value="${state.radius}"><span>km</span></label>
+            <input id="radius" type="range" min="0.5" max="${SLIDER_MAX}" step="0.5" value="${Math.min(state.radius, SLIDER_MAX)}" style="--fill:${Math.min(1, state.radius / SLIDER_MAX) * 100}%">
+            <label class="unit-input"><input id="radius-num" type="number" min="${MIN_RADIUS}" step="any" inputmode="decimal" value="${state.radius}" aria-label="Distance in km"><span>km</span></label>
           </div>
-          <div class="range-labels"><span>0.5 km</span><span>${MAX_RADIUS} km</span></div>
-          <div class="quick">${[2, 5, 10, 20].map(v => `<button class="chip" data-action="radius" data-val="${v}">${v} km</button>`).join('')}</div>
+          <div class="range-labels"><span>0.5 km</span><span>${SLIDER_MAX} km+</span></div>
+          <p class="card-note">Type any distance in the box, as short or as far as you like.</p>
+          <div class="quick">${[1, 5, 10, 25, 50].map(v => `<button class="chip" data-action="radius" data-val="${v}">${v} km</button>`).join('')}</div>
         </div>
 
         <div class="card">
@@ -635,12 +637,12 @@
   }
 
   function setRadius(v, from) {
-    const r = Math.min(MAX_RADIUS, Math.max(0.5, Math.round((Number(v) || 0.5) * 2) / 2));
+    const r = Math.max(MIN_RADIUS, Math.round((Number(v) || MIN_RADIUS) * 10) / 10);
     state.radius = r;
     const range = document.getElementById('radius'), num = document.getElementById('radius-num');
-    if (range && from !== 'range') range.value = r;
+    if (range && from !== 'range') range.value = Math.min(r, SLIDER_MAX);
     if (num && from !== 'num') num.value = r;
-    if (range) range.style.setProperty('--fill', r / MAX_RADIUS * 100 + '%');
+    if (range) range.style.setProperty('--fill', Math.min(1, r / SLIDER_MAX) * 100 + '%');
   }
 
   function extraStopsCard() {
@@ -1367,28 +1369,6 @@
     renderItems();
     renderSuggest();
     renderStoreLimit();
-  }
-
-  function renderStoreLimit() {
-    const box = document.getElementById('store-limit');
-    if (!box) return;
-    const n = state.maxStores;
-    box.innerHTML = `
-      <div class="stepper">
-        <button data-action="stores" data-d="-1" aria-label="Fewer stores" ${n === 1 ? 'disabled' : ''}>&minus;</button>
-        <div><b>${n || 'Any'}</b><span>${n ? (n === 1 ? 'store' : 'stores') : 'number of stores'}</span></div>
-        <button data-action="stores" data-d="1" aria-label="More stores" ${!n ? 'disabled' : ''}>+</button>
-      </div>
-      <button class="chip ${n ? '' : 'on'}" data-action="nolimit">No limit, find the best price anywhere</button>`;
-  }
-
-  function setRadius(v, from) {
-    const r = Math.min(MAX_RADIUS, Math.max(0.5, Math.round((Number(v) || 0.5) * 2) / 2));
-    state.radius = r;
-    const range = document.getElementById('radius'), num = document.getElementById('radius-num');
-    if (range && from !== 'range') range.value = r;
-    if (num && from !== 'num') num.value = r;
-    if (range) range.style.setProperty('--fill', r / MAX_RADIUS * 100 + '%');
   }
 
   app.addEventListener('click', e => {
