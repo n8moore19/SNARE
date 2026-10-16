@@ -55,7 +55,7 @@
       localStorage.setItem(STORE_KEY, JSON.stringify({
         priceAlerts: state.priceAlerts, rescueAlerts: state.rescueAlerts, trips: state.trips,
         joinedGroups: state.joinedGroups, userPosts: state.userPosts, userComments: state.userComments,
-        votes: state.votes, communityStops: state.communityStops,
+        votes: state.votes,
       }));
     } catch (e) { /* storage blocked, keep working in memory */ }
   }
@@ -83,7 +83,8 @@
     userPosts: saved.userPosts || [],
     userComments: saved.userComments || {},
     votes: saved.votes || {},
-    communityStops: saved.communityStops || [],
+    communityStops: [], // for this visit only, like the list
+    planDirty: false,   // list or stops changed since the last trip was planned
     communityView: 'mine',
     groupId: null,
     openComments: [],
@@ -567,8 +568,9 @@
     app.innerHTML = `
       <section class="screen plan">
         ${band('Step 1 of 2', 'Plan my trip', 'Your list, your distance, your budget.')}
+        ${state.planDirty && result ? '<div class="banner ok changed"><strong>Your list changed</strong>Hit Find my best trip to update your route with what you added.</div>' : ''}
 
-        <div class="card">
+        <div class="card list-card">
           <h2>What do you need? <small id="count"></small></h2>
           <div class="search">
             <input id="q" type="text" placeholder="Search items, like milk or rice" autocomplete="off" value="${esc(state.query)}">
@@ -577,6 +579,7 @@
           <div class="quick">${QUICK.map(id => `<button class="chip" data-action="add" data-id="${id}">+ ${products[id].name}</button>`).join('')}</div>
           <ul id="items" class="items"></ul>
         </div>
+        ${extraStopsCard()}
 
         <div class="card">
           <h2>Where are you starting?</h2>
@@ -640,6 +643,28 @@
     if (range) range.style.setProperty('--fill', r / MAX_RADIUS * 100 + '%');
   }
 
+  function extraStopsCard() {
+    const tips = tipStops();
+    const savedDeals = state.rescueAdded.map(id => rescues[id]);
+    const n = tips.length + savedDeals.length;
+    if (!n) return '';
+    const short = t => t.length > 60 ? t.slice(0, 57).trim() + '...' : t;
+    return `<div class="card extras">
+      <h2>Extra stops <small>${plural(n, 'stop')}</small></h2>
+      <p class="card-note">Added from Community and Alerts. Community tips become stops on your route and don't change your prices.</p>
+      <ul class="items">
+        ${tips.map(t => `<li>
+          <div><strong>${esc(t.place)}</strong><span><span class="src">Community tip</span>${esc(short(t.text))}</span></div>
+          <button class="remove" data-action="tip" data-id="${t.id}" aria-label="Remove stop">&times;</button>
+        </li>`).join('')}
+        ${savedDeals.map(r => `<li>
+          <div><strong>${r.name}, ${money(r.price)}</strong><span><span class="src">Rescue deal</span>${stores[r.store].name}. Added if your route stops there.</span></div>
+          <button class="remove" data-action="rescue" data-id="${r.id}" aria-label="Remove deal">&times;</button>
+        </li>`).join('')}
+      </ul>
+    </div>`;
+  }
+
   function renderItems() {
     const ul = document.getElementById('items');
     if (!ul) return;
@@ -647,7 +672,7 @@
       ? state.items.map(it => {
         const p = products[it.id];
         return `<li>
-            <div><strong>${p.name}</strong><span>${p.unit}</span></div>
+            <div><strong>${p.name}${it.from ? `<span class="src">From ${it.from}</span>` : ''}</strong><span>${p.unit}</span></div>
             <div class="qty">
               <button data-action="qty" data-id="${it.id}" data-d="-1" aria-label="Fewer">&minus;</button>
               <b>${it.qty}</b>
@@ -1313,12 +1338,16 @@
   }
 
   function openTab(tab) {
-    if (tab === 'plan') go(result && state.items.length ? 'results' : 'home');
+    if (tab === 'plan') {
+      const hasPlan = state.items.length || state.communityStops.length || state.rescueAdded.length;
+      go(result && !state.planDirty ? 'results' : hasPlan ? 'plan' : 'home');
+    }
     else go(tab);
   }
 
   function findTrip() {
     state.extraStops = [];
+    state.planDirty = false;
     state.loggedTrip = false;
     go('loading');
     setTimeout(() => {
@@ -1433,7 +1462,11 @@
       case 'rescue':
         state.rescueAdded = state.rescueAdded.includes(id) ? state.rescueAdded.filter(x => x !== id) : [...state.rescueAdded, id];
         if (state.screen === 'results') replan(true);
-        else rerender();
+        else {
+          state.planDirty = true;
+          if (state.screen === 'alerts' && state.rescueAdded.includes(id)) toast('Saved to Extra stops on Plan');
+          rerender();
+        }
         break;
       case 'watch': {
         const name = products[id].name;
@@ -1478,8 +1511,9 @@
       }
       case 'listadd':
         if (!state.items.some(it => it.id === id)) {
-          state.items.push({ id, qty: 1 });
-          toast(`${products[id].name} added to your list`);
+          state.items.push({ id, qty: 1, from: 'Alerts' });
+          state.planDirty = true;
+          toast(`${products[id].name} added to your list on Plan`);
         }
         rerender();
         break;
@@ -1556,8 +1590,8 @@
         state.communityStops = on ? state.communityStops.filter(x => x !== id) : [...state.communityStops, id];
         persist();
         if (state.screen === 'results') { replan(true); break; }
-        if (result) result = plan();
-        toast(on ? 'Removed from your route' : result ? 'Added as a stop on your trip' : 'Added as a stop on your next trip');
+        state.planDirty = true;
+        if (state.screen !== 'plan') toast(on ? 'Removed from your route' : 'Added to Extra stops on Plan');
         rerender();
         break;
       }
