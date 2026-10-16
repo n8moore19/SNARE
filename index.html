@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#004230">
+  <title>SNARE Trip Planner</title>
+  <meta name="description" content="SNARE prototype: plan the best grocery trip for your list, budget and distance.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="expand-toggle" id="expand" type="button"></button>
+
+  <!-- Shown beside the phone on wide screens, for screen recordings -->
+  <aside class="pitch" aria-hidden="true">
+    <div class="pitch-brand">snare<span class="dot"></span></div>
+    <h2><span class="hl">Make</span> every food dollar count.</h2>
+    <p>Plan the cheapest realistic grocery trip, catch rescue deals before food goes to waste, and find free food nearby. All in one place.</p>
+    <div class="sdgs"><span>SDG 12.3 Halve food waste</span><span>SDG 2 Zero Hunger</span></div>
+    <small>Team SNARE · Ivey Venturing Field Project prototype</small>
+  </aside>
+
+  <div class="device">
+    <div class="phone">
+      <div class="status" aria-hidden="true">
+        <b>9:41</b>
+        <span class="island"></span>
+        <span class="status-icons">
+          <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+          <svg width="26" height="12" viewBox="0 0 26 12"><rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="17" height="8" rx="1.8"/><rect x="23.5" y="4" width="2" height="4" rx="1" opacity="0.5"/></svg>
+        </span>
+      </div>
+      <div class="viewport" id="viewport">
+        <header class="bar">
+          <button class="back" id="back" aria-label="Back" hidden>&#8249;</button>
+          <button class="brand" data-action="home" aria-label="SNARE home">snare<span class="dot"></span></button>
+          <span class="demo-tag">Demo data</span>
+        </header>
+        <main id="app"></main>
+      </div>
+      <nav class="tabs" id="tabs" aria-label="Main"></nav>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
