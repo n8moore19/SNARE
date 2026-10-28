@@ -1,0 +1,14 @@
+# Cloudflare Worker that lets the SNARE prototype talk to Claude without
+# putting the API key in the public website. See README.md for setup.
+name = "snare-ai"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Sites allowed to call this worker (comma separated).
+ALLOWED_ORIGINS = "https://n8moore19.github.io"
+# Claude model. claude-opus-5-5 is the default; claude-haiku-5-5 is much cheaper.
+MODEL = "claude-opus-5-5"
+
+# The API key is a secret, set with: npx wrangler secret put ANTHROPIC_API_KEY

@@ -1486,140 +1486,624 @@
       </section>`;
   }
 
-  // ---------- AI assistant (simulated) ----------
-  // aiReply() is the single place a real model would plug in: send the
-  // message plus the fridge, profile and list as context through a small
-  // server proxy, and map its tool calls onto the same actions used below.
+  // ---------- AI assistant ----------
+  // Two brains share one chat. If window.SNARE_AI_URL is set (config.js), each
+  // message goes to a small server that asks Claude, sending the app state as
+  // context. Otherwise, or if that call fails, the scripted brain below answers
+  // using the same app data. Both return { html, actions } and can act on the app.
 
   const AI_CHIPS = {
-    fridge: ['What can I make tonight?', 'What should I use first?', 'Is my chicken still good?'],
-    meals: ['Something under $3 a serving', 'Make it vegetarian', "Remember I don't like mushrooms"],
-    recipe: ['What can I swap in?', 'Is this cheap to make?', 'Add the missing items'],
-    shop: ['Plan my cheapest trip', "What's on sale near me?", 'What can I make tonight?'],
-    impact: ['How much have I saved?', 'What can I make tonight?', 'What should I use first?'],
+    fridge: ['What can I make tonight?', 'What should I use first?', 'Plan my meals for the week'],
+    meals: ['Something quick under $3', 'Make it vegetarian', "Remember I don't like mushrooms"],
+    recipe: ['What do I need for this?', 'What can I swap in?', 'Add the missing items'],
+    shop: ['Plan my cheapest trip', "What's on sale near me?", 'How much will my list cost?'],
+    impact: ['How much have I saved?', 'Plan my meals for the week', 'What should I use first?'],
   };
 
+  // Conversation memory for follow-ups ("the second one", "cheaper", "yes").
+  const aiCtx = { lastRecipes: [], lastRecipe: null, lastProduct: null, lastQuery: null, offset: 0, pending: null, awaitingRating: null };
+  const aiHistory = []; // plain text turns sent to the live model
+
   function aiAct(label, act, arg = '') {
-    return `<button class="btn small ${act === 'trip' || act === 'recipe' ? '' : 'outline'}" data-action="aiact" data-act="${act}" data-arg="${arg}">${label}</button>`;
+    const primary = ['trip', 'recipe', 'addall', 'addmissing'].includes(act);
+    return `<button class="btn small ${primary ? '' : 'outline'}" data-action="aiact" data-act="${act}" data-arg="${esc(arg)}">${esc(label)}</button>`;
   }
 
-  function mealMini(a) {
-    return `<div class="ai-meal"><strong>${a.r.name}</strong><span>${reasons(a)[0] || `${a.r.time} min`}${a.need.length ? ` · ${plural(a.need.length, 'item')} to buy` : ' · nothing to buy'}</span>${aiAct('Open', 'recipe', a.r.id)}</div>`;
+  // ----- understanding the message -----
+
+  const PRODUCT_ALIASES = {
+    beef: 'ground_beef', 'ground beef': 'ground_beef', mince: 'ground_beef', hamburger: 'ground_beef',
+    chicken: 'chicken_thighs', 'chicken thigh': 'chicken_thighs', 'chicken breast': 'chicken_breast',
+    cheese: 'cheddar', pepper: 'bell_pepper', 'red pepper': 'bell_pepper', capsicum: 'bell_pepper',
+    beans: 'black_beans', 'black bean': 'black_beans', scallion: 'green_onions', 'green onion': 'green_onions',
+    egg: 'eggs', spaghetti: 'pasta', noodle: 'pasta', 'tomato sauce': 'pasta_sauce', marinara: 'pasta_sauce', sauce: 'pasta_sauce',
+    tortilla: 'tortillas', wrap: 'tortillas', yoghurt: 'yogurt', 'sour cream': 'yogurt', toast: 'bread',
+    potato: 'potatoes', tomato: 'tomatoes', salad: 'lettuce', oatmeal: 'oats', 'leftover rice': 'cooked_rice',
+    leftover: 'leftovers', 'frozen veg': 'frozen_veg', 'frozen vegetable': 'frozen_veg', veggies: 'frozen_veg',
+    'frozen spinach': 'frozen_spinach', lentil: 'lentils', banana: 'bananas', apple: 'apples', carrot: 'carrots',
+    onion: 'onions', mushroom: 'mushrooms', cucumber: 'cucumber', milk: 'milk', rice: 'rice', tofu: 'tofu', tuna: 'tuna',
+  };
+  const RECIPE_ALIASES = {
+    omelette: ['omelette', 'omelet'], friedrice: ['fried rice'], quesadilla: ['quesadilla'], burritobowl: ['burrito bowl', 'burrito'],
+    stirfry: ['stir fry', 'stirfry', 'stir-fry'], tomatopasta: ['tomato pasta', 'tomato spinach pasta', 'one pot pasta'],
+    shakshuka: ['shakshuka'], lentilcurry: ['lentil curry', 'curry', 'dal', 'dahl'], tacos: ['taco'], tofubowl: ['tofu bowl', 'tofu rice bowl'],
+    pancakes: ['pancake'], potatoes: ['loaded potato', 'baked potato', 'microwave potato'], tunapasta: ['tuna pasta', 'pasta salad'],
+    mushroompasta: ['mushroom pasta', 'creamy pasta'], parfait: ['parfait'], frenchtoast: ['french toast'],
+    beefchili: ['beef chili', 'beef and bean chili', 'chili con carne'], chili: ['veggie chili', 'vegetarian chili', 'veggie bean chili'],
+    wraps: ['chicken wrap', 'veggie wrap', 'chicken veggie wrap'],
+  };
+
+  // Hand picked aliases win; then full names, ids, keywords and the last word
+  // of a name ("Fresh spinach" also answers to "spinach").
+  const aliasList = (() => {
+    const map = new Map(Object.entries(PRODUCT_ALIASES));
+    const add = (a, id) => { if (a.length > 2 && !map.has(a)) map.set(a, id); };
+    for (const p of D.products) {
+      const name = p.name.toLowerCase();
+      add(name, p.id);
+      add(name.replace(/s$/, ''), p.id);
+      add(p.id.replace(/_/g, ' '), p.id);
+      (p.keywords || '').split(' ').filter(w => w.length > 3).forEach(w => add(w, p.id));
+      const last = name.split(' ').pop();
+      if (last.length > 3 && !p.leftover) add(last.replace(/s$/, ''), p.id);
+    }
+    return [...map.entries()].sort((a, b) => b[0].length - a[0].length);
+  })();
+
+  const wordRe = w => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(e?s)?\\b`, 'i');
+
+  // Products mentioned, in order, without double counting overlapping words.
+  function findProducts(text) {
+    let t = ' ' + text.toLowerCase() + ' ';
+    const found = [];
+    for (const [alias, id] of aliasList) {
+      const m = t.match(wordRe(alias));
+      if (!m) continue;
+      let pid = id;
+      if (alias === 'chicken' && fridgeAll().some(f => f.id === 'chicken_breast')) pid = 'chicken_breast';
+      found.push({ id: pid, at: m.index });
+      t = t.slice(0, m.index) + ' '.repeat(m[0].length) + t.slice(m.index + m[0].length);
+    }
+    return [...new Map(found.sort((a, b) => a.at - b.at).map(f => [f.id, f])).keys()];
   }
 
-  function productsIn(text) {
-    return D.products.filter(p => {
-      const words = [p.name.toLowerCase(), p.id.replace('_', ' '), ...(p.keywords || '').split(' ')].filter(w => w.length > 2);
-      return words.some(w => text.includes(w.replace(/s$/, '')));
-    });
+  function findRecipe(text) {
+    const t = text.toLowerCase();
+    let best = null;
+    for (const r of D.recipes) {
+      for (const a of [r.name.toLowerCase(), ...(RECIPE_ALIASES[r.id] || [])]) {
+        if (wordRe(a).test(t) && (!best || a.length > best.len)) best = { id: r.id, len: a.length };
+      }
+    }
+    if (/\bchili\b/.test(t) && !best) {
+      const ranked = rankedMeals('all').map(a => a.r.id);
+      best = { id: ranked.indexOf('beefchili') !== -1 && (ranked.indexOf('chili') === -1 || ranked.indexOf('beefchili') < ranked.indexOf('chili')) ? 'beefchili' : 'chili' };
+    }
+    return best ? best.id : null;
   }
+
+  // "the second one", "that", "it" after a list of meals.
+  function recipeFromContext(text) {
+    const t = text.toLowerCase();
+    const ord = [['first', 0], ['1st', 0], ['second', 1], ['2nd', 1], ['third', 2], ['3rd', 2], ['last', -1]]
+      .find(([w]) => new RegExp(`\\b(the ${w}|${w} one|${w} recipe|${w} meal)\\b`).test(t));
+    if (ord && aiCtx.lastRecipes.length) return aiCtx.lastRecipes[ord[1] < 0 ? aiCtx.lastRecipes.length - 1 : Math.min(ord[1], aiCtx.lastRecipes.length - 1)];
+    if (/\b(it|that|this|that one|this one|the recipe)\b/.test(t)) return aiCtx.lastRecipe || (state.screen === 'recipe' ? state.recipeId : null);
+    return null;
+  }
+
+  function parseFilters(text) {
+    const t = text.toLowerCase();
+    const f = {};
+    const min = t.match(/(\d+)\s*(min|minute)/);
+    if (min) f.maxTime = Number(min[1]);
+    else if (/\b(quick|fast|easy|lazy|no time|in a hurry)\b/.test(t)) f.maxTime = 15;
+    const under = t.match(/(under|below|less than|max)\s*\$?\s*(\d+(\.\d+)?)/);
+    if (under) f.maxCost = Number(under[2]);
+    else if (/\b(cheap|cheapest|budget|broke|save money|inexpensive)\b/.test(t)) f.maxCost = 3;
+    if (/\bvegan\b/.test(t)) f.diet = 'vegan';
+    else if (/\bvegetarian|veggie|meatless|no meat\b/.test(t)) f.diet = 'vegetarian';
+    if (/gluten[ -]?free/.test(t)) f.glutenFree = true;
+    const meal = t.match(/\b(breakfast|lunch|dinner|supper)\b/);
+    if (meal) f.meal = meal[1] === 'supper' ? 'dinner' : meal[1];
+    if (/(nothing to buy|without (going )?shopping|no shopping|what i (already )?have|only what i have|ready now|without buying)/.test(t)) f.ready = true;
+    const withM = t.match(/\b(with|using|use up|uses|has)\s+(.+?)(\?|$|\band\b|,)/);
+    if (withM) f.with = findProducts(withM[2]).filter(id => !products[id].leftover || fridgeAll().some(x => x.id === id));
+    const without = t.match(/\b(without|no|minus|except)\s+(.+?)(\?|$|,)/);
+    if (without && !f.ready) f.without = findProducts(without[2]);
+    const serves = t.match(/for\s+(\d+)\s*(people|of us|servings|person)/);
+    if (serves) f.serves = Number(serves[1]);
+    return f;
+  }
+
+  function mealsFor(f) {
+    let list = rankedMeals('all');
+    if (f.maxTime) list = list.filter(a => a.r.time <= f.maxTime);
+    if (f.maxCost != null) list = list.filter(a => a.perServing <= f.maxCost);
+    if (f.diet === 'vegan') list = list.filter(a => recipeTags(a.r).includes('Vegan'));
+    if (f.diet === 'vegetarian') list = list.filter(a => recipeTags(a.r).some(t => t === 'Vegetarian' || t === 'Vegan'));
+    if (f.glutenFree) list = list.filter(a => recipeTags(a.r).includes('Gluten free'));
+    if (f.meal) list = list.filter(a => a.r.meal === f.meal || (f.meal === 'lunch' && a.r.meal === 'dinner'));
+    if (f.ready) list = list.filter(a => !a.need.length);
+    if (f.with && f.with.length) list = list.filter(a => f.with.every(id => a.r.ingredients.some(i => i.id === id || (i.alt || []).includes(id))));
+    if (f.without && f.without.length) list = list.filter(a => !f.without.some(id => a.r.ingredients.some(i => !i.opt && i.id === id)));
+    if (f.serves) list = [...list].sort((a, b) => (b.r.serves >= f.serves) - (a.r.serves >= f.serves));
+    return list;
+  }
+
+  function describeFilters(f) {
+    const bits = [];
+    if (f.maxTime) bits.push(`under ${f.maxTime} min`);
+    if (f.maxCost != null) bits.push(`under ${money(f.maxCost)} a serving`);
+    if (f.diet) bits.push(f.diet);
+    if (f.glutenFree) bits.push('gluten free');
+    if (f.meal) bits.push(f.meal);
+    if (f.ready) bits.push('nothing to buy');
+    if (f.with && f.with.length) bits.push('with ' + listText(f.with.map(id => lower(products[id].name))));
+    if (f.without && f.without.length) bits.push('without ' + listText(f.without.map(id => lower(products[id].name))));
+    return bits.join(', ');
+  }
+
+  function mealMini(a, i) {
+    return `<div class="ai-meal"><strong>${i != null ? `${i + 1}. ` : ''}${a.r.name}</strong><span>${reasons(a)[0] || `${a.r.time} min`} · ${a.need.length ? `${plural(a.need.length, 'item')} to buy, ${money(a.perServing)}/serving` : 'nothing to buy'}</span>${aiAct('Open', 'recipe', a.r.id)}</div>`;
+  }
+
+  function showMeals(list, intro, f) {
+    const top = list.slice(aiCtx.offset, aiCtx.offset + 3);
+    if (!top.length) {
+      return { html: `I couldn't find a meal ${f && describeFilters(f) ? `that's ${describeFilters(f)}` : 'that fits'}. Want me to loosen it up? Try "something under $4" or "with what I have".`, actions: [] };
+    }
+    aiCtx.lastRecipes = top.map(a => a.r.id);
+    aiCtx.lastRecipe = top[0].r.id;
+    const skipped = P().dislikes.length ? ` (skipping ${listText(P().dislikes.map(id => lower(products[id].name)))}, like you asked)` : '';
+    const more = list.length > aiCtx.offset + 3 ? '<p class="ai-hint">Say "more" for other ideas, or "the second one" to dig in.</p>' : '';
+    const firstNeeds = top[0].need.length;
+    if (firstNeeds) aiCtx.pending = { act: 'addmissing', arg: top[0].r.id, label: `add the ${plural(firstNeeds, 'item')} for ${top[0].r.name}` };
+    return {
+      html: `${intro}${skipped}:${top.map((a, i) => mealMini(a, i)).join('')}${more}`,
+      actions: firstNeeds ? [aiAct(`Add missing for ${top[0].r.name}`, 'addmissing', top[0].r.id)] : [aiAct(`Cook ${top[0].r.name}`, 'recipe', top[0].r.id)],
+    };
+  }
+
+  // Greedy week plan: each pick uses up what's expiring, then the next pick
+  // works with what's left. Dinners first, no repeats.
+  function planWeek(n) {
+    const used = new Set();
+    const picks = [];
+    const all = D.recipes.filter(dietOk);
+    for (let i = 0; i < n; i++) {
+      const scored = all.filter(r => !picks.includes(r) && r.meal !== 'breakfast').map(r => {
+        const a = analyse(r);
+        const fresh = a.expiring.filter(h => !used.has(h.f.uid));
+        return { r, a, s: a.score - (a.expiring.length - fresh.length) * 11 };
+      }).sort((x, y) => y.s - x.s);
+      if (!scored.length) break;
+      picks.push(scored[0].r);
+      scored[0].a.have.filter(h => products[h.f.id].life <= 10).forEach(h => used.add(h.f.uid));
+    }
+    const plans = picks.map(r => analyse(r));
+    const need = [...new Set(plans.flatMap(a => a.need.map(m => m.ing.id)))].filter(id => !state.items.some(it => it.id === id));
+    const cost = need.reduce((t, id) => t + ((bestNearby(id) || {}).price || products[id].base), 0);
+    return { plans, need, cost };
+  }
+
+  // "Can you add milk to my list?" is a request, not a question.
+  const isQuestion = t => !/^(can|could|would|will) you\b|^please\b/.test(t.trim()) && /\?|^(what|how|when|where|which|can|could|should|is|are|do|does|will|why)\b/.test(t.trim());
+
+  // ----- the scripted brain -----
 
   function aiReply(raw) {
-    const text = raw.toLowerCase();
+    const text = raw.trim();
+    const t = text.toLowerCase();
     const say = (html, actions = []) => ({ html, actions });
+    const prods = findProducts(t);
+    const onRecipe = state.screen === 'recipe' && /(need|swap|substitut|cost|how long|steps|make this|missing|ingredient|freeze|leftover|serve|for \d|double|cheap|price)/.test(t) ? state.recipeId : null;
+    const rid = findRecipe(t) || recipeFromContext(t) || onRecipe;
 
-    // Memory: dislikes, allergies and diets
-    if (/(remember|don'?t like|do not like|don'?t eat|hate|allergic|i'?m (vegetarian|vegan|halal))/.test(text)) {
-      const diet = DIETS.find(([v]) => text.includes(v === 'gluten' ? 'gluten' : v === 'dairy' ? 'dairy free' : v));
-      if (diet && !/(don'?t|not)/.test(text.split(diet[0])[0].slice(-12))) {
-        if (!P().diet.includes(diet[0])) P().diet.push(diet[0]);
-        persist();
-        return say(`Got it, I'll remember you're <b>${lower(diet[1])}</b>. Your meals now only show recipes that fit.`, [aiAct('See meals', 'tab', 'meals')]);
-      }
-      const found = productsIn(text).filter(p => !p.leftover);
-      if (found.length) {
-        found.forEach(p => { if (!P().dislikes.includes(p.id)) P().dislikes.push(p.id); });
-        persist();
-        const hidden = D.recipes.filter(r => found.some(p => r.ingredients.some(i => !i.opt && (i.id === p.id || (i.alt || []).includes(p.id))))).length;
-        return say(`Got it, I'll remember you don't eat <b>${listText(found.map(p => lower(p.name)))}</b>. I've hidden ${plural(hidden, 'recipe')} that ${hidden === 1 ? 'needs' : 'need'} it. You can change this anytime in your profile.`, [aiAct('See meals', 'tab', 'meals'), aiAct('What I remember', 'profile')]);
-      }
-      return say("Tell me what to remember, like \"I don't like mushrooms\" or \"I'm vegetarian\".");
+    // Yes / no to a suggestion
+    if (aiCtx.pending && /^(yes|yeah|yep|yup|sure|ok|okay|do it|please|go ahead|sounds good|let'?s do it|perfect)\b/.test(t)) {
+      const p = aiCtx.pending;
+      aiCtx.pending = null;
+      const done = runAiAction(p.act, p.arg, true);
+      return say(`Done, I ${done || p.label}.`, p.act === 'addmissing' || p.act === 'addall' ? [aiAct('Plan my cheapest trip', 'trip'), aiAct('Open list', 'tab', 'shop')] : []);
+    }
+    if (aiCtx.pending && /^(no|nah|nope|not now|maybe later)\b/.test(t)) {
+      aiCtx.pending = null;
+      return say("No problem. Anything else?");
     }
 
-    // Food safety
-    if (/(safe|still good|gone bad|go bad|smell|expired|best before|spoiled|off\b)/.test(text)) {
-      const mentioned = productsIn(text);
-      const item = fridgeAll().find(f => mentioned.some(p => p.id === f.id)) || expiringItems()[0];
-      const general = 'Best before dates are about quality, not safety (CFIA), but raw meat, fish and leftovers are the ones to be strict about. If it smells sour, feels slimy or looks off, throw it out. <b>When in doubt, throw it out.</b>';
-      if (!item) return say(general);
-      const p = products[item.id], d = daysHi(item);
-      const top = rankedMeals('all').find(a => a.have.some(h => h.f.uid === item.uid));
-      return say(`<b>${esc(itemName(item))}</b>: ${d <= 0 ? 'past its usual window' : `about <b>${plural(d, 'day')} left</b>`} by our estimate. ${p.flags && p.flags.includes('meat') ? 'Raw meat usually keeps 1 to 2 days in the fridge, so cook it today or freeze it.' : ''} ${general}`,
-        top ? [aiAct(`Cook ${top.r.name}`, 'recipe', top.r.id)] : []);
+    // Rating right after cooking
+    if (aiCtx.awaitingRating && /(loved|liked|love it|good|great|tasty|delicious|amazing|yum)/.test(t) && !/(not|didn'?t)/.test(t)) {
+      state.ratings[aiCtx.awaitingRating] = 1; persist();
+      const r = recipes[aiCtx.awaitingRating]; aiCtx.awaitingRating = null;
+      return say(`Noted! I'll rank meals like <b>${r.name}</b> higher from now on.`, [aiAct('See meals', 'tab', 'meals')]);
+    }
+    if (aiCtx.awaitingRating && /(didn'?t like|bad|gross|meh|not great|hated|not good|bland)/.test(t)) {
+      state.ratings[aiCtx.awaitingRating] = -1; persist();
+      const r = recipes[aiCtx.awaitingRating]; aiCtx.awaitingRating = null;
+      return say(`Got it. I won't suggest <b>${r.name}</b> again.`);
     }
 
-    // Trip planning
-    if (/(trip|route|cheapest (store|way|place)|which store|plan my|where should i shop|grocer)/.test(text)) {
+    // Memory: forget, diet, dislikes, allergies
+    if (/\bforget\b/.test(t)) {
+      const gone = prods.filter(id => P().dislikes.includes(id));
+      if (gone.length) { P().dislikes = P().dislikes.filter(id => !gone.includes(id)); persist(); return say(`Okay, I've forgotten that you don't eat ${listText(gone.map(id => lower(products[id].name)))}.`); }
+      const diet = DIETS.find(([v]) => t.includes(v === 'gluten' ? 'gluten' : v));
+      if (diet && P().diet.includes(diet[0])) { P().diet = P().diet.filter(d => d !== diet[0]); persist(); return say(`Okay, I'm no longer filtering for ${lower(diet[1])}.`); }
+    }
+    const dietM = t.match(/\b(i'?m|i am|i eat|remember i'?m|i'?ve gone|i went)\s+(a\s+)?(vegetarian|vegan|halal|gluten[ -]?free|dairy[ -]?free)/);
+    if (dietM) {
+      const key = dietM[3].startsWith('gluten') ? 'gluten' : dietM[3].startsWith('dairy') ? 'dairy' : dietM[3];
+      if (!P().diet.includes(key)) P().diet.push(key);
+      if (key === 'vegan' && !P().diet.includes('vegetarian')) P().diet.push('vegetarian');
+      persist();
+      const n = D.recipes.filter(dietOk).length;
+      return say(`Got it, I'll remember you're <b>${lower(DIETS.find(d => d[0] === key)[1])}</b>. ${plural(n, 'recipe')} fit.`, [aiAct('See meals', 'tab', 'meals')]);
+    }
+    if (/(don'?t like|do not like|don'?t eat|can'?t eat|hate|allergic|not a fan of|never eat|no more)/.test(t) && prods.length) {
+      const add = prods.filter(id => !products[id].leftover);
+      add.forEach(id => { if (!P().dislikes.includes(id)) P().dislikes.push(id); });
+      persist();
+      const hidden = D.recipes.filter(r => add.some(id => r.ingredients.some(i => !i.opt && (i.id === id || (i.alt || []).includes(id))))).length;
+      const allergy = /allergic/.test(t) ? ' Always double check labels, since I only filter my own recipes.' : '';
+      return say(`Got it, I'll remember you don't eat <b>${listText(add.map(id => lower(products[id].name)))}</b>. I've hidden ${plural(hidden, 'recipe')} that ${hidden === 1 ? 'needs' : 'need'} it.${allergy}`, [aiAct('See meals', 'tab', 'meals'), aiAct('What I remember', 'profile')]);
+    }
+
+    // Budget
+    const budgetM = t.match(/budget\D{0,12}\$?\s*(\d{2,3})|\$\s*(\d{2,3})\s*(a|per|this|for the)\s*week/);
+    if (budgetM && !isQuestion(t)) {
+      P().budget = Number(budgetM[1] || budgetM[2]); persist();
+      return say(`Updated: your weekly food budget is now <b>${money(P().budget)}</b>. I'll check trips against it.`);
+    }
+
+    // Week plan
+    const weekM = t.match(/(plan|meal plan|meals? for|cook for|dinners? for)\b.*\b(week|weekdays|next (\d+) days)|(\d+)\s+(dinners|meals|days of (meals|dinners))/);
+    if (weekM) {
+      const n = Math.min(7, Number(weekM[3] || weekM[4]) || 5);
+      const { plans, need, cost } = planWeek(n);
+      if (!plans.length) return say("I couldn't build a plan with your current filters. Try loosening your diet settings.");
+      aiCtx.lastRecipes = plans.map(a => a.r.id);
+      aiCtx.lastRecipe = plans[0].r.id;
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const start = (new Date().getDay() + 6) % 7;
+      const leftover = P().budget - cost - state.items.reduce((s, it) => s + ((bestNearby(it.id) || {}).price || 0) * it.qty, 0);
+      if (need.length) aiCtx.pending = { act: 'addall', arg: need.join(','), label: `add ${plural(need.length, 'item')} to your list` };
+      return say(`Here's ${n} days built around what expires first:${plans.map((a, i) => `<div class="ai-meal"><strong>${days[(start + i) % 7]}: ${a.r.name}</strong><span>${reasons(a)[0] || `${a.r.time} min`}</span>${aiAct('Open', 'recipe', a.r.id)}</div>`).join('')}
+        <p>${need.length ? `You'd need <b>${plural(need.length, 'item')}</b> for about <b>${money(cost)}</b>, leaving roughly ${money(Math.max(0, leftover))} of your ${money(P().budget)} budget. Want me to add them to your list?` : 'You already have everything for this. Nice!'}</p>`,
+        need.length ? [aiAct(`Add all ${need.length} to list`, 'addall', need.join(',')), aiAct('Plan the trip', 'addalltrip', need.join(','))] : []);
+    }
+
+    // Fridge edits: bought, used, threw out, froze, opened
+    if (prods.length && !isQuestion(t)) {
+      const names = ids => listText(ids.map(id => lower(products[id].name)));
+      if (/(threw|thrown|tossed|went bad|gone off|go off|spoiled|moldy|mouldy|expired)/.test(t)) {
+        const hit = prods.map(id => fridgeAll().find(f => f.id === id)).filter(Boolean);
+        hit.forEach(f => tossItem(f)); persist();
+        return say(hit.length ? `Logged ${names(hit.map(f => f.id))} as wasted. I'll warn you sooner next time${hit.some(f => (state.tossLog[f.id] || 0) >= 2) ? ', and suggest a smaller pack' : ''}.` : "I don't see that in your fridge.");
+      }
+      if (/\bfreez/.test(t)) {
+        const hit = prods.map(id => fridgeAll().find(f => f.id === id && !f.frozen && products[id].freeze)).filter(Boolean);
+        hit.forEach(freezeItem); persist();
+        return say(hit.length ? `Moved ${names(hit.map(f => f.id))} to the freezer. ${hit.length === 1 ? 'It keeps' : 'They keep'} for months now.` : "That isn't in your fridge, or it doesn't freeze well.");
+      }
+      if (/\bopened\b/.test(t)) {
+        const hit = prods.map(id => fridgeAll().find(f => f.id === id)).filter(Boolean);
+        hit.forEach(markOpened); persist();
+        return say(hit.length ? hit.map(f => `<b>${itemName(f)}</b> is now ${rangeText(f).toLowerCase()}.`).join(' ') : "I don't see that in your fridge.");
+      }
+      if (/(i (just )?(used|ate|finished|used up)|ran out of|i'?m out of|out of|all gone|finished the)/.test(t)) {
+        const hit = prods.map(id => fridgeAll().find(f => f.id === id)).filter(Boolean);
+        state.fridge = state.fridge.filter(f => !hit.includes(f)); persist();
+        const buy = prods.filter(id => !products[id].leftover);
+        if (/out of/.test(t) && buy.length) aiCtx.pending = { act: 'addall', arg: buy.join(','), label: `add ${names(buy)} to your list` };
+        return say(`${hit.length ? `Removed ${names(hit.map(f => f.id))} from your fridge.` : ''} ${/out of/.test(t) && buy.length ? `Want me to add ${names(buy)} to your list?` : ''}`.trim() || 'Okay!',
+          /out of/.test(t) && buy.length ? [aiAct('Add to list', 'addall', buy.join(','))] : []);
+      }
+      if (/(add|put|place|stick).*(to|on|onto|in)\s+(my |the )?(shopping )?list|^(i need|need|buy|get|grab|pick up)\b|add .* to shop/.test(t)) {
+        const buy = prods.filter(id => !products[id].leftover);
+        buy.forEach(id => { if (!state.items.some(it => it.id === id)) state.items.push({ id, qty: 1, why: 'Added by chat' }); });
+        const total = buy.reduce((s, id) => s + ((bestNearby(id) || {}).price || 0), 0);
+        return say(`Added ${names(buy)} to your list, about ${money(total)} at the cheapest stores near you.`, [aiAct('Plan my cheapest trip', 'trip'), aiAct('Open list', 'tab', 'shop')]);
+      }
+      if (/(remove|take|delete).*(off|from)\s+(my |the )?list/.test(t)) {
+        state.items = state.items.filter(it => !prods.includes(it.id));
+        return say(`Took ${names(prods)} off your list.`);
+      }
+      if (/(i (just )?(bought|got|picked up|grabbed|have|ve got)|add .* (to|in) (my |the )?fridge|put .* in (my |the )?fridge|^got\b)/.test(t)) {
+        const added = prods.map(id => addToFridge(id, { src: /bought|picked|grabbed/.test(t) ? 'trip' : 'estimate' }));
+        state.highlight = added.map(a => a.uid); persist();
+        const usesAdded = a => a.have.filter(h => added.some(x => x.uid === h.f.uid)).length;
+        const top = rankedMeals('all').filter(usesAdded).sort((a, b) => usesAdded(b) - usesAdded(a) || b.score - a.score)[0];
+        if (top) { aiCtx.lastRecipe = top.r.id; aiCtx.lastRecipes = [top.r.id]; }
+        return say(`Added ${added.map(f => `<b>${itemName(f)}</b> (${rangeText(f).toLowerCase()})`).join(', ')} to your fridge.${top ? ` That works great in <b>${top.r.name}</b>.` : ''}`, top ? [aiAct(`Open ${top.r.name}`, 'recipe', top.r.id), aiAct('See fridge', 'tab', 'fridge')] : [aiAct('See fridge', 'tab', 'fridge')]);
+      }
+    }
+
+    // Cooked something
+    const cookedM = /(i (just )?(made|cooked)|cooked the|made the)\b/.test(t);
+    if (cookedM && rid) {
+      cook(rid);
+      aiCtx.awaitingRating = rid;
+      const r = recipes[rid];
+      return say(`Nice! I marked the fresh ingredients for <b>${r.name}</b> as used${r.serves >= 2 ? ' and added the leftovers to your fridge (good for 3 to 4 days)' : ''}. How was it?`, [aiAct('Loved it', 'rate', rid + ':1'), aiAct('Not for me', 'rate', rid + ':-1')]);
+    }
+
+    // "Add the missing items" for a recipe in view or just discussed
+    if (rid && /add (the |all )?(missing|ingredients|what i need)/.test(t)) {
+      const n = addMissing(rid);
+      return say(n ? `Added ${plural(n, 'item')} for <b>${recipes[rid].name}</b> to your list.` : `You already have everything for <b>${recipes[rid].name}</b> on hand or on your list.`, n ? [aiAct('Plan my cheapest trip', 'trip'), aiAct('Open list', 'tab', 'shop')] : []);
+    }
+
+    // Recipe questions
+    if (rid && !/(what can i make|ideas|suggest)/.test(t)) {
+      const a = analyse(recipes[rid]);
+      aiCtx.lastRecipe = rid;
+      const r = a.r;
+      if (/(how (do|to|would) (i )?(make|cook)|steps|instructions|method|recipe for)/.test(t)) {
+        return say(`<b>${r.name}</b> (${r.time} min, serves ${r.serves}):<ol>${r.steps.map(s => `<li>${s}</li>`).join('')}</ol>`, [aiAct('Open recipe', 'recipe', rid)]);
+      }
+      if (/(how long|how much time|take)/.test(t)) return say(`<b>${r.name}</b> takes about <b>${r.time} minutes</b> and serves ${r.serves}.`, [aiAct('Open recipe', 'recipe', rid)]);
+      if (/(cost|price|how much|expensive|cheap)/.test(t)) {
+        return say(`To finish <b>${r.name}</b> you'd spend about <b>${money(a.needCost)}</b> (${money(a.perServing)} per serving).${a.have.length ? ` You already have ${plural(a.have.length, 'ingredient')}.` : ''}`, a.need.length ? [aiAct('Add missing items', 'addmissing', rid)] : []);
+      }
+      if (/(freeze|leftover|keep|store)/.test(t)) return say(`Leftover ${lower(r.name)} keeps 3 to 4 days in the fridge (Health Canada). ${['beefchili', 'chili', 'lentilcurry', 'tomatopasta'].includes(rid) ? 'It also freezes really well for 2 to 3 months.' : 'Most of it freezes okay for a few weeks.'}`);
+      if (/(for (\d+)|double|half|scale)/.test(t)) {
+        const n = Number((t.match(/for (\d+)/) || [])[1]) || (t.includes('double') ? r.serves * 2 : Math.ceil(r.serves / 2));
+        return say(`<b>${r.name}</b> serves ${r.serves} as written. For ${n}, multiply everything by about <b>${(n / r.serves).toFixed(1)}</b>. Cooking time stays roughly the same.`);
+      }
+      if (/(swap|substitut|instead|replace|don'?t have)/.test(t)) {
+        const miss = a.need.map(m => m.ing.id);
+        const subs = miss.map(id => SUBS[id] ? `<li><b>${products[id].name}</b>: ${SUBS[id]}</li>` : '').join('');
+        return say(subs ? `For <b>${r.name}</b>, you could swap:<ul>${subs}</ul>` : `You have everything for <b>${r.name}</b>, no swaps needed.`);
+      }
+      if (/(need|ingredient|missing|have|shopping|buy|add)/.test(t)) {
+        if (a.need.length) aiCtx.pending = { act: 'addmissing', arg: rid, label: `add the ${plural(a.need.length, 'missing item')}` };
+        return say(`For <b>${r.name}</b>:<ul>${a.have.map(h => `<li>Have: ${lower(itemName(h.f))}</li>`).join('')}${a.need.map(n => `<li>Need: <b>${lower(products[n.ing.id].name)}</b>${n.best ? `, ${money(n.best.price)} at ${stores[n.best.store].name}${n.best.deal ? ' (sale)' : ''}` : ''}</li>`).join('')}</ul>${a.need.length ? 'Want me to add the missing ones to your list?' : 'You have it all, go cook!'}`,
+          a.need.length ? [aiAct(`Add ${a.need.length} missing`, 'addmissing', rid)] : [aiAct('Open recipe', 'recipe', rid)]);
+      }
+      const why = reasons(a);
+      if (a.need.length) aiCtx.pending = { act: 'addmissing', arg: rid, label: `add the ${plural(a.need.length, 'missing item')}` };
+      return say(`<b>${r.name}</b>: ${r.time} min, serves ${r.serves}, ${a.need.length ? `${plural(a.need.length, 'item')} to buy (${money(a.perServing)}/serving)` : 'nothing to buy'}.${why.length ? `<ul>${why.map(w => `<li>${w}</li>`).join('')}</ul>` : ''}${roommateNote(a) ? `<p>${roommateNote(a)}.</p>` : ''}`,
+        [aiAct('Open recipe', 'recipe', rid), ...(a.need.length ? [aiAct('Add missing', 'addmissing', rid)] : [])]);
+    }
+
+    // Item questions
+    const pid = prods[0] || (/(it|that)\b/.test(t) ? aiCtx.lastProduct : null);
+    if (pid && !/(what can i make|meal|recipe|cook|dinner|lunch|breakfast|ideas)/.test(t)) {
+      aiCtx.lastProduct = pid;
+      const p = products[pid];
+      const f = fridgeAll().find(x => x.id === pid);
+      if (/(swap|substitut|instead|replace|don'?t have|alternative)/.test(t)) return say(SUBS[pid] ? `Instead of <b>${lower(p.name)}</b>: ${SUBS[pid]}.` : `I don't have a good swap for ${lower(p.name)} yet.`);
+      if (/(store|keep it|keep them|fridge or|where should i keep)/.test(t) && !/(still|good|safe)/.test(t)) return say(storageTip(p));
+      if (/(price|cost|cheapest|where (can|do|should) i (buy|get)|on sale|deal)/.test(t)) {
+        const b = bestNearby(pid);
+        return say(b ? `Cheapest <b>${lower(p.name)}</b> near you is <b>${money(b.price)}</b> at ${stores[b.store].name}${b.deal ? ' (on sale this week)' : ''}. Regular price is about ${money(p.base)}.` : `I can't find ${lower(p.name)} within ${P().radius} km.`, b ? [aiAct('Add to list', 'additem', pid)] : []);
+      }
+      if (/(do i have|is there|have i got|any left)/.test(t)) return say(f ? `Yes, ${esc(f.qty)} of ${lower(itemName(f))}, ${rangeText(f).toLowerCase()} left${f.owner !== 'You' ? ` (it's ${f.owner === 'Shared' ? 'shared' : f.owner + "'s"})` : ''}.` : `No ${lower(p.name)} in your fridge. Want it on your list?`, f ? [] : [aiAct('Add to list', 'additem', pid)]);
+      if (/(safe|still good|gone bad|go bad|smell|expire|expiry|best before|how long|last|spoil|off\b)/.test(t)) {
+        const general = 'Best before dates are about quality, not safety (CFIA), but raw meat, fish and leftovers are the ones to be strict about. If it smells sour, feels slimy or looks off, throw it out. <b>When in doubt, throw it out.</b>';
+        if (!f) return say(`${p.name} usually keeps about <b>${p.life} days</b>${p.open ? ` unopened and ${p.open} days once opened` : ''} in the fridge${p.freeze ? `, or ${Math.round(p.freeze / 30)} months frozen` : ''}. ${general}`);
+        const top = rankedMeals('all').find(a => a.have.some(h => h.f.uid === f.uid));
+        if (top) { aiCtx.lastRecipe = top.r.id; }
+        return say(`<b>${esc(itemName(f))}</b>: ${rangeText(f).toLowerCase()} left. ${sourceText(f)} ${(p.flags || []).includes('meat') && daysHi(f) <= 2 ? 'Cook it today or freeze it.' : ''} ${general}`,
+          [...(top ? [aiAct(`Cook ${top.r.name}`, 'recipe', top.r.id)] : []), ...(p.freeze && !f.frozen ? [aiAct('Freeze it', 'freeze', pid)] : [])]);
+      }
+    }
+
+    // List and budget questions
+    if (/(my list|shopping list|list cost|cost of my list|how much will)/.test(t)) {
+      if (!state.items.length) return say('Your list is empty. Ask me for meal ideas and I can fill it with just what you need.');
+      const lines = state.items.map(it => ({ it, b: bestNearby(it.id) }));
+      const total = lines.reduce((s, x) => s + (x.b ? x.b.price * x.it.qty : 0), 0);
+      return say(`Your list is ${plural(state.items.length, 'item')}, about <b>${money(total)}</b> at the cheapest stores near you. That's ${total <= P().budget ? `${money(P().budget - total)} under` : `${money(total - P().budget)} over`} your ${money(P().budget)} weekly budget.`, [aiAct('Plan my cheapest trip', 'trip'), aiAct('Open list', 'tab', 'shop')]);
+    }
+
+    // Fridge overview
+    if (/(what'?s in my fridge|what do i have|my fridge|what have i got|inventory)/.test(t)) {
+      const all = fridgeAll().filter(f => !f.frozen);
+      if (!all.length) return say("Your fridge is empty. Scan it or tell me what you bought, like \"I bought eggs and spinach\".", [aiAct('Scan fridge', 'tab', 'fridge')]);
+      const soon = all.filter(f => daysLeft(f) <= USE_SOON);
+      return say(`You have ${plural(all.length, 'item')}${soon.length ? `, and these need using first:<ul>${soon.slice(0, 5).map(f => `<li><b>${esc(itemName(f))}</b>, ${rangeText(f).toLowerCase()}</li>`).join('')}</ul>` : ', and nothing is close to expiring.'}`, [aiAct('What can I make?', 'ask', 'What can I make tonight?')]);
+    }
+
+    // Trip planning, with optional changes
+    if (/(trip|route|which store|where should i shop|plan my (shop|groceries)|go shopping|cheapest store)/.test(t)) {
+      const changes = [];
+      if (/\b(walk|walking|on foot)\b/.test(t)) { P().mode = 'walk'; changes.push('walking'); }
+      if (/\b(bus|transit|ltc)\b/.test(t)) { P().mode = 'transit'; changes.push('by transit'); }
+      if (/\b(drive|driving|car)\b/.test(t)) { P().mode = 'car'; changes.push('by car'); }
+      const st = t.match(/(\d+|one|two|three)\s+stores?/);
+      if (st) { P().maxStores = { one: 1, two: 2, three: 3 }[st[1]] || Number(st[1]); changes.push(`up to ${plural(P().maxStores, 'store')}`); }
+      const kmM = t.match(/(\d+(\.\d+)?)\s*km/);
+      if (kmM) { P().radius = Number(kmM[1]); changes.push(`within ${P().radius} km`); }
+      persist();
       if (!state.items.length) {
         const top = rankedMeals('all').find(a => a.need.length);
-        return say(`Your list is empty. ${top ? `Want me to add what you need for <b>${top.r.name}</b>, then plan the cheapest trip?` : 'Add a few items first.'}`,
-          top ? [aiAct('Add and plan trip', 'addplan', top.r.id)] : [aiAct('Open Shop', 'tab', 'shop')]);
+        if (top) aiCtx.pending = { act: 'addplan', arg: top.r.id, label: `add what you need for ${top.r.name} and planned the trip` };
+        return say(`Your list is empty. ${top ? `Want me to add what you need for <b>${top.r.name}</b> (${listText(top.need.map(n => lower(products[n.ing.id].name)))}) and plan the trip?` : 'Add a few items first.'}`, top ? [aiAct('Add and plan trip', 'addplan', top.r.id)] : [aiAct('Open Shop', 'tab', 'shop')]);
       }
-      const b = state.items.map(it => bestNearby(it.id)).filter(Boolean);
-      const byStore = {};
-      b.forEach(x => { byStore[x.store] = (byStore[x.store] || 0) + 1; });
-      const main = Object.entries(byStore).sort((a, c) => c[1] - a[1])[0];
-      return say(`You have ${plural(state.items.length, 'item')} on your list. Most are cheapest at <b>${stores[main[0]].name}</b>. I'll compare every store within ${P().radius} km and plan the cheapest ${MODES[P().mode].label.toLowerCase()} route.`,
-        [aiAct('Plan my trip', 'trip'), aiAct('Open list', 'tab', 'shop')]);
+      aiCtx.pending = { act: 'trip', arg: '', label: 'planned your trip' };
+      return say(`${changes.length ? `Updated: ${changes.join(', ')}. ` : ''}I'll compare every store within ${P().radius} km for your ${plural(state.items.length, 'item')} and plan the cheapest ${MODES[P().mode].label.toLowerCase()} route. Ready?`, [aiAct('Plan my trip', 'trip'), aiAct('Open list', 'tab', 'shop')]);
     }
 
     // Deals
-    if (/(sale|deal|discount|flyer|cheap near)/.test(text)) {
+    if (/(sale|deal|discount|flyer|special)/.test(t)) {
       const near = nearbyStores();
-      const deals = D.deals.filter(d => near.some(s => s.id === d.store)).slice(0, 4);
+      const deals = D.deals.filter(d => near.some(s => s.id === d.store) && !P().dislikes.includes(d.product))
+        .sort((a, b) => (fridgeUseScore(b.product) - fridgeUseScore(a.product)));
       if (!deals.length) return say(`I don't see deals within ${P().radius} km. Try a longer distance in Shop.`, [aiAct('Open Shop', 'tab', 'shop')]);
-      return say(`On sale near ${esc(home().name)} this week:<ul>${deals.map(d => `<li><b>${products[d.product].name}</b> ${money(d.price)} at ${stores[d.store].name}</li>`).join('')}</ul>`,
+      return say(`On sale near ${esc(home().name)} this week, most useful for your meals first:<ul>${deals.slice(0, 5).map(d => `<li><b>${products[d.product].name}</b> ${money(d.price)} at ${stores[d.store].name} <s>${money(products[d.product].base)}</s></li>`).join('')}</ul>`,
         deals.slice(0, 2).map(d => aiAct(`Add ${lower(products[d.product].name)}`, 'additem', d.product)));
     }
 
     // Use first
-    if (/(use first|expir|going bad|about to|soon|waste|use up)/.test(text)) {
+    if (/(use first|expir|going bad|about to|soon|waste|use up|go off)/.test(t)) {
       const exp = expiringItems();
-      if (!exp.length) return say("Nothing is close to expiring. Nice work. Want ideas anyway?", [aiAct('See meals', 'tab', 'meals')]);
-      const top = rankedMeals('all')[0];
-      return say(`Use these first:<ul>${exp.slice(0, 4).map(f => `<li><b>${esc(itemName(f))}</b>, ${rangeText(f).toLowerCase()} left</li>`).join('')}</ul>${top ? `<b>${top.r.name}</b> uses ${plural(top.expiring.length, 'of them')}.` : ''}`,
-        top ? [aiAct('Open recipe', 'recipe', top.r.id)] : []);
+      if (!exp.length) return say("Nothing is close to expiring. Nice work! Want ideas anyway?", [aiAct('Meal ideas', 'ask', 'What can I make tonight?')]);
+      aiCtx.offset = 0;
+      const top = rankedMeals('all').filter(a => a.expiring.length);
+      aiCtx.lastRecipes = top.slice(0, 3).map(a => a.r.id);
+      aiCtx.lastRecipe = aiCtx.lastRecipes[0];
+      return say(`Use these first:<ul>${exp.slice(0, 4).map(f => `<li><b>${esc(itemName(f))}</b>, ${rangeText(f).toLowerCase()} left${f.owner !== 'You' && f.owner !== 'Shared' ? ` (${f.owner}'s)` : ''}</li>`).join('')}</ul>${top.length ? `Best way to use them:${top.slice(0, 2).map((a, i) => mealMini(a, i)).join('')}` : ''}`);
     }
 
-    // Savings
-    if (/(saved|saving|impact|how much)/.test(text)) {
+    // Savings and progress
+    if (/(saved|saving|impact|how much have|streak|progress|how am i doing)/.test(t)) {
       const total = state.cooked.reduce((n, x) => n + x.value, 0) + state.trips.reduce((n, x) => n + x.saved, 0);
-      return say(total ? `You've saved about <b>${money(total)}</b> and rescued ${plural(state.cooked.reduce((n, x) => n + x.rescued, 0), 'expiring item')}.` : "Nothing tracked yet. Cook something from your fridge and I'll start counting.", [aiAct('See impact', 'tab', 'impact')]);
+      const rescued = state.cooked.reduce((n, x) => n + x.rescued, 0);
+      const streak = weekStreak();
+      return say(total ? `You've saved about <b>${money(total)}</b> and rescued <b>${plural(rescued, 'expiring item')}</b>${streak ? `, with a <b>${plural(streak, 'week')}</b> cooking streak` : ''}. ${state.tossed ? `You've thrown out ${plural(state.tossed, 'item')} so far.` : 'Nothing wasted yet!'}` : "Nothing tracked yet. Cook something from your fridge and I'll start counting.", [aiAct('See impact', 'tab', 'impact')]);
     }
 
-    // Swaps
-    if (/(swap|instead|substitut|replace|don'?t have)/.test(text)) {
-      return say('Easy student swaps:<ul><li>Yogurt for sour cream or mayo</li><li>Frozen spinach or veg for fresh</li><li>Chicken thighs for breasts (cheaper, juicier)</li><li>Leftover rice for fresh rice in fried rice</li><li>Tortillas for bread in sandwiches</li></ul>');
+    // Swaps in general
+    if (/(swap|substitut|instead of|replace)/.test(t)) {
+      return say('Easy student swaps:<ul><li>Yogurt for sour cream or mayo</li><li>Frozen spinach or veg for fresh (keeps for months)</li><li>Chicken thighs for breasts (cheaper, juicier)</li><li>Leftover rice for fresh in fried rice</li><li>Lentils or beans for half the ground beef</li></ul>Ask about a specific ingredient for more.');
     }
 
-    // Missing items for the open recipe
-    if (/(add the missing|missing items)/.test(text) && state.recipeId) {
-      return say(`I can add what you need for <b>${recipes[state.recipeId].name}</b> to your list.`, [aiAct('Add missing items', 'addmissing', state.recipeId)]);
+    // Follow ups on the last meal list
+    if (aiCtx.lastQuery && /^(more|another|other|something else|different|next|show me more|any others)/.test(t)) {
+      aiCtx.offset += 3;
+      return showMeals(mealsFor(aiCtx.lastQuery), 'A few more', aiCtx.lastQuery);
+    }
+    if (aiCtx.lastQuery && t.split(/\s+/).length <= 6 && /(cheaper|quicker|faster|less time|make it|what about|vegetarian|vegan|without|gluten)/.test(t) && !prods.some(id => !(aiCtx.lastQuery.with || []).includes(id) && !/without/.test(t))) {
+      const f = { ...aiCtx.lastQuery, ...parseFilters(t) };
+      if (/cheaper/.test(t)) f.maxCost = Math.min(f.maxCost || 99, 2.5);
+      if (/quicker|faster/.test(t)) f.maxTime = Math.min(f.maxTime || 99, 15);
+      aiCtx.lastQuery = f; aiCtx.offset = 0;
+      return showMeals(mealsFor(f), `Okay, ${describeFilters(f) || 'here you go'}`, f);
     }
 
-    // Meal ideas, with budget and diet filters
-    if (/(make|cook|dinner|lunch|breakfast|recipe|tonight|hungry|eat|meal|idea|cheap|budget|under|vegetarian|vegan|serving)/.test(text)) {
-      let list = rankedMeals('all');
-      const under = text.match(/under \$?(\d+(\.\d+)?)/);
-      if (under || /cheap|budget|serving/.test(text)) list = [...list].filter(a => a.perServing <= (under ? Number(under[1]) : 3));
-      if (/vegetarian|vegan/.test(text)) list = list.filter(a => recipeTags(a.r).some(t => t === 'Vegetarian' || t === 'Vegan'));
-      if (/breakfast/.test(text)) list = list.filter(a => a.r.meal === 'breakfast');
-      if (/quick|fast/.test(text)) list = list.filter(a => a.r.time <= 15);
-      const top = list.slice(0, 3);
-      if (!top.length) return say("I couldn't find a match. Try loosening it up, like \"something under $4\".");
-      return say(`${fridgeAll().length ? 'Based on your fridge' : 'Here are some student favourites'}:${top.map(mealMini).join('')}`,
-        top[0].need.length ? [aiAct(`Add missing for ${top[0].r.name}`, 'addmissing', top[0].r.id)] : []);
+    // Meal ideas
+    if (/(make|cook|dinner|lunch|breakfast|recipe|tonight|hungry|eat|meal|idea|suggest|food|snack|quick|cheap|budget|under|vegetarian|vegan|serving|starving)/.test(t) || prods.length) {
+      const f = parseFilters(t);
+      if (!f.with && prods.length && /(with|using|have|use)/.test(t)) f.with = prods;
+      aiCtx.lastQuery = f; aiCtx.offset = 0;
+      const desc = describeFilters(f);
+      const intro = fridgeAll().length ? `Based on your fridge${desc ? ` (${desc})` : ''}` : `Student favourites${desc ? ` (${desc})` : ''}`;
+      return showMeals(mealsFor(f), intro, f);
     }
 
-    if (/(thank|thanks|cheers|great|perfect)/.test(text)) return say('Anytime. Happy cooking!');
+    if (/(what can you do|help|how does this work|what do you do)/.test(t)) {
+      return say('I know your fridge, budget, diet and nearby deals. Try:<ul><li>"What can I make in 15 minutes?"</li><li>"I bought eggs and spinach"</li><li>"Plan my meals for the week"</li><li>"Is my chicken still good?"</li><li>"I\'m out of milk"</li><li>"Plan my trip walking, 1 store"</li><li>"Remember I\'m vegetarian"</li></ul>');
+    }
+    if (/^(hi|hey|hello|yo|sup)\b/.test(t)) return say(`Hey! ${expiringItems().length ? `Heads up: <b>${esc(itemName(expiringItems()[0]))}</b> (${dayWord(daysLeft(expiringItems()[0]))}). Want a recipe for it?` : 'What are you hungry for?'}`);
+    if (/(thank|thanks|cheers|great|perfect|awesome|nice)/.test(t)) return say('Anytime. Happy cooking!');
 
-    return say("I'm a prototype with a limited script, so try one of these, or ask about your fridge, meals, deals or trips.");
+    return say(`I didn't quite catch that. I can find meals, update your fridge or list, plan your week or your trip. Try "what can I make with chicken?" or "plan my meals for the week".`);
   }
+
+  // How useful a sale item is for meals you could cook.
+  const fridgeUseScore = pid => rankedMeals('all').slice(0, 8).filter(a => a.need.some(n => n.ing.id === pid)).length;
+
+  const SUBS = {
+    yogurt: 'sour cream, mayo, or a splash of milk', milk: 'water plus a little butter, or yogurt thinned with water', eggs: 'in pancakes, a mashed banana per egg',
+    chicken_thighs: 'chicken breast, tofu, or a can of chickpeas', chicken_breast: 'chicken thighs (cheaper), or tofu', ground_beef: 'lentils or black beans (or half and half to stretch it)',
+    spinach: 'frozen spinach, lettuce in a pinch, or any leafy green', cheddar: 'any cheese you have', tortillas: 'bread or a rice bowl instead',
+    rice: 'leftover rice, pasta, or bread', pasta_sauce: 'chopped tomatoes with garlic and a pinch of salt', bell_pepper: 'carrots or any crunchy veg',
+    broccoli: 'frozen mixed veg', tomatoes: 'pasta sauce or salsa', salsa: 'chopped tomatoes and onion', lettuce: 'spinach or cucumber',
+    bread: 'tortillas', onions: 'green onions or a little garlic', garlic: 'garlic powder', black_beans: 'lentils or any canned beans', mushrooms: 'spinach or bell pepper',
+    tofu: 'eggs or chickpeas', lentils: 'canned beans', cucumber: 'lettuce or carrots', oats: 'crushed cereal', bananas: 'apples, or skip it', potatoes: 'rice or pasta',
+  };
+
+  function storageTip(p) {
+    const tips = {
+      meat: 'Keep it on the bottom shelf in its package so it can\'t drip, and cook or freeze it within 1 to 2 days.',
+      dairy: 'Keep it at the back of the fridge, not the door, where it stays coldest.',
+      eggs: 'Keep eggs in their carton on a shelf, not the door.',
+      bakery: 'Keep it on the counter for a few days, or freeze it and toast from frozen.',
+      leftover: 'Cool it within 2 hours, keep it in a sealed container, and eat within 3 to 4 days.',
+    };
+    if (p.id === 'spinach' || p.id === 'lettuce') return 'Keep greens in the crisper drawer with a paper towel in the bag to soak up moisture. They last a few extra days that way.';
+    if (p.id === 'tomatoes' || p.id === 'bananas' || p.id === 'potatoes' || p.id === 'onions') return `${p.name} keep best on the counter or in a cool, dark spot, not the fridge.`;
+    return tips[p.cat] || `${p.name} keeps about ${p.life} days where it's usually stored.`;
+  }
+
+  // ----- live Claude (optional) -----
+
+  const AI_URL = (window.SNARE_AI_URL || '').trim();
+
+  // Everything the model needs to give personal answers, kept compact.
+  function aiContext() {
+    return {
+      today: new Date().toDateString(),
+      screen: state.screen,
+      openRecipe: state.screen === 'recipe' ? state.recipeId : null,
+      profile: { diet: P().diet, weeklyBudget: P().budget, area: home().name, travel: P().mode, radiusKm: P().radius, maxStores: P().maxStores || 'any', dislikes: P().dislikes, sharedHouse: P().house },
+      fridge: fridgeAll().map(f => ({ product: f.id, name: itemName(f), qty: f.qty, left: rangeText(f), daysLeftEarliest: daysLeft(f), owner: f.owner, frozen: f.frozen, opened: f.opened })),
+      shoppingList: state.items.map(it => ({ product: it.id, qty: it.qty, cheapest: (b => b ? `${money(b.price)} at ${stores[b.store].name}` : null)(bestNearby(it.id)) })),
+      topMeals: rankedMeals('all').slice(0, 10).map(a => ({ id: a.r.id, name: a.r.name, minutes: a.r.time, serves: a.r.serves, why: reasons(a), have: a.have.map(h => h.f.id), need: a.need.map(n => n.ing.id), costPerServingToFinish: Number(a.perServing.toFixed(2)), studentLikePct: a.r.pop })),
+      allRecipes: D.recipes.map(r => ({ id: r.id, name: r.name, minutes: r.time, meal: r.meal })),
+      products: D.products.filter(p => !p.leftover).map(p => ({ id: p.id, name: p.name })),
+      dealsNearby: D.deals.filter(d => nearbyStores().some(s => s.id === d.store)).map(d => ({ product: d.product, price: d.price, store: stores[d.store].name })),
+      liked: Object.keys(state.ratings).filter(id => state.ratings[id] > 0),
+      disliked: Object.keys(state.ratings).filter(id => state.ratings[id] < 0),
+      learned: { oftenThrownOut: Object.keys(state.tossLog).filter(id => state.tossLog[id] >= 2), shelfLifeAdjustDays: Object.fromEntries(Object.keys(state.learn).filter(id => learnAdj(id)).map(id => [id, learnAdj(id)])) },
+      progress: { mealsCooked: state.cooked.length, itemsRescued: state.cooked.reduce((n, x) => n + x.rescued, 0), streakWeeks: weekStreak() },
+    };
+  }
+
+  // Map the model's actions onto the app's own actions, ignoring anything unknown.
+  const LIVE_ACTS = {
+    open_recipe: 'recipe', add_missing: 'addmissing', add_to_list: 'additem', remove_from_list: 'removeitem', add_to_fridge: 'fridgeadd',
+    mark_used: 'useditem', freeze_item: 'freeze', plan_trip: 'trip', open_tab: 'tab', remember_dislike: 'dislike', set_diet: 'diet', set_budget: 'budget',
+  };
+  function validLiveAction(a) {
+    const act = LIVE_ACTS[a.type];
+    if (!act) return null;
+    const tgt = String(a.target || '');
+    if (['recipe', 'addmissing'].includes(act) && !recipes[tgt]) return null;
+    if (['additem', 'removeitem', 'fridgeadd', 'useditem', 'freeze', 'dislike'].includes(act) && !products[tgt]) return null;
+    if (act === 'tab' && !['fridge', 'meals', 'shop', 'impact', 'profile'].includes(tgt)) return null;
+    if (act === 'diet' && !DIETS.some(d => d[0] === tgt)) return null;
+    if (act === 'budget' && !(Number(tgt) > 0)) return null;
+    return { act, arg: tgt, label: String(a.label || 'Do it').slice(0, 40), auto: !!a.auto };
+  }
+
+  // Light formatting for model text: escape, then **bold**, bullet lines and line breaks.
+  function formatReply(s) {
+    const lines = esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split('\n');
+    let html = '', inList = false;
+    for (const line of lines) {
+      const m = line.match(/^\s*(?:[-•*]|\d+\.)\s+(.*)/);
+      if (m) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${m[1]}</li>`; continue; }
+      if (inList) { html += '</ul>'; inList = false; }
+      if (line.trim()) html += `<p>${line}</p>`;
+    }
+    return html + (inList ? '</ul>' : '');
+  }
+
+  async function liveReply(text) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    try {
+      const res = await fetch(AI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...aiHistory.slice(-12), { role: 'user', content: text }], context: aiContext() }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error('AI server ' + res.status);
+      const data = await res.json();
+      if (typeof data.reply !== 'string') throw new Error('Bad reply');
+      const acts = (data.actions || []).map(validLiveAction).filter(Boolean);
+      const done = acts.filter(a => a.auto).map(a => runAiAction(a.act, a.arg, true)).filter(Boolean);
+      return {
+        html: formatReply(data.reply) + (done.length ? `<p class="ai-done">${ICONS.check}${esc(done.join(' · '))}</p>` : ''),
+        actions: acts.filter(a => !a.auto).map(a => aiAct(a.label, a.act, a.arg)),
+        text: data.reply,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // ----- chat panel -----
 
   function renderAI() {
     aiBox.hidden = !state.aiOpen;
     if (!state.aiOpen) return;
-    const chips = AI_CHIPS[TAB_OF[state.screen] === 'meals' && state.screen === 'recipe' ? 'recipe' : TAB_OF[state.screen]] || AI_CHIPS.fridge;
+    const key = state.screen === 'recipe' ? 'recipe' : TAB_OF[state.screen];
+    const chips = AI_CHIPS[key] || AI_CHIPS.fridge;
     aiBox.innerHTML = `
       <div class="ai-head"><span>${ICONS.spark}<strong>Ask SNARE</strong><small>Knows your fridge, budget and nearby deals</small></span><button class="icon-btn" data-ai="close" aria-label="Close">${ICONS.cross}</button></div>
       <div class="ai-msgs" id="ai-msgs">
@@ -1627,8 +2111,8 @@
         ${state.aiTyping ? '<div class="msg ai typing"><span></span><span></span><span></span></div>' : ''}
       </div>
       <div class="ai-chips">${chips.map(c => `<button class="chip" data-ai="ask" data-q="${esc(c)}">${c}</button>`).join('')}</div>
-      <form class="ai-input" data-ai="form"><input id="ai-text" placeholder="Ask about your fridge, meals or trips" autocomplete="off"><button class="btn small" aria-label="Send">${ICONS.send}</button></form>
-      <p class="ai-note">Prototype: answers are scripted, not a live AI model.</p>`;
+      <form class="ai-input" data-ai="form"><input id="ai-text" placeholder="Ask anything about food, your fridge or trips" autocomplete="off"><button class="btn small" aria-label="Send">${ICONS.send}</button></form>
+      <p class="ai-note">${AI_URL ? (state.aiOffline ? 'Live AI unavailable, using the built in assistant.' : 'Powered by Claude. Answers can be wrong, so check food safety yourself.') : 'Built in assistant (prototype). Live Claude can be switched on in config.js.'}</p>`;
     const msgs = document.getElementById('ai-msgs');
     msgs.scrollTop = msgs.scrollHeight;
   }
@@ -1637,37 +2121,70 @@
     state.aiOpen = true;
     if (!state.aiMsgs.length) {
       const exp = expiringItems();
-      state.aiMsgs.push({
-        from: 'ai',
-        html: `Hi! I can see your fridge, your ${money(P().budget)} weekly budget and deals near ${esc(home().name)}.${exp.length ? ` Heads up: your <b>${esc(lower(itemName(exp[0])))}</b> ${dayWord(daysLeft(exp[0]))}.` : ''} What do you need?`,
-      });
+      const greet = `Hi! I can see your fridge, your ${money(P().budget)} weekly budget and deals near ${esc(home().name)}.${exp.length ? ` Heads up: <b>${esc(itemName(exp[0]))}</b> (${dayWord(daysLeft(exp[0]))}).` : ''} Ask me anything, or tell me what you bought.`;
+      state.aiMsgs.push({ from: 'ai', html: greet });
     }
     renderAI();
     setTimeout(() => { const i = document.getElementById('ai-text'); if (i) i.focus(); }, 50);
   }
 
-  function askAI(text) {
-    if (!text.trim()) return;
+  async function askAI(text) {
+    if (!text.trim() || state.aiTyping) return;
     state.aiMsgs.push({ from: 'you', html: esc(text) });
     state.aiTyping = true;
     renderAI();
-    setTimeout(() => {
-      state.aiTyping = false;
-      const reply = aiReply(text);
-      state.aiMsgs.push({ from: 'ai', html: reply.html, actions: reply.actions });
-      renderAI();
-    }, 650 + Math.random() * 400);
+    let reply;
+    if (AI_URL) {
+      try {
+        reply = await liveReply(text);
+        state.aiOffline = false;
+      } catch (e) {
+        state.aiOffline = true; // fall back to the built in brain
+      }
+    }
+    if (!reply) {
+      await new Promise(r => setTimeout(r, 450 + Math.random() * 350));
+      reply = aiReply(text);
+      reply.text = reply.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    aiHistory.push({ role: 'user', content: text }, { role: 'assistant', content: reply.text });
+    state.aiTyping = false;
+    state.aiMsgs.push({ from: 'ai', html: reply.html, actions: reply.actions });
+    renderAI();
+    if (['fridge', 'shop', 'meals', 'profile', 'impact'].includes(state.screen)) rerender();
   }
 
-  function runAiAction(act, arg) {
+  // Runs an action from a chat button, a "yes", or the live model. Returns a
+  // short past tense description when it changes something.
+  function runAiAction(act, arg, quiet) {
+    const ids = String(arg || '').split(',').filter(Boolean);
+    let done = '';
     if (act === 'recipe') { state.aiOpen = false; openRecipe(arg); }
     else if (act === 'tab') { state.aiOpen = false; openTab(arg); }
     else if (act === 'profile') { state.aiOpen = false; go('profile'); }
-    else if (act === 'addmissing') { addMissing(arg); rerender(); }
-    else if (act === 'additem') { addToList(arg); rerender(); }
-    else if (act === 'trip') { state.aiOpen = false; findTrip(); }
-    else if (act === 'addplan') { addMissing(arg); state.aiOpen = false; findTrip(); }
+    else if (act === 'ask') { askAI(arg); return ''; }
+    else if (act === 'addmissing') { const n = addMissing(arg); done = `added ${plural(n, 'item')} for ${recipes[arg].name} to your list`; }
+    else if (act === 'addall' || act === 'addalltrip') {
+      ids.forEach(id => { if (!state.items.some(it => it.id === id)) state.items.push({ id, qty: 1, why: 'Week plan' }); });
+      done = `added ${plural(ids.length, 'item')} to your list`;
+      if (act === 'addalltrip') { state.aiOpen = false; findTrip(); }
+    }
+    else if (act === 'additem') { if (!state.items.some(it => it.id === arg)) state.items.push({ id: arg, qty: 1, why: 'Added by chat' }); done = `added ${lower(products[arg].name)} to your list`; }
+    else if (act === 'removeitem') { state.items = state.items.filter(it => it.id !== arg); done = `took ${lower(products[arg].name)} off your list`; }
+    else if (act === 'fridgeadd') { const f = addToFridge(arg); state.highlight = [f.uid]; persist(); done = `added ${lower(products[arg].name)} to your fridge`; }
+    else if (act === 'useditem') { const f = fridgeAll().find(x => x.id === arg); if (f) { state.fridge = state.fridge.filter(x => x !== f); persist(); done = `marked ${lower(itemName(f))} as used`; } }
+    else if (act === 'freeze') { const f = fridgeAll().find(x => x.id === arg && !x.frozen); if (f) { freezeItem(f); persist(); done = `froze your ${lower(itemName(f))}`; } }
+    else if (act === 'dislike') { if (!P().dislikes.includes(arg)) P().dislikes.push(arg); persist(); done = `will remember you don't eat ${lower(products[arg].name)}`; }
+    else if (act === 'diet') { if (!P().diet.includes(arg)) P().diet.push(arg); persist(); done = `will only show ${lower(DIETS.find(d => d[0] === arg)[1])} meals`; }
+    else if (act === 'budget') { P().budget = Number(arg); persist(); done = `set your weekly budget to ${money(P().budget)}`; }
+    else if (act === 'rate') { const [rid, v] = arg.split(':'); state.ratings[rid] = Number(v); aiCtx.awaitingRating = null; persist(); done = Number(v) > 0 ? `will suggest more like ${recipes[rid].name}` : `won't suggest ${recipes[rid].name} again`; }
+    else if (act === 'trip') { state.aiOpen = false; findTrip(); done = 'planned your trip'; }
+    else if (act === 'addplan') { const n = addMissing(arg); state.aiOpen = false; findTrip(); done = `added ${plural(n, 'item')} and planned your trip`; }
+    if (!quiet && done && !['addmissing', 'addplan'].includes(act)) toast(done.charAt(0).toUpperCase() + done.slice(1)); // addMissing shows its own
     renderAI();
+    if (state.screen !== 'loading' && !state.aiOpen) return done;
+    if (['fridge', 'shop', 'meals', 'profile'].includes(state.screen)) rerender();
+    return done;
   }
 
   // ---------- maps ----------
