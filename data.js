@@ -25,47 +25,49 @@ window.SNARE_DATA = {
     { id: 'market', name: 'Western Fair Farmers Market', where: 'King St', lat: 42.9880, lng: -81.2210, factor: 0.95, carries: ['produce', 'bakery', 'eggs'] },
   ],
 
-  // base: typical regular price. life: estimated days it keeps where it is
-  // usually stored (fridge, unless noted), loosely based on USDA FoodKeeper and
-  // Health Canada guidance. flags drive diet filters. swap: cheaper alternative.
+  // base: typical regular price. life: days it usually keeps as bought (fresh or
+  // unopened). open: days once opened. freeze: days in the freezer. Loosely
+  // based on USDA FoodKeeper and Health Canada guidance. flags drive diet
+  // filters. swap: cheaper alternative.
   products: [
-    { id: 'bananas', name: 'Bananas', unit: 'about 2 lb', cat: 'produce', base: 1.69, life: 5 },
+    { id: 'bananas', name: 'Bananas', unit: 'about 2 lb', cat: 'produce', base: 1.69, life: 5, freeze: 90 },
     { id: 'apples', name: 'Apples', unit: '3 lb bag', cat: 'produce', base: 4.99, life: 30 },
     { id: 'carrots', name: 'Carrots', unit: '2 lb bag', cat: 'produce', base: 2.49, life: 21 },
     { id: 'potatoes', name: 'Potatoes', unit: '10 lb bag', cat: 'produce', base: 6.49, life: 30 },
     { id: 'onions', name: 'Onions', unit: '3 lb bag', cat: 'produce', base: 3.49, life: 30 },
     { id: 'garlic', name: 'Garlic', unit: '1 bulb', cat: 'produce', base: 0.99, life: 60 },
-    { id: 'spinach', name: 'Fresh spinach', unit: '312 g bag', cat: 'produce', base: 4.49, life: 5, swap: 'frozen_spinach' },
+    { id: 'spinach', name: 'Fresh spinach', unit: '312 g bag', cat: 'produce', base: 4.49, life: 5, swap: 'frozen_spinach', freeze: 180 },
     { id: 'tomatoes', name: 'Tomatoes', unit: '1 lb', cat: 'produce', base: 2.99, life: 7 },
     { id: 'lettuce', name: 'Romaine lettuce', unit: 'each', cat: 'produce', base: 2.99, life: 7, keywords: 'salad' },
     { id: 'broccoli', name: 'Broccoli', unit: 'each', cat: 'produce', base: 2.99, life: 5, swap: 'frozen_veg' },
-    { id: 'bell_pepper', name: 'Bell pepper', unit: 'each', cat: 'produce', base: 1.49, life: 7, keywords: 'red pepper' },
-    { id: 'mushrooms', name: 'Mushrooms', unit: '227 g', cat: 'produce', base: 2.99, life: 5, keywords: 'mushroom' },
+    { id: 'bell_pepper', name: 'Bell pepper', unit: 'each', cat: 'produce', base: 1.49, life: 7, keywords: 'red pepper', freeze: 240 },
+    { id: 'mushrooms', name: 'Mushrooms', unit: '227 g', cat: 'produce', base: 2.99, life: 5, keywords: 'mushroom', freeze: 240 },
     { id: 'cucumber', name: 'Cucumber', unit: 'each', cat: 'produce', base: 1.29, life: 7 },
     { id: 'green_onions', name: 'Green onions', unit: 'bunch', cat: 'produce', base: 1.29, life: 7, keywords: 'scallions' },
     { id: 'frozen_spinach', name: 'Frozen spinach', unit: '300 g', cat: 'frozen', base: 2.29, life: 240 },
     { id: 'frozen_veg', name: 'Frozen mixed vegetables', unit: '750 g', cat: 'frozen', base: 2.79, life: 240, keywords: 'veggies peas' },
-    { id: 'milk', name: 'Milk 2%', unit: '2 L', cat: 'dairy', base: 5.49, life: 7, flags: ['dairy'] },
-    { id: 'cheddar', name: 'Cheddar cheese', unit: '400 g', cat: 'dairy', base: 7.49, life: 28, flags: ['dairy'], keywords: 'cheese' },
-    { id: 'yogurt', name: 'Plain yogurt', unit: '750 g', cat: 'dairy', base: 4.29, life: 10, flags: ['dairy'], keywords: 'yoghurt sour cream' },
-    { id: 'butter', name: 'Butter', unit: '454 g', cat: 'dairy', base: 6.99, life: 30, flags: ['dairy'] },
+    { id: 'milk', name: 'Milk 2%', unit: '2 L', cat: 'dairy', base: 5.49, life: 12, flags: ['dairy'], open: 7, freeze: 90 },
+    { id: 'cheddar', name: 'Cheddar cheese', unit: '400 g', cat: 'dairy', base: 7.49, life: 42, flags: ['dairy'], keywords: 'cheese', open: 28, freeze: 180 },
+    { id: 'yogurt', name: 'Plain yogurt', unit: '750 g', cat: 'dairy', base: 4.29, life: 14, flags: ['dairy'], keywords: 'yoghurt sour cream', open: 7, freeze: 60 },
+    { id: 'butter', name: 'Butter', unit: '454 g', cat: 'dairy', base: 6.99, life: 60, flags: ['dairy'], open: 30, freeze: 270 },
     { id: 'eggs', name: 'Eggs', unit: 'dozen large', cat: 'eggs', base: 4.29, life: 28, flags: ['egg'], keywords: 'egg' },
-    { id: 'chicken_thighs', name: 'Chicken thighs', unit: '1 kg', cat: 'meat', base: 10.99, life: 2, flags: ['meat'], keywords: 'chicken' },
-    { id: 'chicken_breast', name: 'Chicken breasts', unit: '1 kg', cat: 'meat', base: 15.99, life: 2, flags: ['meat'], swap: 'chicken_thighs', keywords: 'chicken' },
-    { id: 'ground_beef', name: 'Ground beef', unit: '450 g', cat: 'meat', base: 6.99, life: 2, flags: ['meat'], keywords: 'beef meat' },
-    { id: 'tofu', name: 'Firm tofu', unit: '350 g', cat: 'protein', base: 3.29, life: 7 },
+    { id: 'chicken_thighs', name: 'Chicken thighs', unit: '1 kg', cat: 'meat', base: 10.99, life: 2, flags: ['meat'], keywords: 'chicken', freeze: 270 },
+    { id: 'chicken_breast', name: 'Chicken breasts', unit: '1 kg', cat: 'meat', base: 15.99, life: 2, flags: ['meat'], swap: 'chicken_thighs', keywords: 'chicken', freeze: 270 },
+    { id: 'ground_beef', name: 'Ground beef', unit: '450 g', cat: 'meat', base: 6.99, life: 2, flags: ['meat'], keywords: 'beef meat', freeze: 120 },
+    { id: 'tofu', name: 'Firm tofu', unit: '350 g', cat: 'protein', base: 3.29, life: 30, open: 4, freeze: 150 },
     { id: 'lentils', name: 'Red lentils', unit: '900 g', cat: 'pantry', base: 3.99, life: 365 },
     { id: 'black_beans', name: 'Black beans', unit: '540 ml can', cat: 'pantry', base: 1.49, life: 365, keywords: 'beans' },
     { id: 'tuna', name: 'Canned tuna', unit: '170 g', cat: 'pantry', base: 1.79, life: 365, flags: ['fish'], keywords: 'fish' },
     { id: 'pasta', name: 'Spaghetti', unit: '900 g', cat: 'pantry', base: 2.49, life: 365, flags: ['gluten'], keywords: 'pasta noodles' },
-    { id: 'pasta_sauce', name: 'Pasta sauce', unit: '680 ml', cat: 'pantry', base: 2.99, life: 365, keywords: 'tomato sauce marinara' },
+    { id: 'pasta_sauce', name: 'Pasta sauce', unit: '680 ml', cat: 'pantry', base: 2.99, life: 365, keywords: 'tomato sauce marinara', open: 5, freeze: 180 },
     { id: 'rice', name: 'White rice', unit: '2 kg', cat: 'pantry', base: 5.99, life: 365 },
     { id: 'oats', name: 'Large flake oats', unit: '1 kg', cat: 'pantry', base: 4.29, life: 365, keywords: 'oatmeal' },
-    { id: 'salsa', name: 'Salsa', unit: '650 ml jar', cat: 'pantry', base: 3.49, life: 14 },
-    { id: 'bread', name: 'Whole wheat bread', unit: '675 g', cat: 'bakery', base: 3.49, life: 7, flags: ['gluten'] },
-    { id: 'tortillas', name: 'Flour tortillas', unit: '10 pack', cat: 'bakery', base: 3.99, life: 14, flags: ['gluten'], keywords: 'wraps' },
+    { id: 'salsa', name: 'Salsa', unit: '650 ml jar', cat: 'pantry', base: 3.49, life: 180, open: 14 },
+    { id: 'bread', name: 'Whole wheat bread', unit: '675 g', cat: 'bakery', base: 3.49, life: 7, flags: ['gluten'], freeze: 90 },
+    { id: 'tortillas', name: 'Flour tortillas', unit: '10 pack', cat: 'bakery', base: 3.99, life: 14, flags: ['gluten'], keywords: 'wraps', open: 7, freeze: 180 },
     // Leftovers can be in a fridge but are never on a shopping list.
-    { id: 'cooked_rice', name: 'Leftover rice', unit: 'container', cat: 'leftover', base: 1.00, life: 4, leftover: true, keywords: 'leftovers' },
+    { id: 'leftovers', name: 'Leftovers', unit: 'container', cat: 'leftover', base: 3.00, life: 4, leftover: true, freeze: 90 },
+    { id: 'cooked_rice', name: 'Leftover rice', unit: 'container', cat: 'leftover', base: 1.00, life: 4, leftover: true, keywords: 'leftovers', freeze: 180 },
   ],
 
   // This week's flyer deals
@@ -161,24 +163,25 @@ window.SNARE_DATA = {
       steps: ['Pan fry the seasoned chicken and slice it.', 'Mix the yogurt with garlic, salt and lemon for a sauce.', 'Fill the tortillas with chicken, lettuce and cucumber.', 'Add sauce, roll up and toast if you like.'] },
   ],
 
-  // What the simulated AI "finds" in the demo fridge photo. days: estimated
-  // days left. conf: model confidence. box: where it sits in the demo image (%).
+  // What the simulated AI "finds" in the demo fridge photo. days: days left.
+  // label: the date was read off the package, so it is exact. conf: model
+  // confidence. box: where it sits in the demo image (%).
   demoScan: [
-    { id: 'chicken_thighs', qty: '500 g pack', days: 1, conf: 0.94, box: [8, 70, 40, 18] },
+    { id: 'chicken_thighs', qty: '500 g pack', days: 1, label: true, opened: false, conf: 0.94, box: [8, 70, 40, 18] },
     { id: 'spinach', qty: 'Half a bag', days: 2, conf: 0.91, box: [52, 41, 40, 17] },
-    { id: 'milk', qty: 'Half a carton', days: 3, conf: 0.97, box: [8, 6, 22, 28] },
+    { id: 'milk', qty: 'Half a carton', days: 3, label: true, opened: true, conf: 0.97, box: [8, 6, 22, 28] },
     { id: 'eggs', qty: '8 left', days: 12, conf: 0.95, box: [34, 18, 58, 13] },
     { id: 'cheddar', qty: '1 block', days: 16, conf: 0.88, box: [8, 43, 22, 13] },
-    { id: 'yogurt', qty: '1 tub', days: 4, conf: 0.83, box: [33, 40, 17, 18] },
+    { id: 'yogurt', qty: '1 tub', days: 4, label: true, opened: true, conf: 0.83, box: [33, 40, 17, 18] },
     { id: 'bell_pepper', qty: '1', days: 3, conf: 0.79, box: [54, 72, 16, 16] },
-    { id: 'tortillas', qty: 'Half a pack', days: 6, conf: 0.72, box: [72, 70, 22, 18] },
+    { id: 'tortillas', qty: 'Half a pack', days: 6, label: true, opened: true, conf: 0.72, box: [72, 70, 22, 18] },
     { id: 'cooked_rice', qty: '1 container', days: 2, conf: 0.61, box: [60, 4, 32, 12] },
   ],
 
   // Single item scans: each photo returns the next guess in this list. alts
   // are what the user can tap if the guess is wrong.
   itemScans: [
-    { id: 'ground_beef', qty: '450 g pack', days: 1, conf: 0.9, alts: ['chicken_thighs', 'tofu'] },
+    { id: 'ground_beef', qty: '450 g pack', days: 1, label: true, conf: 0.9, alts: ['chicken_thighs', 'tofu'] },
     { id: 'tomatoes', qty: '4', days: 3, conf: 0.93, alts: ['bell_pepper', 'apples'] },
     { id: 'spinach', qty: 'Half a bag', days: 2, conf: 0.88, alts: ['lettuce', 'green_onions'] },
     { id: 'cheddar', qty: '1 block', days: 16, conf: 0.86, alts: ['butter', 'yogurt'] },

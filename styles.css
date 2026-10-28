@@ -663,10 +663,11 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .band-actions .btn { margin: 0; }
 
 /* Expiry badges */
-.exp { flex: none; display: inline-block; min-width: 64px; text-align: center; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 8px; white-space: nowrap; }
+.exp { flex: none; display: inline-block; min-width: 72px; text-align: center; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 8px; white-space: nowrap; }
 .exp.urgent { background: #FDE3DC; color: #B3361C; }
 .exp.soon { background: #FFF1CC; color: #8A5A00; }
 .exp.fine { background: var(--soft); color: var(--forest); }
+.exp.frozen { background: #E1EEF7; color: #1F5A85; }
 
 /* Fridge */
 .tonight { background: var(--ink); color: #fff; border-radius: var(--radius); padding: 16px; margin-bottom: 6px; }
@@ -681,7 +682,30 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .frow:first-child { border-top: 0; }
 .frow.new { animation: flash 1.6s ease; }
 @keyframes flash { 0% { background: #F1FADF; } 100% { background: transparent; } }
-.frow-main { flex: 1; min-width: 0; }
+.frow-main { flex: 1; min-width: 0; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.frow-main:hover strong { text-decoration: underline; }
+.frow.open { background: #FAFCF7; }
+.fdetail { list-style: none; padding: 4px 12px 14px 12px; background: #FAFCF7; border-top: 0; font-size: 12.5px; color: var(--muted); }
+.fdetail p { margin: 0 0 8px; }
+.fdetail .learned { display: flex; gap: 6px; align-items: center; color: var(--forest); font-weight: 600; }
+.fdetail .learned svg, .nudge > svg { flex: none; width: 16px; height: 16px; fill: var(--accent); stroke: var(--ink); stroke-width: 1.4; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.date-set { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); border: 1.5px solid var(--line); border-radius: 8px; padding: 3px 4px 3px 10px; background: #fff; }
+.date-set input { border: 0; font-size: 12px; padding: 3px; background: transparent; color: var(--ink); }
+.detail-check { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.detail-check span { font-weight: 600; color: var(--ink); margin-right: 4px; }
+.check-card { background: #fff; border: 2px solid var(--accent); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; box-shadow: var(--shadow); animation: rise 0.35s ease both; }
+.check-card.urgent { border-color: #E98C80; background: #FFF8F6; }
+.check-card h3 { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; margin: 4px 0; }
+.check-card p { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+.check-card .row { flex-wrap: wrap; }
+.nudge { display: flex; gap: 10px; align-items: flex-start; background: var(--soft); border-radius: var(--radius); padding: 12px 12px 12px 14px; margin-bottom: 10px; font-size: 12.5px; color: var(--forest); }
+.nudge > svg { margin-top: 2px; }
+.nudge div { flex: 1; }
+.nudge strong { display: block; font-size: 13.5px; color: var(--ink); }
+.nudge .icon-btn { width: 28px; height: 28px; background: transparent; border: 0; }
+.toss-warn { display: block; font-size: 11.5px; color: #8A5A00; font-weight: 600; margin-top: 2px; }
+.learned-list { margin: 0 0 6px; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
 .frow-main strong { display: block; font-size: 14.5px; }
 .frow-main span { font-size: 12px; color: var(--muted); }
 .owner { font-weight: 700; color: var(--forest); }

@@ -51,6 +51,7 @@
       localStorage.setItem(STORE_KEY, JSON.stringify({
         profile: state.profile, fridge: state.fridge, ratings: state.ratings, feedback: state.feedback,
         cooked: state.cooked, trips: state.trips, tossed: state.tossed,
+        learn: state.learn, tossLog: state.tossLog, views: state.views,
       }));
     } catch (e) { /* storage blocked, keep working in memory */ }
   }
@@ -66,6 +67,11 @@
     cooked: saved.cooked || [],        // meals cooked from the fridge
     trips: saved.trips || [],
     tossed: saved.tossed || 0,
+    learn: saved.learn || {},          // product id: days longer (+) or shorter (-) it lasts for this user
+    tossLog: saved.tossLog || {},      // product id: times thrown out
+    views: saved.views || {},          // recipe id: times opened
+    openItem: null,
+    nudgeDismissed: [],
     // This visit only
     items: [],                         // shopping list: { id, qty, why }
     rescueAdded: [],
@@ -85,6 +91,8 @@
     myLocation: null,
   };
   const P = () => state.profile;
+  // Fridge items saved by the first digital fridge version had a single date.
+  state.fridge.forEach(f => { if (f.expLo == null) { f.expLo = f.expHi = f.exp; f.src = f.src || 'estimate'; } });
   let map = null;
   let result = null;
   let fresh = false; // true right after the loading animation, so results animate in
@@ -270,16 +278,41 @@
   // ---------- fridge ----------
 
   const newUid = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const daysLeft = f => Math.ceil((f.exp - Date.now()) / DAY);
+  const daysUntil = t => Math.ceil((t - Date.now()) / DAY);
+  const daysLeft = f => daysUntil(f.expLo);   // earliest it might go off
+  const daysHi = f => daysUntil(f.expHi);     // latest it should last
+  const itemName = f => f.label || products[f.id].name;
+  const fmtDate = t => new Date(t).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  const learnAdj = id => Math.round(state.learn[id] || 0);
+
+  // Estimates are a range: food can go off from about three quarters of its
+  // usual life. Dates read off a label are exact.
+  const estimateRange = (days, exact) => exact ? [days, days] : [Math.floor(days * 0.75), days];
+
+  function setRange(f, days, exact) {
+    const [lo, hi] = estimateRange(days, exact);
+    const now = Date.now();
+    f.expLo = now + lo * DAY - 3600e3;
+    f.expHi = now + hi * DAY - 3600e3;
+  }
 
   function addToFridge(id, opts = {}) {
+    const p = products[id];
+    const exact = !!opts.label;
+    let days = opts.days ?? p.life;
+    if (opts.opened && p.open && !exact) days = Math.min(days, p.open);
+    if (!exact && learnAdj(id)) days = Math.max(1, days + learnAdj(id)); // what we learned from this user
     const item = {
       uid: newUid(), id,
-      qty: opts.qty || products[id].unit,
-      exp: Date.now() + (opts.days ?? products[id].life) * DAY - 3600e3,
+      label: opts.labelText || null,
+      qty: opts.qty || p.unit,
+      src: opts.src || (exact ? 'label' : 'estimate'),
+      opened: !!opts.opened,
+      frozen: false,
       owner: opts.owner || 'You',
       added: Date.now(),
     };
+    setRange(item, days, exact);
     state.fridge.push(item);
     return item;
   }
@@ -294,12 +327,92 @@
   }
 
   function dayWord(d) {
-    if (d <= 0) return 'past its estimate';
+    if (d <= 0) return 'at the end of its usual window';
     if (d === 1) return 'expires tomorrow';
     return `expires in ${d} days`;
   }
-  const dayBadge = d => d <= 0 ? 'Check it' : d === 1 ? '1 day' : d > 60 ? '2+ months' : d > 30 ? `${Math.round(d / 7)} weeks` : `${d} days`;
-  const expiringItems = () => fridgeAll().filter(f => daysLeft(f) <= USE_SOON).sort((a, b) => a.exp - b.exp);
+  const dayBadge = d => d <= 0 ? 'Check it' : d === 1 ? '1 day' : d > 60 ? `${Math.round(d / 30)} months` : d > 21 ? `${Math.round(d / 7)} weeks` : `${d} days`;
+
+  function rangeText(f) {
+    if (f.frozen) return 'Frozen';
+    const lo = daysLeft(f), hi = daysHi(f);
+    if (hi <= 0) return 'Check it';
+    if (lo === hi || hi > 21) return dayBadge(hi);
+    if (lo <= 0) return `Up to ${hi} ${hi === 1 ? 'day' : 'days'}`;
+    return `${lo} to ${hi} days`;
+  }
+  const rangeFromDays = (d, exact) => { const [lo, hi] = estimateRange(d, exact); return lo === hi || hi > 21 ? dayBadge(hi) : lo <= 0 ? `Up to ${hi} ${hi === 1 ? 'day' : 'days'}` : `${lo} to ${hi} days`; };
+
+  const expiringItems = () => fridgeAll().filter(f => !f.frozen && daysLeft(f) <= USE_SOON).sort((a, b) => a.expLo - b.expLo);
+
+  function sourceText(f) {
+    const p = products[f.id];
+    switch (f.src) {
+      case 'label': return `Date read from the label: ${fmtDate(f.expHi)}.`;
+      case 'opened': return `Marked opened. Opened ${lower(p.name)} usually keeps about ${p.open} days.`;
+      case 'frozen': return `In the freezer since ${fmtDate(f.frozenAt || Date.now())}. Keeps about ${Math.round(p.freeze / 30)} months frozen.`;
+      case 'thawed': return 'Thawed. Use it within about 2 days.';
+      case 'trip': return `Bought ${fmtDate(f.added)} on your SNARE trip, so we know exactly how old it is.`;
+      case 'leftover': return `Cooked ${fmtDate(f.added)}. Leftovers keep 3 to 4 days in the fridge (Health Canada).`;
+      case 'checked': return `You checked it on ${fmtDate(f.checkedAt || Date.now())}.`;
+      default: return `Estimated from typical fridge storage for ${lower(p.name)} (USDA FoodKeeper).`;
+    }
+  }
+
+  // ---------- expiry actions and learning ----------
+
+  function markOpened(f) {
+    const p = products[f.id];
+    f.opened = true;
+    if (p.open && daysHi(f) > p.open) { setRange(f, p.open, false); f.src = 'opened'; }
+  }
+
+  function freezeItem(f) {
+    f.frozen = true;
+    f.frozenAt = Date.now();
+    setRange(f, products[f.id].freeze, false);
+    f.src = 'frozen';
+  }
+
+  function thawItem(f) {
+    f.frozen = false;
+    setRange(f, 2, false);
+    f.src = 'thawed';
+  }
+
+  function setLabelDate(f, iso) {
+    const t = new Date(iso + 'T12:00').getTime();
+    if (!t) return;
+    f.expLo = f.expHi = t;
+    f.frozen = false;
+    f.src = 'label';
+  }
+
+  // Blend each real outcome into how long this food lasts for this user.
+  function learnFrom(id, deltaDays) {
+    const p = products[id];
+    const cur = state.learn[id];
+    const d = Math.max(-2, Math.min(2, deltaDays)); // one event moves the estimate at most 2 days
+    const next = cur == null ? d : cur * 0.5 + d * 0.5;
+    state.learn[id] = Math.max(-(p.life - 1), Math.min(p.life, next));
+  }
+
+  function stillGood(f) {
+    learnFrom(f.id, 1);
+    f.expLo = Date.now() + DAY;
+    f.expHi = Math.max(f.expHi, Date.now() + 2 * DAY);
+    f.src = 'checked';
+    f.checkedAt = Date.now();
+  }
+
+  function tossItem(f) {
+    // Thrown out before the early end of its window means it goes off sooner for this user.
+    const early = daysLeft(f);
+    if (!f.frozen && f.src !== 'label') learnFrom(f.id, early > 0 ? -early : -0.5);
+    state.tossLog[f.id] = (state.tossLog[f.id] || 0) + 1;
+    state.tossed++;
+    state.fridge = state.fridge.filter(x => x.uid !== f.uid);
+  }
 
   function toggleHouse(on) {
     P().house = on;
@@ -329,7 +442,7 @@
 
   function fridgeMatch(ing) {
     const ids = [ing.id, ...(ing.alt || [])];
-    return fridgeAll().filter(f => ids.includes(f.id)).sort((a, b) => a.exp - b.exp)[0] || null;
+    return fridgeAll().filter(f => ids.includes(f.id)).sort((a, b) => a.expLo - b.expLo)[0] || null;
   }
 
   const sharedIngredients = (a, b) => a.ingredients.filter(i => !i.opt && b.ingredients.some(j => !j.opt && j.id === i.id)).length;
@@ -360,8 +473,12 @@
     if (rating > 0) score += 10;
     if (rating < 0) score -= 40;
     if (likedSimilar) score += 7;
+    // Opened often but never cooked or rated: quietly rank it lower.
+    score -= Math.min(9, skippedCount(r.id) * 3);
     return { r, have, need, opt, expiring, needCost, perServing: needCost / r.serves, onSale, rating, likedSimilar, score };
   }
+
+  const skippedCount = rid => state.ratings[rid] || state.cooked.some(c => c.rid === rid) ? 0 : Math.max(0, (state.views[rid] || 0) - 2);
 
   function rankedMeals(filter = state.mealFilter) {
     return D.recipes.filter(dietOk).map(analyse)
@@ -373,7 +490,7 @@
     const out = [];
     if (a.expiring.length) {
       const [first, second] = a.expiring;
-      out.push(`Uses your ${lower(products[first.f.id].name)} (${dayWord(first.days)})${second ? ` and ${lower(products[second.f.id].name)}` : ''}`);
+      out.push(`Uses your ${lower(itemName(first.f))} (${dayWord(first.days)})${second ? ` and ${lower(itemName(second.f))}` : ''}`);
     } else if (a.have.length) {
       out.push(`Uses ${plural(a.have.length, 'thing')} you have`);
     }
@@ -412,6 +529,7 @@
     const used = a.have.filter(h => products[h.f.id].life <= 10).map(h => h.f.uid);
     state.fridge = state.fridge.filter(f => !used.includes(f.uid));
     state.cooked.push({ rid, date: Date.now(), rescued, value, kg: rescued * KG_PER_ITEM });
+    if (a.r.serves >= 2) addToFridge('leftovers', { labelText: `Leftover ${a.r.name}`, days: 4, src: 'leftover', qty: `${a.r.serves - 1} servings` });
     state.justCooked = rid;
     persist();
   }
@@ -484,6 +602,7 @@
     clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
     plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
     house: '<svg viewBox="0 0 24 24"><path d="M3.5 11L12 4l8.5 7M6 9.5V20h12V9.5"/></svg>',
+    snow: '<svg viewBox="0 0 24 24"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5"/></svg>',
     tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>',
   };
 
@@ -601,25 +720,78 @@
   function fridgeRow(f) {
     const d = daysLeft(f);
     const p = products[f.id];
+    const open = state.openItem === f.uid;
     const isNew = state.highlight.includes(f.uid);
-    return `<li class="frow ${isNew ? 'new' : ''}">
-      <span class="exp ${urgency(d)}">${dayBadge(d)}</span>
-      <div class="frow-main"><strong>${p.name}</strong><span>${esc(f.qty)}${f.owner !== 'You' ? ` · <b class="owner">${f.owner === 'Shared' ? 'Shared' : esc(f.owner) + "'s"}</b>` : ''}</span></div>
+    const hint = f.frozen ? 'frozen' : f.src === 'label' ? 'date from label' : f.src === 'opened' ? 'opened' : f.src === 'leftover' ? 'cooked leftovers' : '';
+    const adj = learnAdj(f.id);
+    return `<li class="frow ${isNew ? 'new' : ''} ${open ? 'open' : ''}">
+      <span class="exp ${f.frozen ? 'frozen' : urgency(d)}">${rangeText(f)}</span>
+      <button class="frow-main" data-action="openitem" data-id="${f.uid}" aria-expanded="${open}"><strong>${esc(itemName(f))}</strong><span>${esc(f.qty)}${f.owner !== 'You' ? ` · <b class="owner">${f.owner === 'Shared' ? 'Shared' : esc(f.owner) + "'s"}</b>` : ''}${hint ? ` · ${hint}` : ''}</span></button>
       <button class="icon-btn" data-action="used" data-id="${f.uid}" aria-label="Used it" title="Used it">${ICONS.check}</button>
       <button class="icon-btn" data-action="tossed" data-id="${f.uid}" aria-label="Threw it out" title="Threw it out">${ICONS.trash}</button>
-    </li>`;
+    </li>
+    ${open ? `<li class="fdetail">
+      <p>${sourceText(f)}</p>
+      ${adj && !f.frozen && f.src !== 'label' ? `<p class="learned">${ICONS.spark}Adjusted for you: about ${plural(Math.abs(adj), 'day')} ${adj < 0 ? 'shorter' : 'longer'} than usual, based on your past ${lower(p.name)}.</p>` : ''}
+      <div class="detail-actions">
+        ${p.open && !f.opened && !f.frozen ? `<button class="btn small outline" data-action="iopen" data-id="${f.uid}">Mark opened</button>` : ''}
+        ${p.freeze && !f.frozen ? `<button class="btn small outline" data-action="ifreeze" data-id="${f.uid}">${ICONS.snow}Freeze it</button>` : ''}
+        ${f.frozen ? `<button class="btn small outline" data-action="ithaw" data-id="${f.uid}">Thaw it</button>` : ''}
+        <label class="date-set">Label date<input type="date" class="label-date" data-id="${f.uid}"></label>
+      </div>
+      ${!f.frozen ? `<div class="detail-check"><span>Is it still good?</span><button class="btn small" data-action="igood" data-id="${f.uid}">Still good</button><button class="btn small outline" data-action="igone" data-id="${f.uid}">Gone off</button></div>` : ''}
+    </li>` : ''}`;
+  }
+
+  // One prompt at a time: meat that needs cooking or freezing today, or a
+  // quick check on something at the early end of its window.
+  function checkCard() {
+    const due = fridgeAll().filter(f => !f.frozen && daysLeft(f) <= 0 && daysHi(f) >= 0).sort((a, b) => a.expLo - b.expLo);
+    const meat = fridgeAll().find(f => !f.frozen && (products[f.id].flags || []).includes('meat') && daysHi(f) <= 1 && products[f.id].freeze);
+    if (meat) {
+      const top = rankedMeals('all').find(a => a.have.some(h => h.f.uid === meat.uid));
+      return `<div class="check-card urgent">
+        <span class="eyebrow">Today</span>
+        <h3>Cook or freeze your ${lower(itemName(meat))}</h3>
+        <p>Raw meat keeps about 1 to 2 days in the fridge. Freezing it now keeps it for months.</p>
+        <div class="row">${top ? `<button class="btn small" data-action="recipe" data-id="${top.r.id}">Cook ${top.r.name}</button>` : ''}<button class="btn small outline" data-action="ifreeze" data-id="${meat.uid}">${ICONS.snow}Freeze it</button></div>
+      </div>`;
+    }
+    const f = due[0];
+    if (!f) return '';
+    return `<div class="check-card">
+      <span class="eyebrow">Quick check</span>
+      <h3>${esc(itemName(f))}: still good?</h3>
+      <p>It's at the early end of its usual window. Your answer makes future estimates more accurate.</p>
+      <div class="row"><button class="btn small" data-action="igood" data-id="${f.uid}">Still good</button><button class="btn small outline" data-action="igone" data-id="${f.uid}">Gone off</button></div>
+    </div>`;
+  }
+
+  // Food this user keeps throwing out.
+  function wasteNudge() {
+    const id = Object.keys(state.tossLog).find(k => state.tossLog[k] >= 2 && !products[k].leftover && !state.nudgeDismissed.includes(k));
+    if (!id) return '';
+    const p = products[id];
+    const alt = p.swap && products[p.swap];
+    return `<div class="nudge">
+      ${ICONS.spark}
+      <div><strong>You've thrown out ${lower(p.name)} ${state.tossLog[id]} times</strong>
+      <span>Next time try ${alt ? `${lower(alt.name)} (keeps about ${Math.round(alt.life / 30)} months) or ` : ''}a smaller pack${p.freeze ? ', or freeze half when you get home' : ''}.</span></div>
+      <button class="icon-btn" data-action="nudgeok" data-id="${id}" aria-label="Dismiss">${ICONS.cross}</button>
+    </div>`;
   }
 
   function renderFridge() {
     const all = fridgeAll();
     const shown = all.filter(f => state.fridgeFilter === 'all' ? true : state.fridgeFilter === 'mine' ? f.owner === 'You' : f.owner !== 'You')
-      .sort((a, b) => a.exp - b.exp);
+      .sort((a, b) => a.expLo - b.expLo);
     const urgent = expiringItems();
     const top = rankedMeals('all')[0];
     const groups = [
-      ['Use soon', shown.filter(f => daysLeft(f) <= USE_SOON)],
-      ['This week', shown.filter(f => daysLeft(f) > USE_SOON && daysLeft(f) <= 7)],
-      ['Later', shown.filter(f => daysLeft(f) > 7)],
+      ['Use soon', shown.filter(f => !f.frozen && daysLeft(f) <= USE_SOON)],
+      ['This week', shown.filter(f => !f.frozen && daysLeft(f) > USE_SOON && daysLeft(f) <= 7)],
+      ['Later', shown.filter(f => !f.frozen && daysLeft(f) > 7)],
+      ['Freezer', shown.filter(f => f.frozen)],
     ].filter(([, list]) => list.length);
 
     const title = all.length ? `${plural(all.length, 'item')} in your fridge` : 'Your fridge is empty';
@@ -639,6 +811,8 @@
       <section class="screen">
         ${band(P().house ? `${ICONS.house} House fridge` : 'Your fridge', title, sub,
           `<div class="band-actions"><button class="btn small" data-action="goscan">${ICONS.camera}Scan</button><button class="btn small outline" data-action="typeitems">${ICONS.plus}Add items</button></div>`)}
+        ${checkCard()}
+        ${wasteNudge()}
         ${tonight}
         ${P().house ? `<div class="seg fridge-filter">${[['all', 'Everything'], ['mine', 'Mine'], ['house', 'House and roommates']].map(([v, l]) => `<button class="${state.fridgeFilter === v ? 'on' : ''}" data-action="ffilter" data-id="${v}">${l}</button>`).join('')}</div>` : ''}
         ${groups.map(([label, list]) => `
@@ -651,7 +825,7 @@
             <span class="switch ${P().house ? 'on' : ''}"></span>
           </button>
         </div>
-        <p class="footnote">Expiry dates are estimates based on typical fridge storage (USDA FoodKeeper and Health Canada). When in doubt, throw it out.</p>
+        <p class="footnote">Tap an item to mark it opened, freeze it or enter the label date. Estimates use typical storage (USDA FoodKeeper, Health Canada) and learn from your answers. When in doubt, throw it out.</p>
       </section>`;
     state.highlight = [];
   }
@@ -749,8 +923,8 @@
             const [cl, cc] = confLabel(f.conf);
             return `<li class="${f.keep ? '' : 'off'}">
               <button class="tick ${f.keep ? 'on' : ''}" data-action="rkeep" data-id="${i}" aria-label="Keep this item">${ICONS.check}</button>
-              <div class="rv-main"><strong>${products[f.id].name}</strong><span>${esc(f.qty || products[f.id].unit)} · <b class="conf ${cc}">${cl}</b></span></div>
-              <div class="days-step"><button data-action="rdays" data-id="${i}" data-d="-1" aria-label="Fewer days">&minus;</button><span class="exp ${urgency(f.days)}">${dayBadge(f.days)}</span><button data-action="rdays" data-id="${i}" data-d="1" aria-label="More days">+</button></div>
+              <div class="rv-main"><strong>${products[f.id].name}</strong><span>${esc(f.qty || products[f.id].unit)} · <b class="conf ${cc}">${cl}</b>${f.label ? ' · <b class="conf high">date from label</b>' : ''}</span></div>
+              <div class="days-step"><button data-action="rdays" data-id="${i}" data-d="-1" aria-label="Fewer days">&minus;</button><span class="exp ${urgency(estimateRange(f.days, f.label)[0])}">${rangeFromDays(f.days, f.label)}</span><button data-action="rdays" data-id="${i}" data-d="1" aria-label="More days">+</button></div>
             </li>`;
           }).join('') || '<li class="empty-note">Nothing added yet.</li>'}
         </ul>
@@ -780,8 +954,8 @@
           <div class="item-info">
             <strong>${p.name}</strong>
             <span><b class="conf ${cc}">${cl}${f.conf ? ` · ${Math.round(f.conf * 100)}%` : ''}</b></span>
-            <span>${esc(f.qty || p.unit)}</span>
-            <div class="days-step"><button data-action="rdays" data-id="0" data-d="-1" aria-label="Fewer days">&minus;</button><span class="exp ${urgency(f.days)}">${dayBadge(f.days)}</span><button data-action="rdays" data-id="0" data-d="1" aria-label="More days">+</button></div>
+            <span>${esc(f.qty || p.unit)}${f.label ? ' · <b class="conf high">date read from label</b>' : ' · estimated'}</span>
+            <div class="days-step"><button data-action="rdays" data-id="0" data-d="-1" aria-label="Fewer days">&minus;</button><span class="exp ${urgency(estimateRange(f.days, f.label)[0])}">${rangeFromDays(f.days, f.label)}</span><button data-action="rdays" data-id="0" data-d="1" aria-label="More days">+</button></div>
           </div>
         </div>
         <div class="card">
@@ -800,7 +974,7 @@
 
   function confirmScan() {
     const kept = state.scan.found.filter(f => f.keep);
-    const added = kept.map(f => addToFridge(f.id, { qty: f.qty, days: f.days }));
+    const added = kept.map(f => addToFridge(f.id, { qty: f.qty, days: f.days, label: f.label, opened: f.opened, src: f.label ? 'label' : 'estimate' }));
     state.highlight = added.map(a => a.uid);
     persist();
     return added.length;
@@ -893,7 +1067,7 @@
     const done = state.justCooked === r.id;
     const tags = recipeTags(r);
     const ing = [
-      ...a.have.map(h => `<li class="ing have"><span class="ing-ic">${ICONS.check}</span><div><strong>${products[h.f.id].name}</strong><span>${esc(h.ing.amt)} · in your fridge${h.f.owner !== 'You' ? ` (${h.f.owner === 'Shared' ? 'shared' : esc(h.f.owner) + "'s"})` : ''}</span></div><span class="exp ${urgency(h.days)}">${dayBadge(h.days)}</span></li>`),
+      ...a.have.map(h => `<li class="ing have"><span class="ing-ic">${ICONS.check}</span><div><strong>${esc(itemName(h.f))}</strong><span>${esc(h.ing.amt)} · in your fridge${h.f.owner !== 'You' ? ` (${h.f.owner === 'Shared' ? 'shared' : esc(h.f.owner) + "'s"})` : ''}</span></div><span class="exp ${h.f.frozen ? 'frozen' : urgency(h.days)}">${rangeText(h.f)}</span></li>`),
       ...a.need.map(n => `<li class="ing need"><span class="ing-ic">${ICONS.cart}</span><div><strong>${products[n.ing.id].name}</strong><span>${esc(n.ing.amt)} · ${n.best ? `${money(n.best.price)} at ${stores[n.best.store].name}` : 'not sold nearby'}${n.best && n.best.deal ? ' <b class="tag">Sale</b>' : ''}</span></div></li>`),
       ...a.opt.map(o => `<li class="ing opt"><span class="ing-ic">${ICONS.plus}</span><div><strong>${products[o.ing.id].name}</strong><span>${esc(o.ing.amt)} · optional</span></div></li>`),
     ].join('');
@@ -931,7 +1105,7 @@
     const p = products[it.id];
     const b = bestNearby(it.id);
     return `<li>
-      <div><strong>${p.name}${b && b.deal ? '<b class="tag">Sale</b>' : ''}</strong><span>${b ? `${money(b.price)} at ${stores[b.store].name}` : 'Not sold nearby'}${it.why ? ` · for ${esc(it.why)}` : ''}</span></div>
+      <div><strong>${p.name}${b && b.deal ? '<b class="tag">Sale</b>' : ''}</strong><span>${b ? `${money(b.price)} at ${stores[b.store].name}` : 'Not sold nearby'}${it.why ? ` · for ${esc(it.why)}` : ''}</span>${(state.tossLog[it.id] || 0) >= 2 ? `<span class="toss-warn">You've thrown this out ${state.tossLog[it.id]} times. Buy a smaller pack?</span>` : ''}</div>
       <div class="qty">
         <button data-action="qty" data-id="${it.id}" data-d="-1" aria-label="Fewer">&minus;</button>
         <b>${it.qty}</b>
@@ -1268,6 +1442,15 @@
 
   // ---------- profile and memory ----------
 
+  function learnedList() {
+    const rows = [
+      ...Object.keys(state.learn).filter(id => learnAdj(id)).map(id => `${products[id].name}: about ${plural(Math.abs(learnAdj(id)), 'day')} ${learnAdj(id) < 0 ? 'shorter' : 'longer'} than usual in your fridge`),
+      ...Object.keys(state.tossLog).filter(id => state.tossLog[id] >= 2 && !products[id].leftover).map(id => `You often throw out ${lower(products[id].name)}`),
+      ...D.recipes.filter(r => skippedCount(r.id) > 0).map(r => `You keep skipping ${r.name}, so it ranks lower`),
+    ];
+    return rows.length ? `<ul class="learned-list">${rows.map(r => `<li>${r}</li>`).join('')}</ul>` : '';
+  }
+
   function renderProfile() {
     const liked = Object.keys(state.ratings).filter(id => state.ratings[id] > 0).map(id => recipes[id]);
     const disliked = Object.keys(state.ratings).filter(id => state.ratings[id] < 0).map(id => recipes[id]);
@@ -1285,6 +1468,12 @@
           <div class="field-label">Liked</div>
           <div class="quick">${liked.map(r => `<button class="chip" data-action="unrate" data-id="${r.id}">${r.name} &times;</button>`).join('') || '<span class="empty-note">Rate a meal after cooking it.</span>'}</div>
           ${disliked.length ? `<div class="field-label">Not for you</div><div class="quick">${disliked.map(r => `<button class="chip" data-action="unrate" data-id="${r.id}">${r.name} &times;</button>`).join('')}</div>` : ''}
+        </div>
+        <div class="card memory">
+          <h2>${ICONS.spark} Learned from what you do</h2>
+          <p class="card-note">No ratings needed. SNARE adjusts as you use and throw out food.</p>
+          ${learnedList() || '<span class="empty-note">Nothing yet. Answer a "still good?" check or throw something out and it shows up here.</span>'}
+          ${learnedList() ? '<button class="link" data-action="forgetlearned">Forget all of this</button>' : ''}
         </div>
         <div class="card">
           <button class="switch-row" data-action="house" aria-pressed="${P().house}">
@@ -1353,9 +1542,9 @@
       const item = fridgeAll().find(f => mentioned.some(p => p.id === f.id)) || expiringItems()[0];
       const general = 'Best before dates are about quality, not safety (CFIA), but raw meat, fish and leftovers are the ones to be strict about. If it smells sour, feels slimy or looks off, throw it out. <b>When in doubt, throw it out.</b>';
       if (!item) return say(general);
-      const p = products[item.id], d = daysLeft(item);
+      const p = products[item.id], d = daysHi(item);
       const top = rankedMeals('all').find(a => a.have.some(h => h.f.uid === item.uid));
-      return say(`<b>${p.name}</b>: ${d <= 0 ? 'past its usual window' : `about <b>${plural(d, 'day')} left</b>`} by our estimate. ${p.flags && p.flags.includes('meat') ? 'Raw meat usually keeps 1 to 2 days in the fridge, so cook it today or freeze it.' : ''} ${general}`,
+      return say(`<b>${esc(itemName(item))}</b>: ${d <= 0 ? 'past its usual window' : `about <b>${plural(d, 'day')} left</b>`} by our estimate. ${p.flags && p.flags.includes('meat') ? 'Raw meat usually keeps 1 to 2 days in the fridge, so cook it today or freeze it.' : ''} ${general}`,
         top ? [aiAct(`Cook ${top.r.name}`, 'recipe', top.r.id)] : []);
     }
 
@@ -1388,7 +1577,7 @@
       const exp = expiringItems();
       if (!exp.length) return say("Nothing is close to expiring. Nice work. Want ideas anyway?", [aiAct('See meals', 'tab', 'meals')]);
       const top = rankedMeals('all')[0];
-      return say(`Use these first:<ul>${exp.slice(0, 4).map(f => `<li><b>${products[f.id].name}</b>, ${dayWord(daysLeft(f))}</li>`).join('')}</ul>${top ? `<b>${top.r.name}</b> uses ${plural(top.expiring.length, 'of them')}.` : ''}`,
+      return say(`Use these first:<ul>${exp.slice(0, 4).map(f => `<li><b>${esc(itemName(f))}</b>, ${rangeText(f).toLowerCase()} left</li>`).join('')}</ul>${top ? `<b>${top.r.name}</b> uses ${plural(top.expiring.length, 'of them')}.` : ''}`,
         top ? [aiAct('Open recipe', 'recipe', top.r.id)] : []);
     }
 
@@ -1450,7 +1639,7 @@
       const exp = expiringItems();
       state.aiMsgs.push({
         from: 'ai',
-        html: `Hi! I can see your fridge, your ${money(P().budget)} weekly budget and deals near ${esc(home().name)}.${exp.length ? ` Heads up: your <b>${lower(products[exp[0].id].name)}</b> ${dayWord(daysLeft(exp[0]))}.` : ''} What do you need?`,
+        html: `Hi! I can see your fridge, your ${money(P().budget)} weekly budget and deals near ${esc(home().name)}.${exp.length ? ` Heads up: your <b>${esc(lower(itemName(exp[0])))}</b> ${dayWord(daysLeft(exp[0]))}.` : ''} What do you need?`,
       });
     }
     renderAI();
@@ -1610,6 +1799,8 @@
 
   function openRecipe(id) {
     state.recipeId = id;
+    state.views[id] = (state.views[id] || 0) + 1;
+    persist();
     if (state.justCooked !== id) state.justCooked = null;
     state.feedbackChip = null;
     go('recipe');
@@ -1673,14 +1864,26 @@
       // fridge
       case 'goscan': go('scan'); break;
       case 'ffilter': state.fridgeFilter = id; rerender(); break;
-      case 'used':
-      case 'tossed': {
+      case 'used': {
         const f = state.fridge.find(x => x.uid === id);
         state.fridge = state.fridge.filter(x => x.uid !== id);
-        if (action === 'tossed') { state.tossed++; toast(`${products[f.id].name} logged as wasted. We'll flag it sooner next time.`); }
-        else toast(`${products[f.id].name} marked as used`);
+        toast(`${itemName(f)} marked as used`);
         persist(); rerender(); break;
       }
+      case 'tossed':
+      case 'igone': {
+        const f = state.fridge.find(x => x.uid === id);
+        tossItem(f);
+        toast(`${itemName(f)} logged as wasted. We'll warn you sooner next time.`);
+        persist(); rerender(); break;
+      }
+      case 'openitem': state.openItem = state.openItem === id ? null : id; rerender(); break;
+      case 'iopen': { const f = state.fridge.find(x => x.uid === id); markOpened(f); toast(`${itemName(f)} marked opened: ${rangeText(f).toLowerCase()} left`); persist(); rerender(); break; }
+      case 'ifreeze': { const f = state.fridge.find(x => x.uid === id); freezeItem(f); state.openItem = null; toast(`${itemName(f)} moved to the freezer. Good for about ${Math.round(products[f.id].freeze / 30)} months.`); persist(); rerender(); break; }
+      case 'ithaw': { const f = state.fridge.find(x => x.uid === id); thawItem(f); toast(`${itemName(f)} thawed. Use it within 2 days.`); persist(); rerender(); break; }
+      case 'igood': { const f = state.fridge.find(x => x.uid === id); stillGood(f); toast(`Thanks! We'll expect ${lower(products[f.id].name)} to last a little longer for you.`); persist(); rerender(); break; }
+      case 'nudgeok': state.nudgeDismissed.push(id); rerender(); break;
+      case 'forgetlearned': state.learn = {}; state.tossLog = {}; state.views = {}; persist(); rerender(); break;
 
       // scanning
       case 'demoshelf': startShelfScan('demo'); break;
@@ -1694,7 +1897,7 @@
       }
       case 'ifix': {
         const f = state.scan.found[0];
-        Object.assign(f, { id, qty: products[id].unit, days: products[id].life, conf: null });
+        Object.assign(f, { id, qty: products[id].unit, days: products[id].life, conf: null, label: false });
         state.query = ''; rerender(); break;
       }
       case 'rescan': { const n = confirmScan(); toast(`${plural(n, 'item')} added. Scan the next shelf.`); go('scan'); break; }
@@ -1765,7 +1968,7 @@
         const p = result.options.find(o => o.id === state.selected).plan;
         state.trips.push(tripRecord(p));
         const bought = Object.values(p.assign).flat();
-        const added = bought.map(l => addToFridge(l.id));
+        const added = bought.map(l => addToFridge(l.id, { src: 'trip' }));
         state.highlight = added.map(a => a.uid);
         state.items = state.items.filter(it => !bought.some(l => l.id === it.id));
         state.loggedTrip = true;
@@ -1791,6 +1994,12 @@
   });
 
   app.addEventListener('change', e => {
+    if (e.target.classList.contains('label-date') && e.target.value) {
+      const f = state.fridge.find(x => x.uid === e.target.dataset.id);
+      setLabelDate(f, e.target.value);
+      toast(`${itemName(f)} set to the label date, ${fmtDate(f.expHi)}`);
+      persist(); rerender(); return;
+    }
     if (e.target.id === 'area') { P().area = e.target.value; persist(); }
     if (e.target.id === 'radius-num') setRadius(e.target.value);
     const file = e.target.files && e.target.files[0];
