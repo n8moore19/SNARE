@@ -10,5 +10,21 @@ compatibility_flags = ["nodejs_compat"]
 ALLOWED_ORIGINS = "https://n8moore19.github.io"
 # Claude model. claude-opus-5-5 is the default; claude-haiku-5-5 is much cheaper.
 MODEL = "claude-opus-5-5"
+# Model for the launch agents (Chief of Staff and the rest).
+AGENT_MODEL = "claude-opus-5-5"
 
-# The API key is a secret, set with: npx wrangler secret put ANTHROPIC_API_KEY
+# Storage for the agents: team tasks and each agent's latest output.
+# Create it once with: npx wrangler kv namespace create AGENTS
+# then paste the id it prints below.
+[[kv_namespaces]]
+binding = "AGENTS"
+id = "PASTE_KV_ID_HERE"
+
+# The Chief of Staff writes the daily brief at 13:00 UTC: 8:00 in Toronto in
+# winter, 9:00 in summer time.
+[triggers]
+crons = ["0 13 * * *"]
+
+# Secrets (never in this file):
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put TEAM_KEY     (a passcode your team types to run agents and edit tasks)

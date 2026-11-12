@@ -28,9 +28,30 @@ assistant automatically if the worker is ever unreachable.
    npx wrangler secret put ANTHROPIC_API_KEY # paste the key when asked
    ```
 
+   Then set up storage and a team passcode for the launch agents:
+
+   ```bash
+   npx wrangler kv namespace create AGENTS   # paste the id it prints into wrangler.toml
+   npx wrangler secret put TEAM_KEY           # a passcode your team types to run agents and edit tasks
+   npx wrangler deploy                        # deploy again so the agents and the 8:00 schedule go live
+   ```
+
 4. **Connect the app**: put the URL that `deploy` printed into `config.js` at the root
    of the project (`window.SNARE_AI_URL = 'https://snare-ai.<you>.workers.dev';`),
    then push to GitHub.
+
+## Launch agents
+
+The same worker runs the launch agents shown on `org.html`.
+
+- **Chief of Staff** (built): writes the team's daily brief at 13:00 UTC (8:00 in Toronto
+  in winter, 9:00 in summer), and on demand with Run now. It reads the team task list
+  (edited on the org page, saved in KV), real commits to the SNARE repo from GitHub, the
+  other agents' latest outputs, and sample app metrics (labelled sample until real users).
+  About 10 to 15 cents a run on Opus 5.5.
+- Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
+  `POST /agents/chief/run`. Changing tasks or running an agent needs the `X-Team-Key` header
+  (the team passcode).
 
 ## Settings (wrangler.toml)
 

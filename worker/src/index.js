@@ -3,6 +3,7 @@
 // of app actions. The website never sees the API key.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { handleAgents, runChief } from "./agents.js";
 
 const ACTION_TYPES = [
   "open_recipe",      // target: recipe id
@@ -88,14 +89,16 @@ export default {
     const origin = request.headers.get("Origin") || "";
     const cors = {
       "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : allowed[0] || "",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, X-Team-Key",
       Vary: "Origin",
     };
 
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-    if (request.method !== "POST") return json({ error: "Use POST" }, 405, cors);
     if (!allowed.includes(origin)) return json({ error: "This site is not allowed" }, 403, cors);
+    // Launch agents live under /agents; everything else is the app's chat.
+    if (new URL(request.url).pathname.startsWith("/agents")) return handleAgents(request, env, cors);
+    if (request.method !== "POST") return json({ error: "Use POST" }, 405, cors);
     if (tooMany(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many messages, slow down" }, 429, cors);
 
     let body;
@@ -139,5 +142,10 @@ export default {
       if (error instanceof SyntaxError) return json({ error: "AI reply was not valid JSON" }, 502, cors);
       return json({ error: "Unexpected server error" }, 500, cors);
     }
+  },
+
+  // Cron trigger (wrangler.toml): the Chief of Staff writes the brief each morning.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runChief(env).catch((error) => console.error("Chief of Staff run failed:", error.message)));
   },
 };
