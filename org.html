@@ -882,7 +882,6 @@
                     <g id="link-g"></g>
                   </svg>
                   <div id="talk-layer"></div>
-                  <div class="replay-tag" id="mc-replaying" hidden>Replay · animation only, nothing is running</div>
                 </div>
               </div>
               <p class="stage-note">Click anyone to open their page. When agents pass work to each other, you'll see them talk.</p>
@@ -1193,8 +1192,8 @@
   <div class="detail" id="op-modal" role="dialog" aria-modal="true" aria-label="One page pitch" hidden></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="config.js?v=202611121048"></script>
-  <script src="data.js?v=202611121048"></script>
+  <script src="config.js?v=202611121101"></script>
+  <script src="data.js?v=202611121101"></script>
   <script>
   (function () {
     'use strict';
@@ -1210,7 +1209,7 @@
 
     // runs, input and output tokens per run in a launch month; f = cost multiplier at growth and scale.
     const AGENTS = [
-      { id: 'chief', name: 'Chief of Staff', group: 'chief', model: 'opus', auto: 'auto', built: true, runs: 30, inTok: 60000, outTok: 5000, f: [1.5, 2.5],
+      { id: 'chief', name: 'Chief of Staff', group: 'chief', model: 'sonnet', auto: 'auto', built: true, runs: 30, inTok: 60000, outTok: 5000, f: [1.5, 2.5],
         job: 'Coordinates every agent and writes the team a daily brief.',
         cadence: 'Every morning at 8:00, plus on demand',
         does: ['Reads every agent\'s log and the key numbers', 'Writes a five minute daily brief and a weekly report', 'Assigns work when an agent needs another agent', 'Collects anything waiting at a human gate into one list'],
@@ -1261,7 +1260,7 @@ Slide 2: Cook what expires first: Leftover Egg Fried Rice, 15 minutes.
 Caption: Snap your receipt, see what expires first, earn grocery money. Join the waitlist: {link}
 Fact: cited to its source page.` },
 
-      { id: 'sales', name: 'B2B sales', group: 'sell', model: 'opus', auto: 'gate', built: true, runs: 4, inTok: 180000, outTok: 18000, extra: 0.5, extraNote: '48 web searches', f: [1.5, 3],
+      { id: 'sales', name: 'B2B sales', group: 'sell', model: 'sonnet', auto: 'gate', built: true, runs: 4, inTok: 180000, outTok: 18000, extra: 0.5, extraNote: '48 web searches', f: [1.5, 3],
         job: 'Finds data buyers and writes the pitch for each.',
         cadence: 'Weekly, Thursdays, plus Run now',
         does: ['Finds Canadian food brands, grocers and governments with a reason to care now', 'Names the role to reach and a public way in, never personal details', 'Writes a tailored email for each prospect', 'Builds a printable one page pitch with real cited stats', 'Uses buyer leads from Market intelligence'],
@@ -1274,7 +1273,7 @@ Reach: Director of Consumer Insights, via the partnerships page.
 Question we answer: how much of a full loaf do students throw out, and when?
 Email and one page pitch ready to send.` },
 
-      { id: 'insights', name: 'Insights analyst', group: 'sell', model: 'opus', auto: 'auto', built: true, runs: 28, inTok: 8000, outTok: 3000, batch: true, f: [3, 10],
+      { id: 'insights', name: 'Insights analyst', group: 'sell', model: 'sonnet', auto: 'auto', built: true, runs: 28, inTok: 8000, outTok: 3000, batch: true, f: [3, 10],
         job: 'Turns the student panel into reports buyers pay for.',
         cadence: 'Weekly, Fridays, as a half price batch',
         does: ['Collects real used and tossed events from students who opt in', 'Counts every number over at least 50 distinct students', 'Writes a weekly brief: what was wasted, when and why', 'Writes a report for each prospect in the sales pipeline', 'Sends real stats to Content creation, never sample ones', 'Works on a labelled sample panel until 50 real students share'],
@@ -3186,7 +3185,6 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       if (mc.replay) return;
       mc.replay = true;
       const btn = document.getElementById('mc-replay'); btn.disabled = true;
-      document.getElementById('mc-replaying').hidden = false;
       const wait = ms => new Promise(r => setTimeout(r, ms));
       for (const id of ['market', 'growth', 'content', 'sales', 'insights', 'router', 'privacy', 'rewards', 'chief']) {
         mc.localRun[id] = new Date().toISOString(); paintNodes();
@@ -3196,7 +3194,6 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
         animateEvent({ agent: id, type: 'done', from: [], to: SENDS_UI[id] });
         await wait(1900);
       }
-      document.getElementById('mc-replaying').hidden = true;
       btn.disabled = false; mc.replay = false;
     }
 
@@ -3463,35 +3460,42 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     }
     const otHome = () => { if (location.hash) history.pushState('', '', location.pathname + location.search); route(); };
 
+    const $m = id => { const c = cost(byId[id]); return c < 1 ? 'under $1' : 'about ' + money(c); };
     const OT = [
-      { title: 'The scoreboard', text: 'The first thing the team sees each day: waitlist sign ups, students sharing data toward the 50 student threshold, agent runs this week, decisions waiting for a person, and AI spend against a $30 monthly limit.',
+      { title: 'The scoreboard', text: () => `The team's day starts here: waitlist sign ups, students sharing data toward 50, agent runs, decisions waiting for a person, and today's AI budget. Every Claude call checks that budget first, so the whole organization can never overspend.`,
         async run(r) { otHome(); await otShow('#score', r, 1200); for (const t of document.querySelectorAll('#score .tile')) await otPoint(t, r); } },
-      { title: 'Meet the Dream Team', text: 'Ten AI agents, each with one job. The Chief of Staff on top, then three groups: grow students, sell data, and run safely. The five of us sit at the bottom and hold three keys.',
+      { title: 'Meet the Dream Team', text: () => `Ten AI agents, each with one job. Three groups: grow students (that is the asset), sell data (that is the revenue), and run safely (that protects both). The five of us hold three keys.`,
         async run(r) { otHome(); await otShow('.stage-card', r, 1400); await otPoint('.member[data-m="chief"] .av', r); for (const c of document.querySelectorAll('.col-label')) await otPoint(c, r); await otPoint('.member[data-m="team"]', r); } },
-      { title: 'Watch them work together', text: 'Each agent reads what the others found and passes its work on. Glowing lines show who is talking to whom. This is a replay of a normal week, at speed.',
-        async run(r) { otHome(); await otShow('.hub-head', r, 600, 'start'); await otPoint('#mc-replay', r, true); otGlow($('.stage-card')); await otWait(14000, r); } },
-      { title: 'Ask the Chief of Staff', text: 'Anyone on the team can ask what is going on across the organization. He answers from every agent\'s latest work, and can run an agent or add a task in one tap. Asking needs the team passcode.',
-        async run(r) { otHome(); await otShow('#chief-chat', r, 900); await otType('What needs me right now?', r); await otWait(2600, r); $('#cc-text').value = ''; } },
-      { title: 'Brief and the three gates', text: 'The Chief writes a daily brief. Anything that needs a human waits here: Gate 1 approves a new data buyer, Gate 2 any payout over $500 a week, Gate 3 anything the privacy guard could not fix.',
-        async run(r) { otHome(); await otShow('#hub-brief', r, 3800); await otShow('#hub-waiting', r, 4200); } },
-      { title: 'Live activity', text: 'Every run, hand off and error lands here in real time, in plain words. Agents run on a schedule each weekday, and any of them can also be run by hand.',
-        async run(r) { otHome(); await otShow($('#feed').closest('.panel'), r, 4600); } },
-      { title: 'Grow students: Market intelligence', text: 'Every Monday it searches the web for competitors, buyers and policy news. Each finding links to a real source, and buyer leads go straight to B2B sales.',
+      { title: 'Watch them work together', text: () => `A normal week, at speed. Research becomes leads, leads become pitches, student data becomes reports, and reports reach buyers. Each glowing line is work being handed on.`,
+        async run(r) { otHome(); await otShow('.hub-head', r, 600, 'start'); await otPoint('#mc-replay', r, true); otGlow($('.stage-card')); await otWait(13000, r); } },
+      { title: 'Chief of Staff', agent: 'chief', text: () => `Coordinates everyone and writes the daily brief, for ${$m('chief')} a month. It replaces a coordinator role, so the five of us spend about 3 hours a week on operations instead of a full time job.`,
+        async run(r) { await otOpen('chief', r); } },
+      { title: 'Market intelligence', agent: 'market', text: () => `Searches the web every Monday for competitors, policy and companies with a reason to buy food waste data. Every buyer lead goes to sales. Cost: ${$m('market')} a month. Its job is the top of the revenue funnel.`,
         async run(r) { await otOpen('market', r); } },
-      { title: 'Grow students: Content creation', text: 'Every Wednesday it writes Instagram, LinkedIn and campus posts from real, cited facts, with designed images. Nothing is posted until the privacy guard clears it.',
+      { title: 'Student acquisition', agent: 'growth', text: () => `Finds clubs, residences and events near Western and Fanshawe. Students are the asset: the data only becomes sellable at 50 students sharing, and every student after that makes each report worth more. Cost: ${$m('growth')} a month.`,
+        async run(r) { await otOpen('growth', r); } },
+      { title: 'Content creation', agent: 'content', text: () => `Writes six cited posts a week with designed images. That is our marketing with no ad spend: ${$m('content')} a month instead of paying for reach.`,
         async run(r) { await otOpen('content', r); } },
-      { title: 'Sell data: Insights analyst', text: 'Turns anonymous student events into totals: what gets wasted, when and why. Every number covers at least 50 students. Until 50 real students share, it works on a labelled sample panel.',
+      { title: 'B2B sales', agent: 'sales', text: () => `Turns leads into paying buyers: food brands, grocers and the city. It names the right person, writes a tailored email and a one page pitch with real stats. Every price or contract still needs a person at Gate 1. Cost: ${$m('sales')} a month.`,
+        async run(r) { await otOpen('sales', r); } },
+      { title: 'Insights analyst', agent: 'insights', text: () => `Builds the product we sell: a weekly brief and a report for each prospect, from anonymous student events. Runs as a half price batch, ${$m('insights')} a month, and every number covers at least 50 students.`,
         async run(r) { await otOpen('insights', r); } },
-      { title: 'Run safely: Privacy guard', text: 'Every report, post, email and offer passes through here before it goes out. It strips personal details, enforces the 50 student rule, and holds anything it cannot fix at Gate 3.',
+      { title: 'Data and offers router', agent: 'router', text: () => `Gets paid work to the right buyer: reports on schedule, and sponsored offers to the right group of students. Brands pay for those offers and fund the bonus points, so a brand bonus costs SNARE nothing. Cost: ${$m('router')} a month.`,
+        async run(r) { await otOpen('router', r); } },
+      { title: 'Privacy guard', agent: 'privacy', text: () => `Checks every report, post, email and offer before it goes out. The data is only worth paying for if students trust us with it, so this protects the revenue. Anything it can't fix waits at Gate 3. Cost: ${$m('privacy')} a month.`,
         async run(r) { await otOpen('privacy', r); } },
-      { title: 'Run safely: Rewards ops', text: 'Totals points owed to students, catches duplicate receipts by fingerprint, flags unusual earning, and holds weekly payouts over $500 at Gate 2.',
+      { title: 'Student support', agent: 'support', text: () => `Answers student questions about points, gift cards and privacy around the clock on the cheapest model, ${$m('support')} a month. Happy students keep logging, and logging is the data.`,
+        async run(r) { await otOpen('support', r); } },
+      { title: 'Rewards ops', agent: 'rewards', text: () => `Controls our biggest cost: the points we pay students. It totals what is owed, catches duplicate receipts, flags unusual earning, and holds any week over $500 at Gate 2. Cost: ${$m('rewards')} a month.`,
         async run(r) { await otOpen('rewards', r); } },
-      { title: 'Where the data goes', text: 'Collect, analyse, check, route, deliver. Buyers pick a group of students and SNARE shows the offer inside the app. Buyers only ever get counts back, never a list of people.',
-        async run(r) { otHome(); await otWait(400, r); await otShow('.flow', r, 4200); await otShow('.match', r, 4000); } },
-      { title: 'What it costs', text: 'The whole organization costs less per month than one day of a junior hire. Here is the estimate per agent, next to hiring people for the same work.',
-        async run(r) { otHome(); await otWait(400, r); await otShow('.kpis', r, 3200); await otShow('.compare', r, 3800); } },
+      { title: 'Where the money comes from', text: () => `Buyers pay for anonymous totals, never names. Illustrative prices: a brand pays about $5K a report, a discount grocer about $10K a year, the city $20K to $50K a term. Brands also pay offer fees for sponsored bonuses.`,
+        async run(r) { otHome(); await otWait(400, r); await otShow('.flow', r, 3600); await otShow('.outs', r, 5200, 'start'); } },
+      { title: 'What it costs to run', text: () => `All ten agents plus tools cost about ${($('#c-ai') || {}).textContent || 'a few dollars'} a month. Doing the same work with junior hires would cost about ${($('#c-hire') || {}).textContent || 'thousands'} a month.`,
+        async run(r) { otHome(); await otWait(400, r); await otShow('.kpis', r, 3000); await otShow('.compare', r, 4200); } },
+      { title: 'Cost versus profit', text: () => `Year one, illustrative: if four buyers sign, revenue is about $110K. Costs are agents and tools (under $1K a year), student points (about $9K a year for 500 active students) and 3 hours a week of our time. The agents keep costs nearly flat as revenue grows.`,
+        async run(r) { otHome(); await otWait(400, r); await otShow('.compare', r, 6500); } },
     ];
-
+    const otText = st => (typeof st.text === 'function' ? st.text() : st.text);
     const otWide = () => getComputedStyle(document.querySelector('.pitch')).display !== 'none';
     const otCtl = () => `<div class="ot-ctl">
         <button data-ot="back" aria-label="Previous step" ${ot.step === 0 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
@@ -3499,20 +3503,30 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
         <button data-ot="next" aria-label="Next step"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
         <button data-ot="stop" aria-label="End the demo"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>`;
+    // Inside the app's phone, the app narrates beside the phone (same origin).
+    const otHost = () => {
+      try { const h = document.documentElement.classList.contains('embed') && window.parent !== window && window.parent.snareHost; return h && h.wide() ? h : null; } catch (e) { return null; }
+    };
     function otPaint() {
-      const wide = otWide();
+      const host = otHost();
+      const wide = !host && otWide();
       document.body.classList.toggle('ot-wide', ot.on && wide);
-      document.body.classList.toggle('ot-narrow', ot.on && !wide && !ot.ended);
+      document.body.classList.toggle('ot-narrow', ot.on && !wide && !host && !ot.ended);
       const st = OT[ot.step];
+      if (host) {
+        otPanel.hidden = true; otBar.hidden = true;
+        host.narrate(ot.on ? { steps: OT.map(x => x.title), step: ot.step, text: otText(st), paused: ot.paused, ended: ot.ended } : null, otCommand);
+        return;
+      }
       if (!ot.on) { otPanel.hidden = true; otBar.hidden = true; return; }
       if (wide) {
         otBar.hidden = true; otPanel.hidden = false;
         otPanel.innerHTML = `<span class="ot-k">Guided demo</span><h3>The launch organization</h3>
-          <ol>${OT.map((x, i) => `<li class="${i < ot.step ? 'done' : i === ot.step ? 'on' : ''}"><button data-ot="go" data-i="${i}"><i>${i + 1}</i><b>${x.title}</b></button>${i === ot.step && !ot.ended ? `<p>${x.text}</p>` : ''}</li>`).join('')}</ol>
+          <ol>${OT.map((x, i) => `<li class="${i < ot.step ? 'done' : i === ot.step ? 'on' : ''}"><button data-ot="go" data-i="${i}"><i>${i + 1}</i><b>${x.title}</b></button>${i === ot.step && !ot.ended ? `<p>${otText(x)}</p>` : ''}</li>`).join('')}</ol>
           ${ot.ended ? '' : otCtl()}${ot.paused ? '<span class="ot-paused">Paused</span>' : ''}`;
       } else {
         otPanel.hidden = true; otBar.hidden = ot.ended;
-        otBar.innerHTML = `<div class="ot-row"><span class="ot-n">${ot.step + 1}/${OT.length}</span><b>${st.title}</b>${otCtl()}</div><p>${st.text}</p>`;
+        otBar.innerHTML = `<div class="ot-row"><span class="ot-n">${ot.step + 1}/${OT.length}</span><b>${st.title}</b>${otCtl()}</div><p>${otText(st)}</p>`;
       }
     }
     async function otGo(i) {
@@ -3538,9 +3552,9 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       const cost = ($('#k-all') || {}).textContent || '';
       otEnd.innerHTML = `<div class="ot-card"><span class="eyebrow">That's the launch organization</span><h3>Ten agents. Three human keys.</h3>
         <ul>
-          <li>The agents find buyers, grow the student base, write content, build reports and pay rewards on their own.</li>
-          <li>People step in only at three gates: a new buyer, payouts over $500, and anything privacy could not fix.</li>
-          <li>About ${esc(cost || 'a few dollars')} a month in AI and tools, and about 3 hours of human time a week.</li>
+          <li><b>Revenue:</b> anonymous food waste reports and sponsored offers. Illustrative year one, about $110K if four buyers sign.</li>
+          <li><b>Costs:</b> about ${esc(cost || 'a few dollars')} a month for agents and tools, student points, and 3 hours a week of our time.</li>
+          <li><b>Control:</b> people step in only at three gates: a new buyer, payouts over $500, and anything privacy could not fix.</li>
         </ul>
         <div class="acts"><button class="btn" data-ot="replay">Replay</button><button class="btn outline" data-ot="stop">Explore on my own</button></div></div>`;
       otEnd.hidden = false;
@@ -3553,13 +3567,15 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     function otClick(e) {
       const b = e.target.closest('[data-ot]');
       if (!b) return;
-      const a = b.dataset.ot;
+      otCommand(b.dataset.ot, Number(b.dataset.i));
+    }
+    function otCommand(a, i) {
       if (a === 'replay') { ot.paused = false; otGo(0); }
       else if (a === 'stop') { otStop(); otHome(); }
       else if (a === 'pause') { ot.paused = !ot.paused; otPaint(); }
       else if (a === 'next') otGo(Math.min(OT.length - 1, ot.step + 1));
       else if (a === 'back') otGo(Math.max(0, ot.step - 1));
-      else if (a === 'go') otGo(Number(b.dataset.i));
+      else if (a === 'go') otGo(i);
     }
     [otPanel, otBar, otEnd].forEach(el => el.addEventListener('click', otClick));
     document.querySelectorAll('.ot-start').forEach(b => b.addEventListener('click', () => { ot.paused = false; otGo(0); }));

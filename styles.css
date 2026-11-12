@@ -1213,11 +1213,12 @@ body.expanded .splash-hint { display: none; }
 .tour-ctl [data-tour="stop"] svg { fill: none; }
 .tour-panel[hidden] { display: none; }
 body.tour-wide .pitch > :not(.tour-panel) { display: none; }
-.tour-panel { color: #fff; }
+.tour-panel { color: #fff; max-height: calc(100vh - 60px); overflow-y: auto; scrollbar-width: none; padding-right: 4px; }
+.tour-panel::-webkit-scrollbar { display: none; }
 .tp-k { font-size: 12px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lime); }
-.tour-panel h3 { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; margin: 6px 0 16px; line-height: 1.05; }
+.tour-panel h3 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; margin: 6px 0 12px; line-height: 1.05; }
 .tour-panel ol { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 2px; }
-.tour-panel li button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; color: rgba(255, 255, 255, 0.55); font: inherit; text-align: left; padding: 6px 8px; border-radius: 10px; cursor: pointer; }
+.tour-panel li button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; color: rgba(255, 255, 255, 0.55); font: inherit; text-align: left; padding: 4px 8px; border-radius: 10px; cursor: pointer; }
 .tour-panel li button:hover { background: rgba(255, 255, 255, 0.07); }
 .tour-panel li i { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.3); font-style: normal; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
 .tour-panel li b { font-size: 14.5px; font-weight: 700; }

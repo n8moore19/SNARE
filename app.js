@@ -3785,11 +3785,37 @@
     document.getElementById('home-btn').hidden = mode === 'splash';
     if (mode === 'org') orgFrame.src = 'org.html?embed=1&t=' + Date.now() + orgHash;
     else if (orgFrame.getAttribute('src')) orgFrame.removeAttribute('src');
+    if (mode !== 'org' && !tour.on) { document.body.classList.remove('tour-wide'); tourPanel.hidden = true; }
     if (mode !== 'app') { if (tour.on) stopTour(); closeMenu(); closeMoment(); hideNotif(); state.aiOpen = false; renderAI(); }
   }
   document.getElementById('tour-start').addEventListener('click', () => { setPhone('app'); startTour(); });
   document.getElementById('org-open').addEventListener('click', () => setPhone('org'));
   document.getElementById('org-tour').addEventListener('click', () => setPhone('org', '#tour'));
+  // The organization demo runs inside the phone; its narration lives here,
+  // beside the phone, exactly like the user demo.
+  let orgCmd = null;
+  function orgNarrate(st, cmd) {
+    orgCmd = cmd;
+    const on = !!st && phoneMode === 'org';
+    document.body.classList.toggle('tour-wide', on);
+    tourPanel.hidden = !on;
+    if (!on) return;
+    tourPanel.innerHTML = `<span class="tp-k">Guided demo</span><h3>The launch organization</h3>
+      <ol>${st.steps.map((t, i) => `<li class="${i < st.step ? 'done' : i === st.step ? 'on' : ''}"><button data-oc="go" data-i="${i}"><i>${i + 1}</i><b>${esc(t)}</b></button>${i === st.step && !st.ended ? `<p>${esc(st.text)}</p>` : ''}</li>`).join('')}</ol>
+      ${st.ended ? '' : `<div class="tour-ctl">
+        <button data-oc="back" aria-label="Previous step" ${st.step === 0 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
+        <button data-oc="pause" aria-label="${st.paused ? 'Play' : 'Pause'}">${st.paused ? '<svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>'}</button>
+        <button data-oc="next" aria-label="Next step"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
+        <button data-oc="stop" aria-label="End the demo">${ICONS.cross}</button></div>`}${st.paused ? '<small class="tp-paused">Paused</small>' : ''}
+      <div class="tour-home"><button class="pitch-home" type="button" data-oc="home">&larr; Back to home</button></div>`;
+  }
+  window.snareHost = { wide: () => getComputedStyle(pitchEl).display !== 'none', narrate: orgNarrate };
+  tourPanel.addEventListener('click', e => {
+    const b = e.target.closest('[data-oc]');
+    if (!b) return;
+    if (b.dataset.oc === 'home') { setPhone('splash'); return; }
+    if (orgCmd) orgCmd(b.dataset.oc, Number(b.dataset.i));
+  });
   document.getElementById('home-brand').addEventListener('click', () => setPhone('splash'));
   document.getElementById('home-btn').addEventListener('click', () => setPhone('splash'));
 
