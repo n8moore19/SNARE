@@ -872,7 +872,7 @@
       ${row('impact', ICONS.leaf, 'Impact', 'Food and money you saved')}
       ${row('profile', ICONS.user, 'Preferences', 'Food needs, budget and travel')}
       ${row('help', ICONS.spark, 'Help', 'Points, gift cards and privacy')}
-      ${row('tour', ICONS.camera, 'Watch the demo', "Maya's first month, step by step")}`;
+      ${row('tour', ICONS.camera, 'Watch user demo', "Maya's first month, step by step")}`;
     hideNotif(); pmenu.hidden = false;
     requestAnimationFrame(() => pmenu.classList.add('open'));
     document.querySelector('.avatar-btn').setAttribute('aria-expanded', 'true');
@@ -926,7 +926,7 @@
         <div class="sticky">
           <button class="btn block" data-action="finishwelcome" data-id="scan">${ICONS.camera}Scan my fridge</button>
           <button class="link block-link" data-action="finishwelcome" data-id="fridge">Skip for now</button>
-          <button class="link block-link" data-action="tour">&#9654; Or watch the guided demo</button>
+          <button class="link block-link" data-action="tour">&#9654; Or watch the user demo</button>
         </div>
       </section>`;
   }
