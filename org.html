@@ -439,6 +439,30 @@
     .art .used { font-size: 11px; color: var(--forest); font-weight: 700; }
     @media (max-width: 900px) { .arts { grid-template-columns: 1fr; } }
 
+
+    /* ---------- agent 10: Rewards ops ---------- */
+    .wtiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+    .wtiles div { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+    .wtiles b { display: block; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .wtiles span { font-size: 11.5px; color: var(--muted); }
+    .capbar { height: 12px; border-radius: 99px; background: var(--soft); overflow: hidden; margin: 8px 0 6px; }
+    .capbar i { display: block; height: 100%; background: var(--forest); border-radius: 99px; }
+    .capbar.over i { background: var(--warn); }
+    .flag { border-top: 1px solid var(--line); padding: 8px 0; font-size: 12.5px; }
+    .flag:first-child { border-top: 0; }
+    .flag strong { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+    .flag .sev { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 1px 6px; border-radius: 5px; background: #FFF6D6; color: #7A5A00; }
+    .flag .sev.high { background: var(--warn-bg); color: var(--warn); }
+    .flag code { font-size: 11px; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+    .inv { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+    .inv-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .inv-top strong { font-size: 15px; }
+    .inv-top b { margin-left: auto; font-size: 18px; font-variant-numeric: tabular-nums; }
+    .inv table { margin-top: 8px; font-size: 12.5px; }
+    .feef { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+    .feef input { width: 80px; font: inherit; font-size: 12.5px; padding: 5px 8px; border: 1.5px solid var(--line); border-radius: 8px; }
+    @media (max-width: 900px) { .wtiles { grid-template-columns: repeat(2, 1fr); } }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -561,6 +585,7 @@
             <button role="tab" data-ltab="router" aria-selected="false">Data and offers router</button>
             <button role="tab" data-ltab="privacy" aria-selected="false">Privacy guard</button>
             <button role="tab" data-ltab="support" aria-selected="false">Student support</button>
+            <button role="tab" data-ltab="rewards" aria-selected="false">Rewards ops</button>
           </div>
         </div>
         <div id="pass-slot"></div>
@@ -728,6 +753,29 @@
           <div class="pipe-head"><h3>Help center</h3><div class="chips" id="help-tools"></div></div>
           <p class="sub" id="helpc-sub">The only source the help chat answers from.</p>
           <div id="helpc"></div>
+        </div>
+        </div>
+
+        <div data-pane="rewards" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">Weekly rewards close</h3>
+          <span id="w-status" class="pill gate"><i></i>Checking</span>
+          <span id="w-time" class="note" style="margin:0"></span>
+          <button class="btn" id="run-rewards" type="button" disabled>Run now</button>
+        </div>
+        <p class="sub">Points live on students' phones; phones send an anonymous copy of points activity, with receipts as a fingerprint only. Every Sunday this agent totals it, runs fraud checks, tracks the $500 weekly payout cap (Gate 2) and drafts brand invoices. Payouts are demo gift card codes for now.</p>
+        <div id="w-load"></div>
+        <div class="brief-grid">
+          <div class="panel brief" id="rewards"></div>
+          <div class="side">
+            <div class="panel"><h3>Gate 2: payout cap</h3><p class="sub">Gift card payouts this week.</p><div id="cap"></div></div>
+            <div class="panel"><h3>Fraud checks</h3><p class="sub">Ids are random and shortened; nothing names a student.</p><div id="flags"></div></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="pipe-head"><h3>Brand invoices</h3><div id="fee-box"></div></div>
+          <p class="sub">Each brand's redeemed bonuses since its last invoice: the points cost plus a service fee per redemption. An offer is only invoiced once 50 or more students redeemed it; smaller counts carry over.</p>
+          <div id="invoices"></div>
         </div>
         </div>
       </section>
@@ -960,18 +1008,18 @@ SNARE: Receipts give 25 points once they're readable. If yours was blurry, snap 
 Student: I did, still nothing
 SNARE: I'm not sure what happened. Want to send this to the team? [Send to the team]` },
 
-      { id: 'rewards', name: 'Rewards ops', group: 'safe', model: 'haiku', auto: 'gate', runs: 30, inTok: 50000, outTok: 3000, f: [10, 100],
-        job: 'Keeps points, payouts and brand bonus billing in balance.',
-        cadence: 'Daily, plus a weekly close',
-        does: ['Tracks points owed to students', 'Orders gift cards from the reseller', 'Bills brands for the bonuses they sponsor', 'Spots fraud, like the same receipt scanned twice'],
-        tools: ['Points ledger', 'Gift card reseller', 'Invoicing'],
-        gate: 'Gate 2: payouts over $500 a week wait for a person.',
+      { id: 'rewards', name: 'Rewards ops', group: 'safe', model: 'haiku', auto: 'gate', built: true, runs: 4, inTok: 6000, outTok: 600, f: [10, 100],
+        job: 'Keeps points, payouts and brand billing in balance.',
+        cadence: 'Weekly close on Sundays, plus Run now',
+        does: ['Totals points earned and owed from an anonymous copy of points activity', 'Catches duplicate receipts by fingerprint, never the receipt itself', 'Flags earning beyond normal limits and odd cash out patterns', 'Tracks gift card payouts against the $500 weekly cap (Gate 2)', 'Drafts weekly brand invoices from redeemed bonuses, 50 students or more'],
+        tools: ['Anonymous points activity', 'Fraud checks in code', 'Invoice drafts'],
+        gate: 'Gate 2: payouts over $500 a week wait for a person. Payouts are demo codes for now.',
         talks: ['router', 'support', 'chief'],
         sample: `Week 46 close
-Points earned: 31,400 ($314)
-Gift cards: 18 x $5 = $90
-Brand bonuses billed: Golden Crust $460, Hearty Pantry $210
-Duplicate receipts blocked: 6` },
+Points earned: 31,400 ($314). Owed to students: $1,920.
+Gift cards: 18 x $5 = $90 of the $500 cap.
+Flags: 1 duplicate receipt across 2 phones.
+Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     ];
     const byId = Object.fromEntries(AGENTS.map(a => [a.id, a]));
 
@@ -2536,7 +2584,104 @@ Duplicate receipts blocked: 6` },
       if (q) tryQuestion(q);
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy(), loadSupport()]));
+    // ---------- agent 10: Rewards ops ----------
+    live.rw = null; live.wbusy = false; live.werror = '';
+    const usd = n => '$' + Number(n || 0).toFixed(2);
+
+    function renderRewards() {
+      const d = live.rw;
+      const latest = d ? d.latest : null;
+      let [cls, label, banner] = statusOf(latest);
+      if (API && live.status && !d) { cls = 'guard'; label = 'Connected'; }
+      const st = document.getElementById('w-status');
+      st.className = 'pill ' + cls; st.innerHTML = '<i></i>' + label;
+      const btn = document.getElementById('run-rewards');
+      btn.disabled = !API || !live.status || live.wbusy;
+      btn.textContent = live.wbusy ? 'Closing the week' : 'Run now';
+      document.getElementById('w-time').textContent = latest ? `Closed ${fmtTime(latest.generatedAt)}` : '';
+      document.getElementById('w-load').innerHTML = API && live.status && !d ? '<p class="note" style="margin:0 0 10px">Points, flags and invoices load with the team passcode. <button class="btn small" data-loadrw>Show rewards</button></p>' : '';
+      const book = d ? d.live.book : { allTime: { earned: 31400, cashed: 9000, liabilityDollars: 224, ids: 140 }, week: { earned: 8200, cashouts: 18, payoutDollars: 90, ids: 96, byReason: {} }, cap: { limit: 500, used: 90, overCap: false }, flags: [{ check: 'Duplicate receipt', severity: 'high', detail: 'Sample: the same receipt scanned twice by 2 phones.', ids: ['ab12cd', 'ef34gh'] }] };
+      const billing = d ? d.live.billing : { fee: 0.5, invoices: [{ brand: 'Golden Crust', lines: [{ offerId: 's', offer: 'Buy any Golden Crust bread', redemptions: 62, points: 100, pointsCost: 62, fee: 31, total: 93 }], total: 93 }], carried: [{ brand: 'Valley Greens', offer: 'Try the small spinach bag', redemptions: 12 }] };
+      const sum = latest ? latest.output : { headline: d ? 'Press Run now for the weekly close.' : 'Sample: the weekly close appears after the first run.', notes: [] };
+      document.getElementById('rewards').innerHTML = `
+        ${!d && banner ? `<div class="preview"><div><b>Preview</b>${esc(banner)} Numbers below are a sample.</div></div>` : ''}
+        <p class="headline">${esc(sum.headline)}</p>
+        <div class="bsec"><b>This week</b><div class="wtiles">
+          <div><b>${book.week.earned.toLocaleString('en-CA')}</b><span>points earned (${usd(book.week.earned / 100)})</span></div>
+          <div><b>${book.week.cashouts}</b><span>gift card cash outs</span></div>
+          <div><b>${usd(book.allTime.liabilityDollars)}</b><span>points owed to students</span></div>
+          <div><b>${book.week.ids}</b><span>phones earning points</span></div></div></div>
+        ${sum.notes.length ? `<div class="bsec"><b>Notes</b><ul class="blist">${sum.notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        ${live.werror ? `<p class="err">${esc(live.werror)}</p>` : ''}
+        <div class="srcs"><span class="src ${d ? 'real' : 'samp'}">${d ? 'Anonymous points activity' : 'Sample'}</span><span class="src">Demo payouts</span></div>`;
+      document.getElementById('cap').innerHTML = `<div class="capbar ${book.cap.overCap ? 'over' : ''}"><i style="width:${Math.min(100, book.cap.used / book.cap.limit * 100)}%"></i></div>
+        <p style="font-size:13px;margin:0"><b>${usd(book.cap.used)}</b> of ${usd(book.cap.limit)}</p>
+        <p class="note">${book.cap.overCap ? 'Over the cap: in the real version, further payouts wait at Gate 2 for a person.' : 'Under the cap. Payouts above $500 in a week would wait at Gate 2.'}</p>`;
+      document.getElementById('flags').innerHTML = book.flags.length ? book.flags.map(f => `<div class="flag"><strong><span class="sev ${f.severity}">${esc(f.severity)}</span>${esc(f.check)}</strong>${esc(f.detail)}<br>${f.ids.map(i => `<code>${esc(i)}</code>`).join(' ')}</div>`).join('') : '<p class="note" style="margin:0">No flags.</p>';
+      document.getElementById('fee-box').innerHTML = d ? `<form class="feef" id="fee-form"><label for="fee-in">Fee per redemption</label><input id="fee-in" type="number" min="0" max="10" step="0.05" value="${billing.fee}"><button class="btn small outline">Save</button></form>` : `<span class="note" style="margin:0">Fee: ${usd(billing.fee)} per redemption</span>`;
+      document.getElementById('invoices').innerHTML = (billing.invoices.length ? billing.invoices.map(inv => `<div class="inv">
+          <div class="inv-top"><strong>${esc(inv.brand)}</strong><span class="note" style="margin:0">${inv.lines.reduce((t, l) => t + l.redemptions, 0)} redemptions</span><b>${usd(inv.total)}</b></div>
+          <div class="scroll"><table><thead><tr><th>Offer</th><th class="num">Redeemed</th><th class="num">Points cost</th><th class="num">Fee</th><th class="num">Total</th></tr></thead><tbody>${inv.lines.map(l => `<tr><td>${esc(l.offer)}</td><td class="num">${l.redemptions}</td><td class="num">${usd(l.pointsCost)}</td><td class="num">${usd(l.fee)}</td><td class="num">${usd(l.total)}</td></tr>`).join('')}</tbody></table></div>
+          <div style="display:flex;gap:6px;margin-top:8px"><button class="btn small" data-invopen="${esc(inv.brand)}">Open invoice</button>${d ? `<button class="btn small outline" data-invsent="${esc(inv.brand)}">Mark as sent</button>` : ''}</div>
+        </div>`).join('') : '<p class="note" style="margin:0">No invoices ready this week.</p>')
+        + (billing.carried.length ? `<p class="note">Carried over, under 50 students so far: ${billing.carried.map(c => `${esc(c.brand)} (${c.redemptions})`).join(', ')}.</p>` : '')
+        + (d && d.sent.length ? `<p class="note">Sent: ${d.sent.slice(0, 5).map(x => `${esc(x.brand)} ${usd(x.total)} on ${fmtTime(x.sentAt)}`).join(' · ')}</p>` : '');
+    }
+
+    function openInvoice(brand) {
+      const billing = live.rw ? live.rw.live.billing : null;
+      const inv = billing ? billing.invoices.find(i => i.brand === brand) : null;
+      if (!inv) return;
+      const m = document.getElementById('op-modal');
+      m.innerHTML = `<div class="op-wrap">
+        <div class="op-bar"><button class="btn small" data-print>Print or save PDF</button><button class="btn small outline" data-opclose>Close</button></div>
+        <article class="op">
+          <div class="op-top"><span class="brand">snare<i></i></span><span>Invoice draft for ${esc(inv.brand)}<br>${new Date().toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
+          <h1>Sponsored bonus offers</h1>
+          <p class="lead">Bonuses redeemed by SNARE students since your last invoice. Counts are distinct students; each student counts once per offer.</p>
+          <h2>Charges</h2>
+          <table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr><th style="text-align:left">Offer</th><th style="text-align:right">Redeemed</th><th style="text-align:right">Points cost</th><th style="text-align:right">Service fee</th><th style="text-align:right">Total</th></tr></thead>
+          <tbody>${inv.lines.map(l => `<tr><td style="padding:8px 4px;border-top:1px solid var(--line)">${esc(l.offer)} (+${l.points} points)</td><td style="text-align:right;border-top:1px solid var(--line)">${l.redemptions}</td><td style="text-align:right;border-top:1px solid var(--line)">${usd(l.pointsCost)}</td><td style="text-align:right;border-top:1px solid var(--line)">${usd(l.fee)}</td><td style="text-align:right;border-top:1px solid var(--line)">${usd(l.total)}</td></tr>`).join('')}
+          <tr><td colspan="4" style="padding:10px 4px;border-top:2px solid var(--ink);font-weight:800">Total</td><td style="text-align:right;border-top:2px solid var(--ink);font-weight:800">${usd(inv.total)}</td></tr></tbody></table>
+          <h2>How it's calculated</h2><p style="font-size:13.5px">Points cost is the bonus points students earned (100 points = $1). The service fee is ${usd(live.rw.live.billing.fee)} per redemption. Only offers with 50 or more redeeming students are invoiced.</p>
+          <div class="op-foot"><span>Team SNARE · Ivey Business School student venture · London, Ontario</span><span>Draft: amounts before tax</span></div>
+        </article></div>`;
+      m.hidden = false;
+      m.querySelector('[data-opclose]').focus();
+    }
+
+    async function loadRw() {
+      try { live.rw = await call('/agents/rewards'); live.werror = ''; } catch (e) { if (e.message !== 'PASS') live.werror = e.message; }
+      renderRewards();
+    }
+    async function runRewardsNow() {
+      live.wbusy = true; live.werror = ''; renderRewards();
+      try { await call('/agents/rewards/run', { method: 'POST' }); await loadRw(); } catch (e) { if (e.message !== 'PASS') live.werror = e.message; }
+      live.wbusy = false; renderRewards();
+    }
+    async function rwPut(body) {
+      try { await call('/agents/rewards', { method: 'PUT', body: JSON.stringify(body) }); await loadRw(); } catch (e) { if (e.message !== 'PASS') { live.werror = e.message; renderRewards(); } }
+    }
+    async function loadRewardsTab() {
+      renderRewards();
+      if (API && live.status && teamKey) await loadRw();
+    }
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('#run-rewards')) needPass(runRewardsNow);
+      if (e.target.closest('[data-loadrw]')) needPass(loadRw);
+      const io = e.target.closest('[data-invopen]');
+      if (io) openInvoice(io.dataset.invopen);
+      const is = e.target.closest('[data-invsent]');
+      if (is) needPass(() => rwPut({ invoiced: is.dataset.invsent }));
+    });
+    document.addEventListener('submit', e => {
+      if (e.target.id !== 'fee-form') return;
+      e.preventDefault();
+      needPass(() => rwPut({ fee: Number(document.getElementById('fee-in').value) }));
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy(), loadSupport(), loadRewardsTab()]));
     render();
   })();
   </script>

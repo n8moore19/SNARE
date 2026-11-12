@@ -20,6 +20,7 @@ INSIGHTS_MODEL = "claude-opus-5-5"   # Insights analyst (runs as a half price ba
 ROUTER_MODEL = "claude-sonnet-5-5"   # Data and offers router (offer ideas; deliveries need no model)
 PRIVACY_MODEL = "claude-sonnet-5-5"  # Privacy guard (reviews posts, outreach, offers and deliveries)
 SUPPORT_MODEL = "claude-haiku-5-5"   # Student support help chat (fast and very cheap)
+REWARDS_MODEL = "claude-haiku-5-5"   # Rewards ops weekly close (the checks themselves are code)
 
 # Storage for the agents: team tasks and each agent's latest output.
 # Create it once with: npx wrangler kv namespace create AGENTS
@@ -39,7 +40,7 @@ id = "PASTE_KV_ID_HERE"
 # Two daily triggers (fits the free plan's limit):
 # 12:00 UTC runs that weekday's agent: Monday Market intelligence, Tuesday Student
 # acquisition, Wednesday Content creation, Thursday B2B sales, Friday Insights analyst,
-# Saturday Data and offers router.
+# Saturday Data and offers router, Sunday Rewards ops.
 # 13:00 UTC collects a finished insights batch, delivers new reports to approved
 # buyers, then the Chief of Staff's daily brief
 # (8:00 in Toronto in winter, 9:00 in summer).

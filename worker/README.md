@@ -104,15 +104,25 @@ The same worker runs the launch agents shown on `org.html`.
   sends with each question. When it can't help, the student can send the question to the
   team; emails and phone numbers are stripped, and the reply shows up in their help chat by
   a random id only their phone knows. About $1 a month at launch.
+- **Rewards ops** (built): points stay on the phone. When connected, phones send an anonymous
+  copy of points activity under a random id (what kind of action earned points, a hashed
+  receipt fingerprint of store, date and total, and cash outs; demo sessions with sample
+  points send nothing). Every Sunday it totals points earned and owed, runs fraud checks
+  (duplicate receipts, more than 5 receipts or 300 points a day or 1,000 a week, new ids
+  cashing out fast, too many cash outs, cashing out more than earned), tracks payouts
+  against the $500 weekly cap (Gate 2), and drafts brand invoices: redeemed bonuses times
+  points cost plus a service fee (editable, $0.50 by default), only once an offer has 50 or
+  more redeeming students. Payouts are demo codes for now. Haiku 5.5 writes the summary;
+  the checks are code. Pennies a month.
 - **Schedule**: two cron triggers. 12:00 UTC runs the weekday's agent (Mon market, Tue
-  acquisition, Wed content, Thu sales, Fri insights, Sat router); 13:00 UTC collects insights,
+  acquisition, Wed content, Thu sales, Fri insights, Sat router, Sun rewards); 13:00 UTC collects insights,
   deletes panel events older than 12 months, delivers new reports to buyers, then the
   Chief of Staff writes the daily brief.
 - **Waitlist**: `join.html` posts to `POST /agents/waitlist/join` (public, rate limited, same
   site only). Each email is one KV key with campus, source and date in its metadata. Students
   can remove their email on the same page. The org page only shows counts.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`, `GET /agents/offers`, `POST /agents/offers/event`, `GET /agents/buyer`, and with the passcode `GET /agents/buyers`, `PUT /agents/buyers`, `GET /agents/offers/all`, `PUT /agents/offers`, `GET /agents/router`, `POST /agents/router/run`, `GET /agents/privacy`, `PUT /agents/privacy`, `POST /agents/privacy/run`, `GET /agents/help`, `POST /agents/support/ask`, `POST /agents/support/ticket`, `GET /agents/support/mine`, and with the passcode `GET /agents/support/inbox`, `PUT /agents/support/inbox`, `PUT /agents/help`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`, `GET /agents/offers`, `POST /agents/offers/event`, `GET /agents/buyer`, and with the passcode `GET /agents/buyers`, `PUT /agents/buyers`, `GET /agents/offers/all`, `PUT /agents/offers`, `GET /agents/router`, `POST /agents/router/run`, `GET /agents/privacy`, `PUT /agents/privacy`, `POST /agents/privacy/run`, `GET /agents/help`, `POST /agents/support/ask`, `POST /agents/support/ticket`, `GET /agents/support/mine`, and with the passcode `GET /agents/support/inbox`, `PUT /agents/support/inbox`, `PUT /agents/help`, `POST /agents/rewards/event` (public), `GET /agents/rewards`, `PUT /agents/rewards`, `POST /agents/rewards/run`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)

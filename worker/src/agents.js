@@ -1248,7 +1248,9 @@ export async function runRetention(env) {
   const a = await env.PANEL.prepare("DELETE FROM events WHERE t < ?").bind(cutoff).run();
   await ensureOfferTable(env);
   const b = await env.PANEL.prepare("DELETE FROM offer_events WHERE t < ?").bind(cutoff).run();
-  const deleted = (a.meta.changes || 0) + (b.meta.changes || 0);
+  await ensureRewardTable(env);
+  const c = await env.PANEL.prepare("DELETE FROM reward_events WHERE t < ?").bind(cutoff).run();
+  const deleted = (a.meta.changes || 0) + (b.meta.changes || 0) + (c.meta.changes || 0);
   if (env.AGENTS) await env.AGENTS.put("privacy:retention", JSON.stringify({ at: new Date().toISOString(), deleted, keepDays: RETENTION_DAYS }));
   return { deleted };
 }
@@ -1545,6 +1547,146 @@ async function supportTicket(request, env, cors) {
   return json({ ticket: { id: t.id, question: t.question, status: t.status, created: t.created } }, 200, cors);
 }
 
+// ---------- agent 10: Rewards ops ----------
+// Points live on each phone. Phones send an anonymous copy of points activity
+// under a random id: what kind of action earned points, a hashed receipt
+// fingerprint (store, date, total), and cash outs. Rewards ops totals it, runs
+// fraud checks (duplicate receipts, earning limits, cash out patterns), tracks
+// the $500 weekly payout cap (Gate 2), and drafts brand invoices on Sundays.
+// Invoices only include an offer once 50 or more students redeemed it; smaller
+// counts carry over. Payouts are demo codes for now.
+
+const PAYOUT_CAP = 500;
+const LIMITS = { receiptsPerDay: 5, pointsPerDay: 300, pointsPerWeek: 1000, newIdDays: 7, cashoutsPerWeek: 2 };
+const REWARD_REASONS = ["receipt", "checkin", "used", "rate", "bonus", "other"];
+
+async function ensureRewardTable(env) {
+  await env.PANEL.prepare("CREATE TABLE IF NOT EXISTS reward_events (id INTEGER PRIMARY KEY, rid TEXT NOT NULL, t INTEGER NOT NULL, type TEXT NOT NULL, pts INTEGER NOT NULL, reason TEXT, fp TEXT, card TEXT, offer TEXT)").run();
+  await env.PANEL.prepare("CREATE INDEX IF NOT EXISTS reward_rid ON reward_events (rid, t)").run();
+}
+
+async function recordReward(request, env, cors) {
+  if (!env.PANEL) return json({ error: "Storage is not set up" }, 503, cors);
+  let b;
+  try { b = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+  const now = Date.now(), t = Number(b.t) || now;
+  if (!/^[a-z0-9]{12,40}$/.test(String(b.rid || "")) || !["earn", "cashout"].includes(b.type) || t < now - 7 * DAY_MS || t > now + 3600e3) return json({ error: "Invalid event" }, 400, cors);
+  const pts = Math.round(Number(b.pts));
+  if (!Number.isFinite(pts) || pts <= 0 || pts > 1000) return json({ error: "Invalid points" }, 400, cors);
+  await ensureRewardTable(env);
+  await env.PANEL.prepare("INSERT INTO reward_events (rid, t, type, pts, reason, fp, card, offer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(
+    b.rid, t, b.type, pts, REWARD_REASONS.includes(b.reason) ? b.reason : null,
+    /^[a-f0-9]{16}$/.test(String(b.fp || "")) ? b.fp : null, ["loblaw", "walmart", "visa"].includes(b.card) ? b.card : null,
+    /^[a-z0-9_-]{1,40}$/i.test(String(b.offer || "")) ? b.offer : null,
+  ).run();
+  return json({ ok: true }, 200, cors);
+}
+
+const shortId = (rid) => rid.slice(0, 6);
+
+async function rewardsBook(env) {
+  if (!env.PANEL) return null;
+  await ensureRewardTable(env);
+  const q = (sql, ...a) => env.PANEL.prepare(sql).bind(...a).all().then((r) => r.results);
+  const now = Date.now(), week = now - 7 * DAY_MS, month = now - 30 * DAY_MS;
+  const [totals] = await q("SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN pts END), 0) AS earned, COALESCE(SUM(CASE WHEN type = 'cashout' THEN pts END), 0) AS cashed, COUNT(DISTINCT rid) AS ids FROM reward_events");
+  const [wk] = await q("SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN pts END), 0) AS earned, COALESCE(SUM(CASE WHEN type = 'cashout' THEN pts END), 0) AS cashed, SUM(type = 'cashout') AS cashouts, COUNT(DISTINCT rid) AS ids FROM reward_events WHERE t > ?", week);
+  const byReason = await q("SELECT reason, SUM(pts) AS pts FROM reward_events WHERE type = 'earn' AND t > ? GROUP BY reason", week);
+
+  // Fraud checks. Ids are random and shown shortened; nothing names a student.
+  const flags = [];
+  for (const r of await q("SELECT fp, COUNT(*) AS n, COUNT(DISTINCT rid) AS ids, GROUP_CONCAT(DISTINCT rid) AS rids FROM reward_events WHERE reason = 'receipt' AND fp IS NOT NULL AND t > ? GROUP BY fp HAVING n > 1", month)) {
+    flags.push({ check: "Duplicate receipt", severity: "high", detail: `The same receipt was scanned ${r.n} times${r.ids > 1 ? ` by ${r.ids} different phones` : " by one phone"}.`, ids: r.rids.split(",").map(shortId) });
+  }
+  for (const r of await q(`SELECT rid, CAST(t / ${DAY_MS} AS INTEGER) AS day, SUM(reason = 'receipt') AS receipts, SUM(pts) AS pts FROM reward_events WHERE type = 'earn' AND t > ? GROUP BY rid, day HAVING receipts > ? OR pts > ?`, week, LIMITS.receiptsPerDay, LIMITS.pointsPerDay)) {
+    flags.push({ check: "Earning limit", severity: "medium", detail: `${r.receipts} receipts and ${r.pts} points in one day (limits ${LIMITS.receiptsPerDay} and ${LIMITS.pointsPerDay}).`, ids: [shortId(r.rid)] });
+  }
+  for (const r of await q("SELECT rid, SUM(pts) AS pts FROM reward_events WHERE type = 'earn' AND t > ? GROUP BY rid HAVING pts > ?", week, LIMITS.pointsPerWeek)) {
+    flags.push({ check: "Earning limit", severity: "medium", detail: `${r.pts} points this week (limit ${LIMITS.pointsPerWeek}).`, ids: [shortId(r.rid)] });
+  }
+  for (const r of await q("SELECT rid, MIN(t) AS first, SUM(CASE WHEN type = 'cashout' AND t > ? THEN 1 ELSE 0 END) AS recent, SUM(CASE WHEN type = 'earn' THEN pts ELSE 0 END) AS earned, SUM(CASE WHEN type = 'cashout' THEN pts ELSE 0 END) AS cashed, MAX(CASE WHEN type = 'cashout' THEN t END) AS lastCash FROM reward_events GROUP BY rid HAVING recent > 0", week)) {
+    if (r.lastCash - r.first < LIMITS.newIdDays * DAY_MS) flags.push({ check: "Cash out pattern", severity: "medium", detail: `Cashed out within ${LIMITS.newIdDays} days of first earning points.`, ids: [shortId(r.rid)] });
+    if (r.recent > LIMITS.cashoutsPerWeek) flags.push({ check: "Cash out pattern", severity: "medium", detail: `${r.recent} cash outs this week (limit ${LIMITS.cashoutsPerWeek}).`, ids: [shortId(r.rid)] });
+    if (r.cashed > r.earned) flags.push({ check: "Cash out pattern", severity: "high", detail: `Cashed out ${r.cashed} points but only earned ${r.earned}, so the phone's balance may have been edited.`, ids: [shortId(r.rid)] });
+  }
+
+  const payoutsWeek = (wk.cashed || 0) / PTS_PER_DOLLAR_W;
+  return {
+    allTime: { earned: totals.earned, cashed: totals.cashed, liabilityDollars: Math.max(0, totals.earned - totals.cashed) / PTS_PER_DOLLAR_W, ids: totals.ids },
+    week: { earned: wk.earned, cashouts: wk.cashouts || 0, payoutDollars: payoutsWeek, ids: wk.ids, byReason: Object.fromEntries(byReason.map((r) => [r.reason || "other", r.pts])) },
+    cap: { limit: PAYOUT_CAP, used: payoutsWeek, overCap: payoutsWeek > PAYOUT_CAP },
+    flags,
+  };
+}
+const PTS_PER_DOLLAR_W = 100;
+
+// Invoices: redeemed bonuses per offer since that offer was last invoiced.
+async function invoiceDrafts(env) {
+  if (!env.PANEL || !env.AGENTS) return { fee: 0.5, invoices: [], carried: [] };
+  await ensureOfferTable(env);
+  const settings = (await env.AGENTS.get("billing:settings", "json")) || { fee: 0.5 };
+  const state = (await env.AGENTS.get("billing:state", "json")) || {};
+  const offers = await getOffers(env);
+  const byBrand = {}, carried = [];
+  for (const o of offers) {
+    const since = state[o.id] || 0;
+    const [r] = (await env.PANEL.prepare("SELECT COUNT(DISTINCT sid) AS n FROM offer_events WHERE offer = ? AND event = 'redeemed' AND t > ?").bind(o.id, since).all()).results;
+    const n = r ? r.n : 0;
+    if (!n) continue;
+    if (n < K) { carried.push({ brand: o.brand, offer: o.text, redemptions: n }); continue; }
+    const pointsCost = (n * o.points) / PTS_PER_DOLLAR_W, fee = n * settings.fee;
+    (byBrand[o.brand] = byBrand[o.brand] || { brand: o.brand, buyerId: o.buyerId, lines: [], total: 0 }).lines.push({ offerId: o.id, offer: o.text, redemptions: n, points: o.points, pointsCost, fee, total: pointsCost + fee });
+    byBrand[o.brand].total += pointsCost + fee;
+  }
+  return { fee: settings.fee, invoices: Object.values(byBrand), carried };
+}
+
+const REWARDS_SCHEMA = {
+  type: "object",
+  properties: { headline: { type: "string" }, notes: { type: "array", items: { type: "string" } } },
+  required: ["headline", "notes"],
+  additionalProperties: false,
+};
+
+export async function runRewards(env) {
+  if (!env.AGENTS) throw new Error("NO_STORE");
+  const [book, billing] = await Promise.all([rewardsBook(env), invoiceDrafts(env)]);
+  let summary = { headline: "Weekly close ready.", notes: [] }, usage = { input: 0, output: 0 };
+  if (env.ANTHROPIC_API_KEY && book) try {
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const r = await client.messages.create({
+      model: env.REWARDS_MODEL || "claude-haiku-5-5", max_tokens: 2000,
+      output_config: { effort: "low", format: { type: "json_schema", schema: REWARDS_SCHEMA } },
+      system: `You write SNARE's weekly rewards close for the student team. Points are on students' phones; this is an anonymous copy. Payouts are demo gift card codes for now; the weekly payout cap is $${PAYOUT_CAP} (Gate 2). From the numbers given, write a one sentence headline and up to 4 short notes: what changed, which fraud flags matter and what to do, the payout cap, and invoices ready to send. Use only the numbers given. Plain, short sentences. No em dashes or hyphens used as dashes.`,
+      messages: [{ role: "user", content: JSON.stringify({ book, billing }) }],
+    });
+    summary = JSON.parse(textOf(r)); usage = { input: r.usage.input_tokens, output: r.usage.output_tokens };
+  } catch (e) {
+    // The numbers and checks are code; only the wording needs Claude.
+    summary = { headline: `Weekly close: ${book.flags.length} fraud flag${book.flags.length === 1 ? "" : "s"}, ${billing.invoices.length} invoice${billing.invoices.length === 1 ? "" : "s"} ready.`, notes: ["The written summary could not be generated, so these are the raw numbers."] };
+  }
+  return save(env, "rewards", {
+    agent: "rewards",
+    generatedAt: new Date().toISOString(),
+    output: { ...summary, book, billing },
+    sources: { flags: book ? book.flags.length : 0, invoices: billing.invoices.length, demoPayouts: true },
+    usage,
+  });
+}
+
+async function markInvoiced(env, brand) {
+  const billing = await invoiceDrafts(env);
+  const inv = billing.invoices.find((i) => i.brand === brand);
+  if (!inv) return null;
+  const state = (await env.AGENTS.get("billing:state", "json")) || {};
+  for (const l of inv.lines) state[l.offerId] = Date.now();
+  await env.AGENTS.put("billing:state", JSON.stringify(state));
+  const sent = (await env.AGENTS.get("billing:sent", "json")) || [];
+  sent.push({ ...inv, sentAt: new Date().toISOString() });
+  await env.AGENTS.put("billing:sent", JSON.stringify(sent.slice(-200)));
+  return sent;
+}
+
 async function getPostStatus(env) {
   return (env.AGENTS ? await env.AGENTS.get("postStatus", "json") : null) || {};
 }
@@ -1592,6 +1734,11 @@ export async function handleAgents(request, env, cors) {
   if (request.method === "POST" && path === "/agents/offers/event") {
     if (tooManyRuns("offer:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 120)) return json({ error: "Too many events" }, 429, cors);
     return recordOfferEvent(request, env, cors);
+  }
+  // Public: anonymous points activity from phones (Rewards ops).
+  if (request.method === "POST" && path === "/agents/rewards/event") {
+    if (tooManyRuns("reward:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 120)) return json({ error: "Too many events" }, 429, cors);
+    return recordReward(request, env, cors);
   }
   // Public: the app's help chat.
   if (request.method === "GET" && path === "/agents/help") return json({ articles: await getHelp(env) }, 200, cors);
@@ -1727,6 +1874,23 @@ export async function handleAgents(request, env, cors) {
     return json({ offers }, 200, cors);
   }
 
+  if (request.method === "GET" && path === "/agents/rewards") {
+    const [latest, sent, settings] = await Promise.all(["latest:rewards", "billing:sent", "billing:settings"].map((k) => (env.AGENTS ? env.AGENTS.get(k, "json") : null)));
+    return json({ latest, live: { book: await rewardsBook(env), billing: await invoiceDrafts(env) }, sent: (sent || []).slice(-20).reverse(), settings: settings || { fee: 0.5 } }, 200, cors);
+  }
+  if (request.method === "PUT" && path === "/agents/rewards") {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+    if (!env.AGENTS) return json({ error: "Storage is not set up" }, 500, cors);
+    if (body.fee !== undefined) {
+      const fee = Number(body.fee);
+      if (!Number.isFinite(fee) || fee < 0 || fee > 10) return json({ error: "Fee must be between $0 and $10" }, 400, cors);
+      await env.AGENTS.put("billing:settings", JSON.stringify({ fee: Math.round(fee * 100) / 100 }));
+      return json({ settings: { fee } }, 200, cors);
+    }
+    const sent = typeof body.invoiced === "string" ? await markInvoiced(env, body.invoiced) : null;
+    return sent ? json({ sent: sent.slice(-20).reverse() }, 200, cors) : json({ error: "Nothing to invoice for that brand" }, 400, cors);
+  }
   if (request.method === "GET" && path === "/agents/support/inbox") {
     const [tickets, stats] = await Promise.all([getTickets(env), env.AGENTS ? env.AGENTS.get("support:stats", "json") : null]);
     return json({ tickets: tickets.slice().reverse().map(({ sid, ...t }) => t), stats }, 200, cors);
@@ -1766,8 +1930,8 @@ export async function handleAgents(request, env, cors) {
     try { return json(await runInsights(env), 200, cors); } catch (error) { return agentError(error, cors); }
   }
 
-  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales, router: runRouter, privacy: runPrivacy };
-  const runMatch = path.match(/^\/agents\/(chief|market|growth|content|sales|router|privacy)\/run$/);
+  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales, router: runRouter, privacy: runPrivacy, rewards: runRewards };
+  const runMatch = path.match(/^\/agents\/(chief|market|growth|content|sales|router|privacy|rewards)\/run$/);
   if (request.method === "POST" && runMatch) {
     if (tooManyRuns(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many runs this hour" }, 429, cors);
     try {

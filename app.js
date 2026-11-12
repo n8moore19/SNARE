@@ -689,10 +689,38 @@
   const budgetNow = () => P().budget + cardCredit();
   const checkinDue = () => Date.now() - state.lastCheckin > CHECKIN_EVERY * DAY;
 
-  function earn(pts, label) {
+  function earn(pts, label, reason = 'other', extra = {}) {
     state.points.push({ t: Date.now(), pts, label });
     updatePointsPill(true);
+    rewardsEvent({ type: 'earn', pts, reason, ...extra });
     return pts;
+  }
+
+  // Points stay on the phone. When the worker is connected, an anonymous copy
+  // of points activity goes to Rewards ops (agent 10) under its own random id,
+  // so it can spot duplicate receipts and unusual patterns. Receipts are sent as
+  // a fingerprint (store, date and total, hashed), never their contents.
+  function rewardsId() {
+    try {
+      let id = localStorage.getItem('snare.rid');
+      if (!id) { id = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 20); localStorage.setItem('snare.rid', id); }
+      return id;
+    } catch (e) { return null; }
+  }
+  function rewardsEvent(ev) {
+    const url = (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
+    const rid = rewardsId();
+    // Demo sessions start with sample points; they never feed real fraud checks.
+    if (!url || !rid || state.points.some(x => x.sample)) return;
+    fetch(url + '/agents/rewards/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rid, t: Date.now(), ...ev }) }).catch(() => {});
+  }
+  async function receiptPrint(storeId, lines) {
+    const total = lines.reduce((t, l) => t + l.price, 0).toFixed(2);
+    const text = `${storeId}|${new Date().toISOString().slice(0, 10)}|${total}`;
+    try {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(buf).slice(0, 8), b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) { return ''; }
   }
 
   function samplePoints() {
@@ -709,6 +737,7 @@
     if (balance() < CARD_PTS) return null;
     const code = 'SNR ' + Math.random().toString(36).slice(2, 6).toUpperCase() + ' ' + Math.random().toString(36).slice(2, 6).toUpperCase();
     state.points.push({ t: Date.now(), pts: -CARD_PTS, label: `Cashed out: $5 ${giftCards[cardId].name}` });
+    rewardsEvent({ type: 'cashout', pts: CARD_PTS, card: cardId });
     const c = { uid: newUid(), card: cardId, amt: CARD_PTS / PTS_PER_DOLLAR, code, used: false, t: Date.now() };
     state.cards.push(c);
     persist();
@@ -895,6 +924,7 @@
           <li>${ICONS.check}Location off. Fridge photos are deleted after scanning.</li>
           <li>${ICONS.check}You earn points either way. Nothing is paid for throwing food out.</li>
           <li>${ICONS.check}Turn sharing off any time and what you shared is deleted.</li>
+          <li>${ICONS.check}Points activity is checked anonymously to stop cheating. Receipts are never stored.</li>
           <li>${ICONS.check}For students 18 and over.</li>
         </ul>
         <div class="sticky">
@@ -1120,8 +1150,8 @@
       if (a.v === 'tossed') tossItem(f, a.reason || 'unknown');
       if (a.v === 'have' && daysLeft(f) <= 0) stillGood(f);
     }
-    earn(PTS.checkin, 'Weekly check in');
-    if (inTime) earn(inTime * PTS.usedInTime, `Used ${plural(inTime, 'item')} in time`);
+    earn(PTS.checkin, 'Weekly check in', 'checkin');
+    if (inTime) earn(inTime * PTS.usedInTime, `Used ${plural(inTime, 'item')} in time`, 'used');
     state.lastCheckin = Date.now();
     state.checkin = null;
     persist();
@@ -1183,6 +1213,7 @@
   function startReceiptScan(photo) {
     const r = D.demoReceipt;
     state.scan = { mode: 'receipt', photo, store: r.store, found: r.lines.map(l => ({ ...l, keep: true, days: products[l.id].life })) };
+    receiptPrint(r.store, r.lines).then(fp => { if (state.scan && state.scan.mode === 'receipt') state.scan.print = fp; });
     go('scanning');
     setTimeout(() => { if (state.screen === 'scanning') go('review'); }, RECEIPT_SCAN_MS);
   }
@@ -1230,8 +1261,9 @@
     const kept = s.found.filter(f => f.keep);
     const added = kept.map(f => addToFridge(f.id, { src: 'receipt' }));
     state.items = state.items.filter(it => !kept.some(k => k.id === it.id)); // bought, so off the list
-    let pts = earn(PTS.receipt, `Receipt, ${stores[s.store].name}`);
-    receiptBonuses(s.found).forEach(o => { pts += earn(o.points, `${o.brand} bonus`); offerEvent(o.id, 'redeemed'); });
+    const print = s.print || '';
+    let pts = earn(PTS.receipt, `Receipt, ${stores[s.store].name}`, 'receipt', { fp: print });
+    receiptBonuses(s.found).forEach(o => { pts += earn(o.points, `${o.brand} bonus`, 'bonus', { offer: o.id, fp: print }); offerEvent(o.id, 'redeemed'); });
     state.highlight = added.map(a => a.uid);
     persist();
     toast(`${plural(added.length, 'item')} added · +${pts} points`);
@@ -2996,7 +3028,7 @@
       case 'used': {
         const f = state.fridge.find(x => x.uid === id);
         useItem(f);
-        if (f.owner === 'You' && daysHi(f) >= 0) { earn(PTS.usedInTime, `Used ${lower(itemName(f))} in time`); toast(`${itemName(f)} used in time · +${PTS.usedInTime} points`); }
+        if (f.owner === 'You' && daysHi(f) >= 0) { earn(PTS.usedInTime, `Used ${lower(itemName(f))} in time`, 'used'); toast(`${itemName(f)} used in time · +${PTS.usedInTime} points`); }
         else toast(`${itemName(f)} marked as used`);
         persist(); rerender(); break;
       }
@@ -3061,7 +3093,7 @@
       case 'fchip': state.feedbackChip = state.feedbackChip === id ? null : id; rerender(); break;
       case 'rate': {
         const r = recipes[state.recipeId];
-        if (state.justCooked === r.id && state.ratings[r.id] == null) earn(PTS.rate, `Rated ${r.name}`);
+        if (state.justCooked === r.id && state.ratings[r.id] == null) earn(PTS.rate, `Rated ${r.name}`, 'rate');
         state.ratings[r.id] = Number(id);
         if (state.feedbackChip) state.feedback[r.id] = state.feedbackChip;
         persist();
@@ -3182,7 +3214,7 @@
     const f = state.fridge.find(x => x.uid === b.dataset.id);
     if (b.dataset.n === 'used' && f) {
       useItem(f);
-      if (daysHi(f) >= 0) earn(PTS.usedInTime, `Used ${lower(itemName(f))} in time`);
+      if (daysHi(f) >= 0) earn(PTS.usedInTime, `Used ${lower(itemName(f))} in time`, 'used');
       toast(`${itemName(f)} marked as finished${daysHi(f) >= 0 ? ` · +${PTS.usedInTime} points` : ''}`);
     }
     if (b.dataset.n === 'tossed' && f) { tossItem(f); toast(`${itemName(f)} logged as tossed. We'll remind you sooner next time.`); }
