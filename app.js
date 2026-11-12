@@ -824,12 +824,13 @@
   }
   const counted = (v, fmt) => `<span data-count="${v}" data-fmt="${fmt}">${fmtCount(v, fmt)}</span>`;
 
-  const TAB_OF = { fridge: 'fridge', scan: 'fridge', scanning: 'fridge', review: 'fridge', checkin: 'fridge', meals: 'meals', recipe: 'meals', shop: 'shop', loading: 'shop', results: 'shop', impact: 'impact', rewards: 'rewards', profile: 'fridge' };
+  const TAB_OF = { fridge: 'fridge', scan: 'fridge', scanning: 'fridge', review: 'fridge', checkin: 'fridge', meals: 'meals', recipe: 'meals', shop: 'shop', loading: 'shop', results: 'shop' };
   const NO_CHROME = ['welcome', 'consent', 'scanning', 'loading'];
 
   function render() {
     if (map) { map.remove(); map = null; }
-    backBtn.hidden = !['scan', 'review', 'recipe', 'results', 'profile', 'checkin'].includes(state.screen);
+    backBtn.hidden = !['scan', 'review', 'recipe', 'results', 'profile', 'checkin', 'impact', 'rewards'].includes(state.screen);
+    closeMenu();
     const r = {
       welcome: renderWelcome, consent: renderConsent, fridge: renderFridge, scan: renderScan, scanning: renderScanning, review: renderReview,
       checkin: renderCheckin, meals: renderMeals, recipe: renderRecipe, shop: renderShop, loading: renderLoading, results: renderResults,
@@ -853,10 +854,39 @@
       ['fridge', 'Fridge', ICONS.fridge, urgent],
       ['meals', 'Meals', ICONS.pot, 0],
       ['shop', 'Shop', ICONS.cart, listN],
-      ['impact', 'Impact', ICONS.leaf, 0],
-      ['rewards', 'Rewards', ICONS.star, balance() >= CARD_PTS ? '$5' : 0],
     ].map(([id, label, icon, n]) => `<button class="${current === id ? 'on' : ''}" data-tab="${id}">${icon}<span>${label}</span>${n ? `<i>${n}</i>` : ''}</button>`).join('');
+    document.querySelector('.avatar-btn').classList.toggle('has-dot', balance() >= CARD_PTS);
   }
+
+  // ---------- profile menu: rewards, impact, preferences, help ----------
+
+  const pmenu = document.getElementById('pmenu');
+  function openMenu() {
+    const ready = balance() >= CARD_PTS;
+    const row = (act, icon, title, sub, badge) => `<button class="pm-row ${state.screen === act ? 'on' : ''}" role="menuitem" data-pm="${act}"><span class="pm-ic">${icon}</span><span class="pm-tx"><b>${title}</b><small>${sub}</small></span>${badge ? `<i>${badge}</i>` : ''}<span class="pm-chev">&#8250;</span></button>`;
+    pmenu.innerHTML = `
+      ${row('rewards', ICONS.star, 'Rewards', `${balance().toLocaleString('en-CA')} points`, ready ? '$5 ready' : '')}
+      ${row('impact', ICONS.leaf, 'Impact', 'Food and money you saved')}
+      ${row('profile', ICONS.user, 'Preferences', 'Food needs, budget and travel')}
+      ${row('help', ICONS.spark, 'Help', 'Points, gift cards and privacy')}`;
+    hideNotif(); pmenu.hidden = false;
+    requestAnimationFrame(() => pmenu.classList.add('open'));
+    document.querySelector('.avatar-btn').setAttribute('aria-expanded', 'true');
+  }
+  function closeMenu() {
+    if (pmenu.hidden) return;
+    pmenu.classList.remove('open');
+    pmenu.hidden = true;
+    document.querySelector('.avatar-btn').setAttribute('aria-expanded', 'false');
+  }
+  pmenu.addEventListener('click', e => {
+    const b = e.target.closest('[data-pm]');
+    if (!b) return;
+    closeMenu();
+    if (b.dataset.pm === 'help') openHelp(); else go(b.dataset.pm);
+  });
+  document.addEventListener('click', e => { if (!pmenu.hidden && !e.target.closest('#pmenu, .avatar-btn')) closeMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 
   // ---------- welcome ----------
 
@@ -3202,7 +3232,7 @@
 
   document.querySelector('.bar').addEventListener('click', e => {
     if (e.target.closest('[data-action="home"]')) go(P().done ? 'fridge' : 'welcome');
-    if (e.target.closest('[data-action="profile"]')) go('profile');
+    if (e.target.closest('[data-action="profile"]')) { if (pmenu.hidden) openMenu(); else closeMenu(); }
     if (e.target.closest('[data-action="rewards"]')) go('rewards');
   });
 
@@ -3250,7 +3280,7 @@
   setExpanded(startExpanded);
 
   backBtn.addEventListener('click', () => {
-    const to = { scan: 'fridge', review: 'scan', recipe: 'meals', results: 'shop', profile: 'fridge', checkin: 'fridge' }[state.screen];
+    const to = { scan: 'fridge', review: 'scan', recipe: 'meals', results: 'shop', profile: 'fridge', checkin: 'fridge', impact: 'fridge', rewards: 'fridge' }[state.screen];
     if (to) go(to);
   });
 
