@@ -188,6 +188,37 @@ window.SNARE_DATA = {
     { id: 'eggs', qty: '6 left', days: 12, conf: 0.95, alts: ['potatoes', 'milk'] },
   ],
 
+  // A demo grocery receipt. The real app reads any receipt photo; no store
+  // partnership is needed. bonus links a line to a sponsored offer below.
+  demoReceipt: {
+    store: 'nofrills',
+    lines: [
+      { id: 'ground_beef', name: 'GRND BEEF MED', price: 4.99 },
+      { id: 'tomatoes', name: 'TOMATOES ON VINE', price: 2.69 },
+      { id: 'bread', name: 'GLDN CRST WW BREAD', price: 3.29, bonus: 'crust' },
+      { id: 'black_beans', name: 'BLACK BEANS 540ML', price: 1.29 },
+      { id: 'onions', name: 'YELLOW ONIONS 3LB', price: 3.19 },
+      { id: 'cheddar', name: 'CHEDDAR MED 400G', price: 6.99 },
+      { id: 'bananas', name: 'BANANAS', price: 1.49 },
+    ],
+  },
+
+  // Sponsored bonus offers, paid for by brands. Brand names are made up for
+  // the prototype. Offers never change meal ranking or the cheapest trip.
+  offers: [
+    { id: 'crust', brand: 'Golden Crust', product: 'bread', pts: 100, text: 'Buy any Golden Crust bread', note: 'Tip: freeze half the loaf to keep it fresh.' },
+    { id: 'greens', brand: 'Valley Greens', product: 'spinach', pts: 75, text: 'Try the new small 142 g spinach bag', note: 'Sized for one person, so less goes in the bin.' },
+    { id: 'pantry', brand: 'Hearty Pantry', product: 'black_beans', pts: 50, text: 'Buy 2 cans of Hearty Pantry beans', note: 'Keeps for a year in the cupboard.' },
+  ],
+
+  // Gift cards a student can cash points out for. Sent by a gift card partner,
+  // so SNARE never holds money. stores: where the card works on a trip.
+  giftCards: [
+    { id: 'loblaw', name: 'Loblaw gift card', where: 'No Frills, Loblaws', stores: ['nofrills', 'loblaws'] },
+    { id: 'walmart', name: 'Walmart gift card', where: 'Walmart', stores: ['walmart'] },
+    { id: 'visa', name: 'Prepaid Visa card', where: 'Any store', stores: null },
+  ],
+
   // Roommates' food, shown when the shared house fridge is on.
   housemates: ['Maya', 'Jordan'],
   houseItems: [

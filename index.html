@@ -16,11 +16,12 @@
   <button class="expand-toggle" id="expand" type="button"></button>
 
   <!-- Shown beside the phone on wide screens, for screen recordings -->
-  <aside class="pitch" aria-hidden="true">
+  <aside class="pitch">
     <div class="pitch-brand">snare<span class="dot"></span></div>
     <h2><span class="hl">Cook</span> what you have. Waste less.</h2>
-    <p>A digital fridge for students. Scan what you have, cook what expires first, and only shop for what's missing, at the cheapest store near you.</p>
+    <p>A free digital fridge for students. Snap your receipt, cook what expires first, and earn grocery money for logging. Brands, grocers and cities pay for the anonymous food waste totals.</p>
     <div class="sdgs"><span>SDG 12.3 Halve food waste</span><span>SDG 12 Responsible consumption</span></div>
+    <a class="pitch-link" href="insights.html" target="_blank" rel="noopener">See what buyers see</a>
     <small>Team SNARE · Ivey Venturing Field Project prototype</small>
   </aside>
 
@@ -39,6 +40,7 @@
           <button class="back" id="back" aria-label="Back" hidden>&#8249;</button>
           <button class="brand" data-action="home" aria-label="SNARE home">snare<span class="dot"></span></button>
           <span class="demo-tag">Demo</span>
+          <button class="pts-btn" id="pts-btn" data-action="rewards" aria-label="Your points" hidden><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg><b>0</b></button>
           <button class="avatar-btn" data-action="profile" aria-label="Your profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c0-4 3.4-6.5 7.5-6.5s7.5 2.5 7.5 6.5"/></svg></button>
         </header>
         <main id="app"></main>
@@ -47,6 +49,7 @@
       <div class="ai-sheet" id="ai" role="dialog" aria-label="Ask SNARE" hidden></div>
       <nav class="tabs" id="tabs" aria-label="Main"></nav>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <div class="notif" id="notif" role="alert" hidden></div>
     </div>
   </div>
 

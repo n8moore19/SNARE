@@ -35,6 +35,18 @@
   const USE_SOON = 3;          // days left at or below this counts as expiring
   const KG_PER_ITEM = 0.3;     // rough weight of a rescued item, for the impact estimate
   const CO2_PER_KG = 2.5;      // rough kg CO2e avoided per kg of food not wasted (estimate)
+  const RECEIPT_SCAN_MS = 2400;
+
+  // Rewards. 100 points = $1. Points come from logging, never from throwing
+  // food out, so nobody is paid to fake waste.
+  const PTS = { receipt: 25, checkin: 20, usedInTime: 5, rate: 10 };
+  const PTS_PER_DOLLAR = 100;
+  const CARD_PTS = 500;        // $5 grocery gift card
+  const PREMIUM_PTS = 2000;    // a year of premium ($20)
+  const PREMIUM_PRICE = 20;
+  const TRIAL_END = 'Dec 31';  // free premium for the fall semester
+  const SAMPLE_PTS = 430;      // demo balance: one receipt with a bonus passes $5
+  const CHECKIN_EVERY = 7;     // days
 
   const DIETS = [['vegetarian', 'Vegetarian'], ['vegan', 'Vegan'], ['halal', 'Halal'], ['gluten', 'Gluten free'], ['dairy', 'Dairy free']];
   const BUDGETS = [30, 50, 75, 100];
@@ -52,11 +64,12 @@
         profile: state.profile, fridge: state.fridge, ratings: state.ratings, feedback: state.feedback,
         cooked: state.cooked, trips: state.trips, tossed: state.tossed,
         learn: state.learn, tossLog: state.tossLog, views: state.views,
+        points: state.points, cards: state.cards, lastCheckin: state.lastCheckin,
       }));
     } catch (e) { /* storage blocked, keep working in memory */ }
   }
   const saved = loadSaved();
-  const defaultProfile = () => ({ done: false, diet: [], budget: 50, area: 'campus', mode: 'walk', radius: 5, maxStores: 2, dislikes: [], house: false });
+  const defaultProfile = () => ({ done: false, diet: [], budget: 50, area: 'campus', mode: 'walk', radius: 5, maxStores: 2, dislikes: [], house: false, track: true, share: false, consented: false });
 
   const state = {
     screen: 'welcome',
@@ -70,6 +83,12 @@
     learn: saved.learn || {},          // product id: days longer (+) or shorter (-) it lasts for this user
     tossLog: saved.tossLog || {},      // product id: times thrown out
     views: saved.views || {},          // recipe id: times opened
+    points: saved.points || [],        // ledger: { t, pts, label }
+    cards: saved.cards || [],          // gift cards: { uid, card, amt, code, used, t }
+    lastCheckin: saved.lastCheckin || 0,
+    checkin: null,                     // { uids, answers } during a weekly check in
+    notified: false,                   // the demo phone notification shows once per visit
+    afterConsent: 'fridge',
     openItem: null,
     nudgeDismissed: [],
     // This visit only
@@ -353,6 +372,7 @@
       case 'frozen': return `In the freezer since ${fmtDate(f.frozenAt || Date.now())}. Keeps about ${Math.round(p.freeze / 30)} months frozen.`;
       case 'thawed': return 'Thawed. Use it within about 2 days.';
       case 'trip': return `Bought ${fmtDate(f.added)} on your SNARE trip, so we know exactly how old it is.`;
+      case 'receipt': return `Bought ${fmtDate(f.added)}, read from your receipt, so we know exactly how old it is.`;
       case 'leftover': return `Cooked ${fmtDate(f.added)}. Leftovers keep 3 to 4 days in the fridge (Health Canada).`;
       case 'checked': return `You checked it on ${fmtDate(f.checkedAt || Date.now())}.`;
       default: return `Estimated from typical fridge storage for ${lower(p.name)} (USDA FoodKeeper).`;
@@ -577,6 +597,60 @@
     toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
+  // ---------- rewards ----------
+
+  const offers = byId(D.offers);
+  const giftCards = byId(D.giftCards);
+  const balance = () => state.points.reduce((t, x) => t + x.pts, 0);
+  const earnedTotal = () => state.points.filter(x => x.pts > 0).reduce((t, x) => t + x.pts, 0);
+  const ptsMoney = pts => money(pts / PTS_PER_DOLLAR);
+  const openCards = () => state.cards.filter(c => !c.used);
+  const cardCredit = () => openCards().reduce((t, c) => t + c.amt, 0);
+  const budgetNow = () => P().budget + cardCredit();
+  const checkinDue = () => Date.now() - state.lastCheckin > CHECKIN_EVERY * DAY;
+
+  function earn(pts, label) {
+    state.points.push({ t: Date.now(), pts, label });
+    updatePointsPill(true);
+    return pts;
+  }
+
+  function samplePoints() {
+    const now = Date.now();
+    const rows = [[34, 25, 'Receipt, No Frills'], [34, 100, 'Golden Crust bonus'], [27, 20, 'Weekly check in'], [26, 25, 'Receipt, FreshCo'],
+      [20, 20, 'Weekly check in'], [19, 10, 'Rated Burrito bowl'], [13, 25, 'Receipt, No Frills'], [13, 50, 'Hearty Pantry bonus'],
+      [12, 20, 'Weekly check in'], [9, 15, 'Used 3 items in time'], [6, 25, 'Receipt, Food Basics'], [5, 20, 'Weekly check in'],
+      [2, 10, 'Rated Beef chili'], [1, 65, 'Used 13 items in time']];
+    state.points = rows.map(([ago, pts, label]) => ({ t: now - ago * DAY, pts, label, sample: true }));
+    state.lastCheckin = now - 8 * DAY; // due, so the demo shows the check in card
+  }
+
+  function cashOut(cardId) {
+    if (balance() < CARD_PTS) return null;
+    const code = 'SNR ' + Math.random().toString(36).slice(2, 6).toUpperCase() + ' ' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    state.points.push({ t: Date.now(), pts: -CARD_PTS, label: `Cashed out: $5 ${giftCards[cardId].name}` });
+    const c = { uid: newUid(), card: cardId, amt: CARD_PTS / PTS_PER_DOLLAR, code, used: false, t: Date.now() };
+    state.cards.push(c);
+    persist();
+    updatePointsPill(true);
+    return c;
+  }
+
+  // A gift card is spent on a logged trip when the route stops where it works.
+  function useCards(p) {
+    const stops = p.order.map(s => s.id);
+    const used = openCards().filter(c => !giftCards[c.card].stores || giftCards[c.card].stores.some(s => stops.includes(s)));
+    used.forEach(c => { c.used = true; });
+    return used;
+  }
+
+  function updatePointsPill(bump) {
+    const b = document.getElementById('pts-btn');
+    if (!b) return;
+    b.querySelector('b').textContent = balance().toLocaleString('en-CA');
+    if (bump) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+  }
+
   // ---------- rendering basics ----------
 
   const ICONS = {
@@ -604,6 +678,10 @@
     house: '<svg viewBox="0 0 24 24"><path d="M3.5 11L12 4l8.5 7M6 9.5V20h12V9.5"/></svg>',
     snow: '<svg viewBox="0 0 24 24"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5"/></svg>',
     tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>',
+    gift: '<svg viewBox="0 0 24 24"><rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5V20h14v-7.5M12 8.5V20M12 8.5c-1.5-3-5.5-4-5.5-1.5S10 8.5 12 8.5zM12 8.5c1.5-3 5.5-4 5.5-1.5S14 8.5 12 8.5z"/></svg>',
+    receipt: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21z"/><path d="M9 8h6M9 11.5h6M9 15h4"/></svg>',
+    shield: '<svg viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.5-3.2 8.2-7.5 9.5-4.3-1.3-7.5-5-7.5-9.5V6z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></svg>',
+    star: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>',
   };
 
   function band(eyebrow, title, sub = '', extra = '') {
@@ -637,22 +715,25 @@
   }
   const counted = (v, fmt) => `<span data-count="${v}" data-fmt="${fmt}">${fmtCount(v, fmt)}</span>`;
 
-  const TAB_OF = { fridge: 'fridge', scan: 'fridge', scanning: 'fridge', review: 'fridge', meals: 'meals', recipe: 'meals', shop: 'shop', loading: 'shop', results: 'shop', impact: 'impact', profile: 'fridge' };
-  const NO_CHROME = ['welcome', 'scanning', 'loading'];
+  const TAB_OF = { fridge: 'fridge', scan: 'fridge', scanning: 'fridge', review: 'fridge', checkin: 'fridge', meals: 'meals', recipe: 'meals', shop: 'shop', loading: 'shop', results: 'shop', impact: 'impact', rewards: 'rewards', profile: 'fridge' };
+  const NO_CHROME = ['welcome', 'consent', 'scanning', 'loading'];
 
   function render() {
     if (map) { map.remove(); map = null; }
-    backBtn.hidden = !['scan', 'review', 'recipe', 'results', 'profile'].includes(state.screen);
+    backBtn.hidden = !['scan', 'review', 'recipe', 'results', 'profile', 'checkin'].includes(state.screen);
     const r = {
-      welcome: renderWelcome, fridge: renderFridge, scan: renderScan, scanning: renderScanning, review: renderReview,
-      meals: renderMeals, recipe: renderRecipe, shop: renderShop, loading: renderLoading, results: renderResults,
-      impact: renderImpact, profile: renderProfile,
+      welcome: renderWelcome, consent: renderConsent, fridge: renderFridge, scan: renderScan, scanning: renderScanning, review: renderReview,
+      checkin: renderCheckin, meals: renderMeals, recipe: renderRecipe, shop: renderShop, loading: renderLoading, results: renderResults,
+      impact: renderImpact, rewards: renderRewards, profile: renderProfile,
     }[state.screen];
     r();
     renderTabs();
     aiFab.hidden = NO_CHROME.includes(state.screen);
-    aiFab.classList.toggle('lift', ['shop', 'review'].includes(state.screen)); // clear the sticky button
-    document.getElementById('tabs').hidden = state.screen === 'welcome';
+    aiFab.classList.toggle('lift', ['shop', 'review', 'checkin'].includes(state.screen)); // clear the sticky button
+    document.getElementById('tabs').hidden = ['welcome', 'consent'].includes(state.screen);
+    document.getElementById('pts-btn').hidden = ['welcome', 'consent'].includes(state.screen);
+    updatePointsPill(false);
+    if (state.screen !== 'fridge') hideNotif();
   }
 
   function renderTabs() {
@@ -664,6 +745,7 @@
       ['meals', 'Meals', ICONS.pot, 0],
       ['shop', 'Shop', ICONS.cart, listN],
       ['impact', 'Impact', ICONS.leaf, 0],
+      ['rewards', 'Rewards', ICONS.star, balance() >= CARD_PTS ? '$5' : 0],
     ].map(([id, label, icon, n]) => `<button class="${current === id ? 'on' : ''}" data-tab="${id}">${icon}<span>${label}</span>${n ? `<i>${n}</i>` : ''}</button>`).join('');
   }
 
@@ -701,6 +783,41 @@
         <div class="sticky">
           <button class="btn block" data-action="finishwelcome" data-id="scan">${ICONS.camera}Scan my fridge</button>
           <button class="link block-link" data-action="finishwelcome" data-id="fridge">Skip for now</button>
+        </div>
+      </section>`;
+  }
+
+  // Two separate choices, as Canadian privacy law expects: the app itself, and
+  // anonymous sharing. Sharing is off until the student turns it on.
+  function consentRows() {
+    return `
+      <div class="card consent">
+        <button class="switch-row" data-action="consent" data-id="track" aria-pressed="${P().track}">
+          <span><strong>${ICONS.fridge} Track my food</strong><span>Needed for your fridge, reminders and meal ideas. Only you see it.</span></span>
+          <span class="switch ${P().track ? 'on' : ''}"></span>
+        </button>
+      </div>
+      <div class="card consent">
+        <button class="switch-row" data-action="consent" data-id="share" aria-pressed="${P().share}">
+          <span><strong>${ICONS.shield} Share anonymously to cut food waste</strong><span>We add what you use and toss to totals from hundreds of students. Never your name, address or location. Brands, grocers and cities use the totals, and that pays for your rewards. Brand bonuses need this on.</span></span>
+          <span class="switch ${P().share ? 'on' : ''}"></span>
+        </button>
+      </div>`;
+  }
+
+  function renderConsent() {
+    app.innerHTML = `
+      <section class="screen">
+        ${band('Your data, your call', 'Two choices, both yours', 'Change either one any time in your profile.')}
+        ${consentRows()}
+        <ul class="promise">
+          <li>${ICONS.check}Totals only. A buyer never sees one student.</li>
+          <li>${ICONS.check}Location off. Fridge photos are deleted after scanning.</li>
+          <li>${ICONS.check}You earn points either way. Nothing is paid for throwing food out.</li>
+          <li>${ICONS.check}For students 18 and over.</li>
+        </ul>
+        <div class="sticky">
+          <button class="btn block" data-action="consentdone" ${P().track ? '' : 'disabled'}>Continue</button>
         </div>
       </section>`;
   }
@@ -767,6 +884,44 @@
     </div>`;
   }
 
+  function checkinCard() {
+    if (!checkinDue() || !fridgeAll().some(f => f.owner === 'You')) return '';
+    return `<div class="check-card checkin-card">
+      <span class="eyebrow">${ICONS.clock} Weekly check in · 30 seconds</span>
+      <h3>What happened to your food?</h3>
+      <p>One tap per item: used it, tossed it, or still have it. Keeps your fridge accurate.</p>
+      <div class="row"><button class="btn small" data-action="startcheckin">Start check in</button><span class="pts-chip">+${PTS.checkin} points</span></div>
+    </div>`;
+  }
+
+  // The one tap reminder a student would get as a phone notification.
+  const notifItem = () => fridgeAll().find(f => f.owner === 'You' && !f.frozen && !(products[f.id].flags || []).includes('meat') && daysLeft(f) <= 1);
+
+  function maybeNotify() {
+    if (state.notified) return;
+    const f = notifItem();
+    if (!f) return;
+    state.notified = true;
+    setTimeout(() => {
+      if (state.screen !== 'fridge' || !state.fridge.includes(f)) return;
+      const n = document.getElementById('notif');
+      n.innerHTML = `
+        <div class="notif-head"><span class="notif-icon">snare</span><b>SNARE</b><span>now</span><button class="notif-x" data-n="close" aria-label="Dismiss">${ICONS.cross}</button></div>
+        <strong>Still got the ${esc(lower(itemName(f)))}?</strong>
+        <p>It's near the end of its window. Finished it or tossed it? One tap, no need to open the app.</p>
+        <div class="notif-actions"><button data-n="used" data-id="${f.uid}">Finished it</button><button data-n="tossed" data-id="${f.uid}">Tossed it</button></div>`;
+      n.hidden = false;
+      requestAnimationFrame(() => n.classList.add('show'));
+    }, 1400);
+  }
+
+  function hideNotif() {
+    const n = document.getElementById('notif');
+    if (!n || n.hidden) return;
+    n.classList.remove('show');
+    setTimeout(() => { n.hidden = true; }, 250);
+  }
+
   // Food this user keeps throwing out.
   function wasteNudge() {
     const id = Object.keys(state.tossLog).find(k => state.tossLog[k] >= 2 && !products[k].leftover && !state.nudgeDismissed.includes(k));
@@ -812,6 +967,7 @@
         ${band(P().house ? `${ICONS.house} House fridge` : 'Your fridge', title, sub,
           `<div class="band-actions"><button class="btn small" data-action="goscan">${ICONS.camera}Scan</button><button class="btn small outline" data-action="typeitems">${ICONS.plus}Add items</button></div>`)}
         ${checkCard()}
+        ${checkinCard()}
         ${wasteNudge()}
         ${tonight}
         ${P().house ? `<div class="seg fridge-filter">${[['all', 'Everything'], ['mine', 'Mine'], ['house', 'House and roommates']].map(([v, l]) => `<button class="${state.fridgeFilter === v ? 'on' : ''}" data-action="ffilter" data-id="${v}">${l}</button>`).join('')}</div>` : ''}
@@ -828,6 +984,67 @@
         <p class="footnote">Tap an item to mark it opened, freeze it or enter the label date. Estimates use typical storage (USDA FoodKeeper, Health Canada) and learn from your answers. When in doubt, throw it out.</p>
       </section>`;
     state.highlight = [];
+    maybeNotify();
+  }
+
+  // ---------- weekly check in ----------
+
+  function startCheckin() {
+    const mine = state.fridge.filter(f => f.owner === 'You' && !f.frozen).sort((a, b) => a.expLo - b.expLo);
+    const pick = mine.filter(f => daysLeft(f) <= USE_SOON || f.opened);
+    state.checkin = { uids: (pick.length >= 3 ? pick : mine).slice(0, 6).map(f => f.uid), answers: {} };
+    go('checkin');
+  }
+
+  function renderCheckin() {
+    const c = state.checkin;
+    const done = Object.keys(c.answers).length;
+    const label = { used: 'Used it', tossed: 'Tossed it', have: 'Still have it' };
+    app.innerHTML = `
+      <section class="screen">
+        ${band('Weekly check in', 'What happened to your food?', 'One tap each. About 30 seconds.')}
+        <div class="ci-progress"><span style="width:${c.uids.length ? done / c.uids.length * 100 : 0}%"></span></div>
+        <p class="ci-count">${done} of ${c.uids.length} done</p>
+        <ul class="ci-list">
+          ${c.uids.map(uid => {
+            const a = c.answers[uid];
+            const f = a ? a.f : state.fridge.find(x => x.uid === uid);
+            if (!f) return '';
+            return `<li class="${a ? 'answered ' + a.v : ''}">
+              <div class="ci-name"><strong>${esc(itemName(f))}</strong><span>${a ? label[a.v] : rangeText(f)}</span></div>
+              ${a ? `<button class="link" data-action="ciundo" data-id="${uid}">Undo</button>` : `<div class="ci-btns">
+                <button data-action="ci" data-id="${uid}" data-v="used">${ICONS.check}Used</button>
+                <button data-action="ci" data-id="${uid}" data-v="tossed">${ICONS.trash}Tossed</button>
+                <button data-action="ci" data-id="${uid}" data-v="have">Still have</button>
+              </div>`}
+            </li>`;
+          }).join('')}
+        </ul>
+        <p class="footnote">Points are for checking in, not for what you answer. Honest answers keep your estimates and the anonymous totals accurate.</p>
+        <div class="sticky">
+          <button class="btn block" data-action="cifinish" ${done ? '' : 'disabled'}>Finish check in · +${PTS.checkin} points</button>
+        </div>
+      </section>`;
+  }
+
+  // Answers apply when the check in finishes, so Undo is simple.
+  function finishCheckin() {
+    const c = state.checkin;
+    let inTime = 0;
+    for (const [uid, a] of Object.entries(c.answers)) {
+      const f = state.fridge.find(x => x.uid === uid);
+      if (!f) continue;
+      if (a.v === 'used') { if (daysHi(f) >= 0) inTime++; state.fridge = state.fridge.filter(x => x !== f); }
+      if (a.v === 'tossed') tossItem(f);
+      if (a.v === 'have' && daysLeft(f) <= 0) stillGood(f);
+    }
+    earn(PTS.checkin, 'Weekly check in');
+    if (inTime) earn(inTime * PTS.usedInTime, `Used ${plural(inTime, 'item')} in time`);
+    state.lastCheckin = Date.now();
+    state.checkin = null;
+    persist();
+    toast(`Check in done · +${PTS.checkin + inTime * PTS.usedInTime} points`);
+    go('fridge');
   }
 
   // ---------- scanning ----------
@@ -835,8 +1052,13 @@
   function renderScan() {
     app.innerHTML = `
       <section class="screen">
-        ${band('Add food', 'Scan your fridge', 'Snap a shelf, the whole fridge, or one item at a time. You can keep scanning and it all goes into one fridge.')}
+        ${band('Add food', 'Add your groceries', 'Snap your receipt, the fastest way. Or scan a shelf, one item, or type it in.')}
         <div class="scan-options">
+          <label class="scan-option featured">
+            <span class="so-icon">${ICONS.receipt}</span>
+            <span><strong>Snap your receipt <em class="pts-chip">+${PTS.receipt} points</em></strong><span>Five seconds. Works with any store, and we know exactly when you bought everything.</span></span>
+            <input type="file" accept="image/*" capture="environment" id="receipt-photo" hidden>
+          </label>
           <label class="scan-option">
             <span class="so-icon">${ICONS.fridge}</span>
             <span><strong>Scan a shelf or the whole fridge</strong><span>Finds everything in the photo at once</span></span>
@@ -854,6 +1076,7 @@
         </div>
         <h2 class="section-title">No photo handy?</h2>
         <div class="row demo-row">
+          <button class="btn outline" data-action="demoreceipt">Try a demo receipt</button>
           <button class="btn outline" data-action="demoshelf">Try a demo fridge</button>
           <button class="btn outline" data-action="demoitem">Try a demo item</button>
         </div>
@@ -875,8 +1098,86 @@
     setTimeout(() => { if (state.screen === 'scanning') go('review'); }, ITEM_SCAN_MS);
   }
 
+  function startReceiptScan(photo) {
+    const r = D.demoReceipt;
+    state.scan = { mode: 'receipt', photo, store: r.store, found: r.lines.map(l => ({ ...l, keep: true, days: products[l.id].life })) };
+    go('scanning');
+    setTimeout(() => { if (state.screen === 'scanning') go('review'); }, RECEIPT_SCAN_MS);
+  }
+
+  // Offers this receipt earns: a bought line matches a sponsored product.
+  function receiptBonuses(lines) {
+    if (!P().share) return [];
+    return [...new Set(lines.filter(l => l.keep && l.bonus).map(l => l.bonus))].map(id => offers[id]);
+  }
+
+  function renderReceiptReview() {
+    const s = state.scan;
+    const kept = s.found.filter(f => f.keep);
+    const bonus = receiptBonuses(s.found);
+    const lockedBonus = !P().share && s.found.some(l => l.bonus);
+    const pts = PTS.receipt + bonus.reduce((t, o) => t + o.pts, 0);
+    const total = s.found.reduce((t, l) => t + l.price, 0);
+    app.innerHTML = `
+      <section class="screen">
+        ${band(`Receipt · ${stores[s.store].name}`, `We read ${plural(s.found.length, 'item')}`, `${money(total)} spent today. Untick anything that isn't food for the fridge.`)}
+        <ul class="review-list receipt-list">
+          ${s.found.map((f, i) => `<li class="${f.keep ? '' : 'off'}">
+            <button class="tick ${f.keep ? 'on' : ''}" data-action="rkeep" data-id="${i}" aria-label="Keep this item">${ICONS.check}</button>
+            <div class="rv-main"><strong>${products[f.id].name}${f.bonus && P().share ? '<b class="tag">Bonus</b>' : ''}</strong><span class="mono">${esc(f.name)} · ${money(f.price)}</span></div>
+            <span class="exp ${urgency(estimateRange(f.days)[0])}">${rangeFromDays(f.days)}</span>
+          </li>`).join('')}
+        </ul>
+        <div class="earn-box">
+          <span class="eyebrow">${ICONS.star} You earn</span>
+          <ul>
+            <li><span>Receipt scanned</span><b>+${PTS.receipt}</b></li>
+            ${bonus.map(o => `<li><span>${esc(o.brand)} bonus <em class="sponsored">Sponsored</em></span><b>+${o.pts}</b></li>`).join('')}
+          </ul>
+          ${lockedBonus ? '<p>A brand bonus is on this receipt. Turn on anonymous sharing in your profile to collect brand bonuses.</p>' : ''}
+        </div>
+        <p class="footnote">Bought today, so expiry estimates start from today. No store partnership needed: the real app reads any receipt.</p>
+        <div class="sticky">
+          <button class="btn block" data-action="receiptconfirm" ${kept.length ? '' : 'disabled'}>Add ${plural(kept.length, 'item')} · +${pts} points</button>
+        </div>
+      </section>`;
+  }
+
+  function confirmReceipt() {
+    const s = state.scan;
+    const kept = s.found.filter(f => f.keep);
+    const added = kept.map(f => addToFridge(f.id, { src: 'receipt' }));
+    state.items = state.items.filter(it => !kept.some(k => k.id === it.id)); // bought, so off the list
+    let pts = earn(PTS.receipt, `Receipt, ${stores[s.store].name}`);
+    receiptBonuses(s.found).forEach(o => { pts += earn(o.pts, `${o.brand} bonus`); });
+    state.highlight = added.map(a => a.uid);
+    persist();
+    toast(`${plural(added.length, 'item')} added · +${pts} points`);
+    go('fridge');
+  }
+
+  // Simple flat receipt illustration standing in for a photo.
+  function receiptSvg() {
+    const r = D.demoReceipt;
+    const rows = r.lines.map((l, i) => `<text x="30" y="${112 + i * 22}">${l.name}</text><text x="270" y="${112 + i * 22}" text-anchor="end">${l.price.toFixed(2)}</text>`).join('');
+    const y = 112 + r.lines.length * 22;
+    const total = r.lines.reduce((t, l) => t + l.price, 0);
+    return `<svg viewBox="0 0 300 360" class="demo-receipt" aria-label="Demo receipt photo">
+      <rect width="300" height="360" fill="#D9D4CA"/>
+      <path d="M18 14h264v${y + 40}l-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6-11 6-11-6z" fill="#FFFDF7"/>
+      <g font-family="Courier New, monospace" fill="#2B2B2B" font-size="11">
+        <text x="150" y="44" text-anchor="middle" font-size="17" font-weight="700">NO FRILLS</text>
+        <text x="150" y="62" text-anchor="middle">LONDON ON</text>
+        <text x="150" y="80" text-anchor="middle">${new Date().toLocaleDateString('en-CA')}</text>
+        ${rows}
+        <text x="30" y="${y + 18}" font-weight="700">TOTAL</text><text x="270" y="${y + 18}" text-anchor="end" font-weight="700">${total.toFixed(2)}</text>
+      </g>
+    </svg>`;
+  }
+
   function scanImage() {
     const s = state.scan;
+    if (s.photo === 'demo-receipt') return receiptSvg();
     if (s.photo === 'demo') return demoFridgeSvg();
     if (String(s.photo).startsWith('demo-item:')) return demoItemSvg(s.photo.slice(10));
     return `<img src="${s.photo}" alt="Your photo">`;
@@ -884,8 +1185,8 @@
 
   function renderScanning() {
     const s = state.scan;
-    const shelf = s.mode === 'shelf';
-    const ms = shelf ? SHELF_SCAN_MS : ITEM_SCAN_MS;
+    const shelf = s.mode === 'shelf' || s.mode === 'receipt';
+    const ms = s.mode === 'receipt' ? RECEIPT_SCAN_MS : shelf ? SHELF_SCAN_MS : ITEM_SCAN_MS;
     const step = (ms - 600) / s.found.length;
     const boxes = shelf && s.photo === 'demo'
       ? s.found.map((f, i) => `<span class="det-box ${f.box[1] < 8 ? 'below' : ''}" style="left:${f.box[0]}%;top:${f.box[1]}%;width:${f.box[2]}%;height:${f.box[3]}%;animation-delay:${300 + i * step}ms"><em>${products[f.id].name}</em></span>`).join('')
@@ -898,7 +1199,7 @@
           <span class="sweep" style="animation-duration:${shelf ? 1.6 : 1.1}s"></span>
         </div>
         <div class="loading-copy">
-          <h1>${shelf ? 'Spotting your food' : 'Identifying this item'}</h1>
+          <h1>${s.mode === 'receipt' ? 'Reading your receipt' : shelf ? 'Spotting your food' : 'Identifying this item'}</h1>
           <div class="progress"><span style="animation-duration:${ms}ms"></span></div>
           <div class="found-chips">${s.found.map((f, i) => `<span class="chip on found" style="animation-delay:${300 + i * step}ms">${ICONS.check}${products[f.id].name}</span>`).join('')}</div>
           <p class="hint">Estimating how much is left and how long each item keeps.</p>
@@ -911,6 +1212,7 @@
   function renderReview() {
     const s = state.scan;
     if (s.mode === 'item') return renderItemReview();
+    if (s.mode === 'receipt') return renderReceiptReview();
     const kept = s.found.filter(f => f.keep);
     const typed = s.mode === 'type';
     app.innerHTML = `
@@ -1143,6 +1445,7 @@
           <ul class="items" id="items">${state.items.map(shopRow).join('') || '<li class="empty">Nothing yet. Open a meal and tap Add to list, or search below.</li>'}</ul>
           <div class="search" style="margin-top:10px"><input id="q" type="text" placeholder="Add something, like rice or onions" autocomplete="off" value="${esc(state.query)}"><div id="suggest" class="suggest"></div></div>
           ${!state.items.length ? '<button class="btn small outline" data-tab="meals" style="margin-top:10px">Find meals</button>' : ''}
+          ${cardCredit() ? `<div class="credit">${ICONS.gift}<span>Budget ${money(P().budget)} + ${money(cardCredit())} gift card = <b>${money(budgetNow())}</b> to spend</span></div>` : ''}
         </div>
         ${deals.length ? `<h2 class="section-title">On sale near you</h2>
         <div class="deal-strip">${deals.map(d => { const p = products[d.product]; return `<button class="deal" data-action="add" data-id="${d.product}"><span class="src">${stores[d.store].name}</span><strong>${p.name}</strong><span><b>${money(d.price)}</b> <s>${money(p.base)}</s></span><i>${ICONS.plus}</i></button>`; }).join('')}</div>` : ''}
@@ -1232,7 +1535,7 @@
   }
 
   function budgetPill(cost) {
-    const diff = P().budget - cost;
+    const diff = budgetNow() - cost;
     return diff >= 0
       ? `<span class="pill ok">${money(diff)} under</span>`
       : `<span class="pill over">${money(-diff)} over</span>`;
@@ -1251,7 +1554,7 @@
   function renderResults() {
     const r = result;
     const start = r.start;
-    const settings = `${MODES[P().mode].label} · within ${P().radius} km · ${storeLimitText()} · ${money(P().budget)} weekly budget`;
+    const settings = `${MODES[P().mode].label} · within ${P().radius} km · ${storeLimitText()} · ${money(P().budget)} weekly budget${cardCredit() ? ` + ${money(cardCredit())} gift card` : ''}`;
     const head = band('Your trip', `${plural(state.items.length, 'item')} from ${esc(start.name)}`, settings,
       '<button class="btn small outline" data-action="edit">Edit trip</button>');
 
@@ -1274,11 +1577,11 @@
     const missing = r.missing.length
       ? `<div class="banner info"><strong>Not found within ${P().radius} km</strong>${r.missing.map(it => products[it.id].name).join(', ')}. A longer distance may find them.</div>`
       : '';
-    const gap = cheapest.cost - P().budget;
+    const gap = cheapest.cost - budgetNow();
     const swapSave = swapsFor(cheapest).reduce((n, s) => n + s.saving, 0);
     const banner = gap > 0
-      ? `<div class="banner over"><strong>About ${money(gap)} over your weekly budget</strong>${swapSave > 0 ? `Smart swaps below could save ${money(swapSave)}. ` : ''}Cooking more from your fridge first is the cheapest fix.</div>`
-      : `<div class="banner ok"><strong>${r.options.every(o => o.plan.cost <= P().budget) ? 'Every option fits your budget' : 'The cheapest option fits your budget'}</strong>Pick the trip that works best for your time.</div>`;
+      ? `<div class="banner over"><strong>About ${money(gap)} over your budget</strong>${swapSave > 0 ? `Smart swaps below could save ${money(swapSave)}. ` : ''}Cooking more from your fridge first is the cheapest fix.</div>`
+      : `<div class="banner ok"><strong>${r.options.every(o => o.plan.cost <= budgetNow()) ? 'Every option fits your budget' : 'The cheapest option fits your budget'}</strong>Pick the trip that works best for your time.</div>`;
 
     const cards = r.options.map(o => `
       <button class="opt ${o.id === sel.id ? 'on' : ''}" data-action="pick" data-id="${o.id}">
@@ -1391,7 +1694,7 @@
       </div>
       <p class="footnote">Community figures are illustrative for the prototype.</p>`;
 
-    if (!c.length && !t.length) {
+    if (!c.length && !t.length && !earnedTotal()) {
       app.innerHTML = `
         <section class="screen">
           ${band('Impact', 'Every meal adds up.')}
@@ -1409,7 +1712,10 @@
 
     const rescued = c.reduce((n, x) => n + x.rescued, 0);
     const kg = c.reduce((n, x) => n + x.kg, 0) + t.reduce((n, x) => n + x.kg, 0);
-    const saved = c.reduce((n, x) => n + x.value, 0) + t.reduce((n, x) => n + x.saved, 0);
+    const usedSaved = c.reduce((n, x) => n + x.value, 0);
+    const tripSaved = t.reduce((n, x) => n + x.saved, 0);
+    const ptsSaved = earnedTotal() / PTS_PER_DOLLAR;
+    const saved = usedSaved + tripSaved + ptsSaved;
     const wasteRate = rescued + state.tossed ? Math.round(state.tossed / (rescued + state.tossed) * 100) : 0;
     const streak = weekStreak();
     const history = [
@@ -1419,7 +1725,12 @@
 
     app.innerHTML = `
       <section class="screen">
-        ${band("Impact · You've saved", counted(saved, 'money'), 'Food you used before it went off, plus sale savings on your trips.')}
+        ${band("Impact · You've saved", counted(saved, 'money'), 'Food you used, sale savings and points, in one number.')}
+        <div class="split">
+          <div><b>${money(usedSaved)}</b><span>used what you had</span></div>
+          <div><b>${money(tripSaved)}</b><span>shopped sales</span></div>
+          <div><b>${money(ptsSaved)}</b><span>points earned</span></div>
+        </div>
         <div class="stats">
           <div class="stat"><b>${counted(rescued, '')}</b><span>expiring items rescued</span></div>
           <div class="stat"><b>${counted(kg, 'kg')}</b><span>food waste avoided</span></div>
@@ -1438,6 +1749,86 @@
         ${community}
       </section>`;
     countUp(app, 1100);
+  }
+
+  // ---------- rewards screen ----------
+
+  function bar(value, max) {
+    return `<div class="meter"><span style="width:${Math.min(100, value / max * 100)}%"></span></div>`;
+  }
+
+  function renderRewards() {
+    const bal = balance();
+    const toCard = CARD_PTS - bal;
+    const earned = bal; // points not spent on gift cards can renew premium
+    const recent = state.points.slice().sort((a, b) => b.t - a.t).slice(0, 6);
+    const picking = state.cashPick;
+    app.innerHTML = `
+      <section class="screen rewards">
+        ${band('Rewards', `${counted(bal, '')} points`, `Worth ${ptsMoney(bal)} · 100 points = $1`)}
+
+        <div class="card reward-card">
+          <div class="rc-head"><span class="rc-icon">${ICONS.gift}</span><div><strong>$5 grocery gift card</strong><span>${toCard > 0 ? `${toCard} points to go` : 'Ready to cash out'}</span></div><b>${Math.min(bal, CARD_PTS)}/${CARD_PTS}</b></div>
+          ${bar(bal, CARD_PTS)}
+          ${toCard > 0
+            ? `<p class="card-note">About ${ptsMoney(toCard)} more. A receipt and a check in each week gets you there.</p>`
+            : picking
+              ? `<div class="field-label">Pick your card</div>
+                 <div class="card-pick">${D.giftCards.map(g => `<button data-action="cashpick" data-id="${g.id}"><strong>${g.name}</strong><span>${g.where}</span></button>`).join('')}</div>`
+              : `<button class="btn block" data-action="cashout">Cash out $5</button>`}
+        </div>
+
+        ${state.cards.length ? `<h2 class="section-title">Your gift cards</h2>
+        <div class="gcards">${state.cards.slice().reverse().map(c => `<div class="gcard ${c.used ? 'used' : ''}">
+          <div><span class="eyebrow">${giftCards[c.card].name}</span><b>${money(c.amt)}</b></div>
+          <div class="code"><span>${c.used ? 'Used on a trip' : 'Show at the till'}</span><code>${c.code}</code></div>
+        </div>`).join('')}</div>
+        <p class="footnote">Sent by our gift card partner, so SNARE never holds your money. Unused cards count toward your budget when you plan a trip. Demo codes only.</p>` : ''}
+
+        <div class="card premium-card">
+          <span class="eyebrow">${ICONS.spark} Premium</span>
+          <h3>Free until ${TRIAL_END}</h3>
+          <p>Your fall semester trial. After that, ${money(PREMIUM_PRICE)} a year, or earn it with points.</p>
+          <div class="earn-back"><span>Your points cover</span><b>${ptsMoney(Math.min(earned, PREMIUM_PTS))} of ${money(PREMIUM_PRICE)}</b></div>
+          ${bar(earned, PREMIUM_PTS)}
+          <ul class="perks">
+            <li>${ICONS.check}Unlimited AI chat</li>
+            <li>${ICONS.check}Weekly meal planner with a shopping list</li>
+            <li>${ICONS.check}Nutrition tracking</li>
+            <li>${ICONS.check}Price alerts on your usual items</li>
+          </ul>
+          <p class="card-note">Your fridge, receipts, reminders, recipes and rewards stay free forever. Points go to a gift card or to premium, your choice.</p>
+        </div>
+
+        <h2 class="section-title">Bonus offers <small>Sponsored</small></h2>
+        ${!P().share ? `<div class="banner info"><strong>Brand bonuses are off</strong>They need anonymous sharing on. You still earn points for receipts and check ins.<div class="actions"><button class="btn small" data-action="consent" data-id="share">Turn on sharing</button></div></div>` : ''}
+        ${D.offers.map(o => { const p = products[o.product]; return `<div class="offer bonus ${P().share ? '' : 'locked'}">
+          <div class="offer-top">
+            <div><span class="kind">Sponsored · ${esc(o.brand)}</span><h3>${esc(o.text)}</h3><p>${esc(o.note)}</p></div>
+            <div class="price"><b>+${o.pts}</b><s style="text-decoration:none">points</s></div>
+          </div>
+          <div class="offer-foot"><small>Scan a receipt with ${lower(p.name)} from any store</small>
+            <button class="btn small ${state.items.some(it => it.id === o.product) ? 'added' : 'outline'}" data-action="offeradd" data-id="${o.product}">${state.items.some(it => it.id === o.product) ? 'On your list' : 'Add to list'}</button></div>
+        </div>`; }).join('')}
+        <p class="footnote">Sponsored offers are always labelled and never change your meal ranking or your cheapest trip.</p>
+
+        <h2 class="section-title">How to earn</h2>
+        <ul class="history earn-list">
+          <li><div><strong>Snap a grocery receipt</strong><span>About 4 a month</span></div><b>+${PTS.receipt}</b></li>
+          <li><div><strong>Weekly check in</strong><span>30 seconds</span></div><b>+${PTS.checkin}</b></li>
+          <li><div><strong>Use an item before it expires</strong><span>Each item</span></div><b>+${PTS.usedInTime}</b></li>
+          <li><div><strong>Cook and rate a SNARE recipe</strong><span>Each meal</span></div><b>+${PTS.rate}</b></li>
+          <li><div><strong>Brand bonuses</strong><span>Paid for by brands</span></div><b>+50 to 200</b></li>
+        </ul>
+        <p class="footnote">About 270 points ($2.70) a month before bonuses. No points for throwing food out, so nobody is paid to fake waste.</p>
+
+        <h2 class="section-title">Recent points</h2>
+        ${recent.length
+          ? `<ul class="history">${recent.map(x => `<li><div><strong>${esc(x.label)}</strong><span>${fmtDate(x.t)}</span></div><b class="${x.pts < 0 ? 'neg' : ''}">${x.pts > 0 ? '+' : ''}${x.pts}</b></li>`).join('')}</ul>`
+          : `<div class="banner info"><strong>No points yet</strong>Snap your first receipt to earn ${PTS.receipt} points.
+              <div class="actions"><button class="btn small" data-action="goscan">${ICONS.receipt}Snap a receipt</button><button class="btn small outline" data-action="samplepts">Load sample points</button></div></div>`}
+      </section>`;
+    countUp(app, 800);
   }
 
   // ---------- profile and memory ----------
@@ -1481,7 +1872,10 @@
             <span class="switch ${P().house ? 'on' : ''}"></span>
           </button>
         </div>
-        <div class="banner info"><strong>Privacy</strong>In the real app, fridge photos are analysed and then deleted; only the item list is kept. In this prototype everything stays in your own browser.</div>
+        <h2 class="section-title">Privacy</h2>
+        ${consentRows()}
+        <div class="banner info"><strong>What buyers see</strong>Only totals across many students, like "41% of large spinach bags get thrown out." Never one person. Fridge photos are deleted after scanning. In this prototype everything stays in your own browser.
+          <div class="actions"><a class="btn small outline" href="insights.html" target="_blank" rel="noopener">See the buyer view</a></div></div>
         <button class="btn outline block" data-action="reset" style="margin-top:14px">Clear my data and start over</button>
       </section>`;
   }
@@ -1498,6 +1892,7 @@
     recipe: ['What do I need for this?', 'What can I swap in?', 'Add the missing items'],
     shop: ['Plan my cheapest trip', "What's on sale near me?", 'How much will my list cost?'],
     impact: ['How much have I saved?', 'Plan my meals for the week', 'What should I use first?'],
+    rewards: ['How many points do I have?', 'How do I earn more points?', 'What does premium cost?'],
   };
 
   // Conversation memory for follow-ups ("the second one", "cheaper", "yes").
@@ -1710,6 +2105,18 @@
     if (aiCtx.pending && /^(no|nah|nope|not now|maybe later)\b/.test(t)) {
       aiCtx.pending = null;
       return say("No problem. Anything else?");
+    }
+
+    // Points, rewards and premium
+    if (/\b(points?|rewards?|gift ?cards?|cash ?out|premium|subscription|trial)\b/.test(t)) {
+      const bal = balance();
+      if (/(premium|subscription|trial|cost|price|pay)/.test(t)) {
+        return say(`Premium is free until <b>${TRIAL_END}</b> for your fall semester. After that it's <b>${money(PREMIUM_PRICE)} a year</b>, or you can earn it: ${PREMIUM_PTS.toLocaleString('en-CA')} points renews it. You have ${bal} points, which covers ${ptsMoney(Math.min(bal, PREMIUM_PTS))}. Your fridge, receipts and rewards stay free either way.`, [aiAct('Open rewards', 'tab', 'rewards')]);
+      }
+      if (/(earn|more|get|how do)/.test(t)) {
+        return say(`The quickest points:<br>- Snap a grocery receipt: <b>+${PTS.receipt}</b><br>- Weekly check in, 30 seconds: <b>+${PTS.checkin}</b><br>- Use food before it expires: <b>+${PTS.usedInTime}</b> each<br>- Cook and rate a recipe: <b>+${PTS.rate}</b><br>- Brand bonuses: <b>+50 to 200</b>${P().share ? '' : ' (need anonymous sharing on)'}`, [aiAct('Snap a receipt', 'tab', 'scan'), aiAct('See bonus offers', 'tab', 'rewards')]);
+      }
+      return say(`You have <b>${bal} points</b>, worth ${ptsMoney(bal)}. ${bal >= CARD_PTS ? "That's enough for a $5 grocery gift card." : `${CARD_PTS - bal} more gets you a $5 grocery gift card.`}`, [aiAct(bal >= CARD_PTS ? 'Cash out $5' : 'Open rewards', 'tab', 'rewards')]);
     }
 
     // Rating right after cooking
@@ -2365,7 +2772,9 @@
       }
       case 'budget': P().budget = Number(id); persist(); rerender(); break;
       case 'mode': P().mode = id; persist(); el.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === el)); break;
-      case 'finishwelcome': P().done = true; persist(); go(id === 'scan' ? 'scan' : 'fridge'); break;
+      case 'finishwelcome': state.afterConsent = id === 'scan' ? 'scan' : 'fridge'; if (P().consented) { P().done = true; persist(); go(state.afterConsent); } else go('consent'); break;
+      case 'consent': P()[id] = !P()[id]; persist(); rerender(); if (state.screen !== 'consent') toast(id === 'share' ? (P().share ? 'Anonymous sharing on. Brand bonuses unlocked.' : 'Anonymous sharing off. We stop using your data in totals.') : (P().track ? 'Food tracking on' : 'Food tracking off')); break;
+      case 'consentdone': P().consented = true; P().done = true; persist(); go(state.afterConsent); break;
       case 'profile': go('profile'); break;
       case 'forget': P().dislikes = P().dislikes.filter(x => x !== id); persist(); rerender(); break;
       case 'unrate': delete state.ratings[id]; persist(); rerender(); break;
@@ -2384,7 +2793,8 @@
       case 'used': {
         const f = state.fridge.find(x => x.uid === id);
         state.fridge = state.fridge.filter(x => x.uid !== id);
-        toast(`${itemName(f)} marked as used`);
+        if (f.owner === 'You' && daysHi(f) >= 0) { earn(PTS.usedInTime, `Used ${lower(itemName(f))} in time`); toast(`${itemName(f)} used in time · +${PTS.usedInTime} points`); }
+        else toast(`${itemName(f)} marked as used`);
         persist(); rerender(); break;
       }
       case 'tossed':
@@ -2404,6 +2814,16 @@
 
       // scanning
       case 'demoshelf': startShelfScan('demo'); break;
+      case 'demoreceipt': startReceiptScan('demo-receipt'); break;
+      case 'receiptconfirm': confirmReceipt(); break;
+      case 'startcheckin': startCheckin(); break;
+      case 'ci': state.checkin.answers[id] = { v: el.dataset.v, f: state.fridge.find(x => x.uid === id) }; rerender(); break;
+      case 'ciundo': delete state.checkin.answers[id]; rerender(); break;
+      case 'cifinish': finishCheckin(); break;
+      case 'cashout': state.cashPick = true; rerender(); break;
+      case 'cashpick': { const c = cashOut(id); state.cashPick = false; if (c) toast(`$5 ${giftCards[id].name} ready. Code ${c.code}`); rerender(); break; }
+      case 'offeradd': if (!state.items.some(it => it.id === id)) { state.items.push({ id, qty: 1, why: 'Bonus offer' }); toast(`${products[id].name} added to your list`); } rerender(); break;
+      case 'samplepts': samplePoints(); persist(); updatePointsPill(true); rerender(); break;
       case 'demoitem': startItemScan(null); break;
       case 'typeitems': state.scan = { mode: 'type', found: [] }; state.query = ''; go('review'); break;
       case 'rkeep': state.scan.found[id].keep = !state.scan.found[id].keep; rerender(); break;
@@ -2436,6 +2856,7 @@
       case 'fchip': state.feedbackChip = state.feedbackChip === id ? null : id; rerender(); break;
       case 'rate': {
         const r = recipes[state.recipeId];
+        if (state.justCooked === r.id && state.ratings[r.id] == null) earn(PTS.rate, `Rated ${r.name}`);
         state.ratings[r.id] = Number(id);
         if (state.feedbackChip) state.feedback[r.id] = state.feedbackChip;
         persist();
@@ -2484,6 +2905,7 @@
       case 'log': {
         const p = result.options.find(o => o.id === state.selected).plan;
         state.trips.push(tripRecord(p));
+        const usedCards = useCards(p);
         const bought = Object.values(p.assign).flat();
         const added = bought.map(l => addToFridge(l.id, { src: 'trip' }));
         state.highlight = added.map(a => a.uid);
@@ -2491,7 +2913,7 @@
         state.loggedTrip = true;
         result = null;
         persist();
-        toast(`${plural(added.length, 'item')} added to your fridge. Savings added to Impact.`);
+        toast(`${plural(added.length, 'item')} added to your fridge.${usedCards.length ? ` ${money(usedCards.reduce((t, c) => t + c.amt, 0))} gift card applied.` : ' Savings added to Impact.'}`);
         go('fridge');
         break;
       }
@@ -2524,6 +2946,7 @@
     const reader = new FileReader();
     reader.onload = () => {
       if (e.target.id === 'shelf-photo') startShelfScan(reader.result);
+      if (e.target.id === 'receipt-photo') startReceiptScan(reader.result);
       if (e.target.id === 'item-photo' || e.target.id === 'next-photo') startItemScan(reader.result);
     };
     reader.readAsDataURL(file);
@@ -2544,6 +2967,23 @@
   document.querySelector('.bar').addEventListener('click', e => {
     if (e.target.closest('[data-action="home"]')) go(P().done ? 'fridge' : 'welcome');
     if (e.target.closest('[data-action="profile"]')) go('profile');
+    if (e.target.closest('[data-action="rewards"]')) go('rewards');
+  });
+
+  // The simulated phone notification: one tap answers without opening the app.
+  document.getElementById('notif').addEventListener('click', e => {
+    const b = e.target.closest('[data-n]');
+    if (!b) return;
+    const f = state.fridge.find(x => x.uid === b.dataset.id);
+    if (b.dataset.n === 'used' && f) {
+      state.fridge = state.fridge.filter(x => x !== f);
+      if (daysHi(f) >= 0) earn(PTS.usedInTime, `Used ${lower(itemName(f))} in time`);
+      toast(`${itemName(f)} marked as finished${daysHi(f) >= 0 ? ` · +${PTS.usedInTime} points` : ''}`);
+    }
+    if (b.dataset.n === 'tossed' && f) { tossItem(f); toast(`${itemName(f)} logged as tossed. We'll remind you sooner next time.`); }
+    persist();
+    hideNotif();
+    if (f && state.screen === 'fridge') rerender();
   });
 
   aiFab.addEventListener('click', openAI);
@@ -2574,7 +3014,7 @@
   setExpanded(startExpanded);
 
   backBtn.addEventListener('click', () => {
-    const to = { scan: 'fridge', review: 'scan', recipe: 'meals', results: 'shop', profile: 'fridge' }[state.screen];
+    const to = { scan: 'fridge', review: 'scan', recipe: 'meals', results: 'shop', profile: 'fridge', checkin: 'fridge' }[state.screen];
     if (to) go(to);
   });
 
@@ -2587,13 +3027,15 @@
     persist();
     go('welcome');
   } else if (hash0 === 'demo') {
-    P().done = true;
+    Object.assign(P(), { done: true, consented: true, share: true });
     state.fridge = [];
     D.demoScan.forEach(x => addToFridge(x.id, x));
+    if (!state.points.length) samplePoints();
+    if (!state.cooked.length && !state.trips.length) sampleHistory();
     persist();
     go('fridge');
-  } else if (['meals', 'shop', 'impact', 'fridge'].includes(hash0)) {
-    P().done = true;
+  } else if (['meals', 'shop', 'impact', 'fridge', 'rewards'].includes(hash0)) {
+    Object.assign(P(), { done: true, consented: true });
     go(hash0);
   } else {
     go(P().done ? 'fridge' : 'welcome');
