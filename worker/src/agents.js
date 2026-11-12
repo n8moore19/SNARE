@@ -156,15 +156,10 @@ export async function runChief(env) {
     system: CHIEF_SYSTEM,
     messages: [{ role: "user", content: `Write today's brief from these inputs (JSON):\n${JSON.stringify(inputs)}` }],
   });
-  if (response.stop_reason === "refusal") throw new Error("REFUSED");
-  if (response.stop_reason === "max_tokens") throw new Error("TOO_LONG");
-  const text = response.content.find((b) => b.type === "text");
-  if (!text) throw new Error("EMPTY");
-
   const record = {
     agent: "chief",
     generatedAt: new Date().toISOString(),
-    output: JSON.parse(text.text),
+    output: JSON.parse(textOf(response)),
     sources: {
       tasks: tasks.length,
       commits: Array.isArray(github) ? github.length : github.error,
@@ -173,8 +168,152 @@ export async function runChief(env) {
     },
     usage: { input: response.usage.input_tokens, output: response.usage.output_tokens },
   };
-  if (env.AGENTS) await env.AGENTS.put("latest:chief", JSON.stringify(record));
+  return save(env, "chief", record);
+}
+
+// ---------- shared ----------
+
+const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" };
+
+function textOf(response) {
+  if (response.stop_reason === "refusal") throw new Error("REFUSED");
+  if (response.stop_reason === "max_tokens") throw new Error("TOO_LONG");
+  const text = response.content.find((b) => b.type === "text");
+  if (!text) throw new Error("EMPTY");
+  return text.text;
+}
+
+async function save(env, id, record) {
+  if (env.AGENTS) await env.AGENTS.put(`latest:${id}`, JSON.stringify(record));
   return record;
+}
+
+// ---------- agent 2: Market intelligence ----------
+// Two steps: research with live web search (Claude's server tool), then turn
+// the notes into a structured brief. Findings keep only links that search
+// actually returned, so the brief can't cite a made up source.
+
+const DEFAULT_WATCHLIST = [
+  { id: "w1", topic: "Competitors: Too Good To Go, Flashfood, Fetch rewards, Kitche and Remy, Olio, fridge and expiry tracking apps", kind: "competitor" },
+  { id: "w2", topic: "Food brands in Canada changing pack sizes or packaging to cut food waste (bread, salad, produce, dairy)", kind: "buyer" },
+  { id: "w3", topic: "Canadian grocers (Loblaw, Sobeys, Metro, Walmart Canada) food waste programs and data partnerships", kind: "buyer" },
+  { id: "w5", topic: "Household food waste measurement and policy in Canada and the City of London, Ontario green bin program", kind: "policy" },
+  { id: "w6", topic: "Student food insecurity and grocery prices in Canada, especially London, Ontario", kind: "market" },
+];
+
+const MARKET_SCHEMA = {
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["competitor", "buyer lead", "funding", "policy", "market"] },
+          title: { type: "string" },
+          summary: { type: "string" },
+          whyItMatters: { type: "string" },
+          url: { type: "string" },
+          source: { type: "string" },
+          date: { type: "string" },
+          sendTo: { type: "string", enum: ["sales", "content", "growth", "team", "none"] },
+        },
+        required: ["category", "title", "summary", "whyItMatters", "url", "source", "date", "sendTo"],
+        additionalProperties: false,
+      },
+    },
+    watchNext: { type: "array", items: { type: "string" } },
+  },
+  required: ["headline", "items", "watchNext"],
+  additionalProperties: false,
+};
+
+const MARKET_RESEARCH_SYSTEM = `You are the Market intelligence agent for SNARE, a student startup in London, Ontario (Ivey Venturing Field Project).
+SNARE is a free digital fridge app for students that rewards logging what they buy, use and throw out. Students who opt in feed an anonymous household food waste panel that SNARE sells to food brands, grocers and cities. Watch competitors, buyers who might pay for food waste data, household food waste policy, and student food costs. Searches are set to London, Ontario: cover Canada, with London first.
+
+Research the watchlist with web search. Focus on the last 30 days, and older only when it is still the latest news. Prefer primary and reputable sources. For each finding note what happened, the date, the source and URL, and why it matters to SNARE. Say plainly when you found nothing new for a topic. Do not speculate beyond what sources say.`;
+
+const MARKET_FORMAT_SYSTEM = `You turn research notes into SNARE's weekly market brief.
+Rules:
+- Use only findings from the notes, and only URLs from the allowed source list, copied exactly.
+- 4 to 10 items, most useful first. Skip anything older than 90 days unless it is the latest on a watched topic.
+- whyItMatters is one or two sentences specific to SNARE.
+- sendTo: "sales" for buyer leads, "content" for post ideas, "growth" for student acquisition ideas, "team" for decisions, otherwise "none".
+- date as YYYY-MM-DD when known, otherwise "".
+- headline: one sentence on the most important thing this week.
+- watchNext: up to 3 things to check next week.
+- Plain, short sentences. No em dashes or hyphens used as dashes.`;
+
+async function getWatchlist(env) {
+  const saved = env.AGENTS ? await env.AGENTS.get("watchlist", "json") : null;
+  return saved || DEFAULT_WATCHLIST;
+}
+
+function validWatchlist(list) {
+  if (!Array.isArray(list) || list.length > 20) return null;
+  const kinds = ["competitor", "buyer", "funding", "policy", "market"];
+  const clean = [];
+  for (const w of list) {
+    if (!w || typeof w.topic !== "string" || !w.topic.trim() || w.topic.length > 300) return null;
+    clean.push({ id: String(w.id || crypto.randomUUID()).slice(0, 40), topic: w.topic.trim(), kind: kinds.includes(w.kind) ? w.kind : "market" });
+  }
+  return clean;
+}
+
+export async function runMarket(env) {
+  if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
+  const watchlist = await getWatchlist(env);
+  const model = env.MARKET_MODEL || "claude-sonnet-5-5";
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+
+  // Step 1: research. Server side search can pause a long turn; resume it.
+  const sources = new Map();
+  const notes = [];
+  let searches = 0, inTok = 0, outTok = 0;
+  const messages = [{ role: "user", content: `Today is ${today()}. Research this watchlist:\n${watchlist.map((w) => `- [${w.kind}] ${w.topic}`).join("\n")}` }];
+  for (let turn = 0; turn < 5; turn++) {
+    const r = await client.beta.messages.create({
+      model, max_tokens: 16000, ...FALLBACK,
+      output_config: { effort: "medium" },
+      system: MARKET_RESEARCH_SYSTEM,
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 12, user_location: { type: "approximate", city: "London", region: "Ontario", country: "CA", timezone: TIMEZONE } }],
+      messages,
+    });
+    inTok += r.usage.input_tokens; outTok += r.usage.output_tokens;
+    if (r.stop_reason === "refusal") throw new Error("REFUSED");
+    for (const b of r.content) {
+      if (b.type === "server_tool_use") searches++;
+      if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+        for (const x of b.content) if (x.type === "web_search_result") sources.set(x.url, { url: x.url, title: x.title, age: x.page_age || "" });
+      }
+      if (b.type === "text") notes.push(b.text);
+    }
+    if (r.stop_reason !== "pause_turn") break;
+    messages.push({ role: "assistant", content: r.content });
+  }
+  if (!sources.size) throw new Error("NO_SOURCES");
+
+  // Step 2: structure the notes. Only real links survive.
+  const allowed = [...sources.values()];
+  const f = await client.beta.messages.create({
+    model, max_tokens: 16000, ...FALLBACK,
+    output_config: { effort: "low", format: { type: "json_schema", schema: MARKET_SCHEMA } },
+    system: MARKET_FORMAT_SYSTEM,
+    messages: [{ role: "user", content: `Today is ${today()}.\n\nResearch notes:\n${notes.join("\n\n")}\n\nAllowed sources (JSON):\n${JSON.stringify(allowed)}` }],
+  });
+  inTok += f.usage.input_tokens; outTok += f.usage.output_tokens;
+  const output = JSON.parse(textOf(f));
+  const before = output.items.length;
+  output.items = output.items.filter((i) => sources.has(i.url));
+
+  return save(env, "market", {
+    agent: "market",
+    generatedAt: new Date().toISOString(),
+    output,
+    sources: { searches, links: sources.size, dropped: before - output.items.length, watchlist: watchlist.length },
+    usage: { input: inTok, output: outTok },
+  });
 }
 
 // ---------- routes ----------
@@ -204,8 +343,10 @@ export async function handleAgents(request, env, cors) {
     return json({ connected: true, hasKey: !!env.ANTHROPIC_API_KEY, hasStore: !!env.AGENTS, hasTeamKey: !!env.TEAM_KEY, model: env.AGENT_MODEL || "claude-opus-5-5" }, 200, cors);
   }
   if (request.method === "GET" && path === "/agents/tasks") return json({ tasks: await getTasks(env) }, 200, cors);
-  if (request.method === "GET" && path === "/agents/chief") {
-    const latest = env.AGENTS ? await env.AGENTS.get("latest:chief", "json") : null;
+  if (request.method === "GET" && path === "/agents/watchlist") return json({ watchlist: await getWatchlist(env) }, 200, cors);
+  const latestMatch = path.match(/^\/agents\/(chief|market)$/);
+  if (request.method === "GET" && latestMatch) {
+    const latest = env.AGENTS ? await env.AGENTS.get(`latest:${latestMatch[1]}`, "json") : null;
     return json({ latest }, 200, cors);
   }
 
@@ -222,10 +363,22 @@ export async function handleAgents(request, env, cors) {
     return json({ tasks }, 200, cors);
   }
 
-  if (request.method === "POST" && path === "/agents/chief/run") {
+  if (request.method === "PUT" && path === "/agents/watchlist") {
+    if (!env.AGENTS) return json({ error: "Storage is not set up on the worker" }, 500, cors);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+    const watchlist = validWatchlist(body.watchlist);
+    if (!watchlist) return json({ error: "Invalid watchlist" }, 400, cors);
+    await env.AGENTS.put("watchlist", JSON.stringify(watchlist));
+    return json({ watchlist }, 200, cors);
+  }
+
+  const RUNNERS = { chief: runChief, market: runMarket };
+  const runMatch = path.match(/^\/agents\/(chief|market)\/run$/);
+  if (request.method === "POST" && runMatch) {
     if (tooManyRuns(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many runs this hour" }, 429, cors);
     try {
-      return json({ latest: await runChief(env) }, 200, cors);
+      return json({ latest: await RUNNERS[runMatch[1]](env) }, 200, cors);
     } catch (error) {
       return agentError(error, cors);
     }
@@ -238,6 +391,7 @@ function agentError(error, cors) {
   if (error.message === "NO_KEY") return json({ error: "The worker has no Anthropic API key yet" }, 500, cors);
   if (error.message === "REFUSED") return json({ error: "Claude declined to write this brief" }, 502, cors);
   if (error.message === "TOO_LONG") return json({ error: "The brief was cut off. Try again." }, 502, cors);
+  if (error.message === "NO_SOURCES") return json({ error: "Web search returned no sources. Try again later." }, 502, cors);
   if (error instanceof Anthropic.AuthenticationError) return json({ error: "The worker's API key is invalid" }, 500, cors);
   if (error instanceof Anthropic.RateLimitError) return json({ error: "Claude is busy, try again shortly" }, 429, cors);
   if (error instanceof Anthropic.BadRequestError) return json({ error: "Claude rejected the request" }, 502, cors);

@@ -3,7 +3,7 @@
 // of app actions. The website never sees the API key.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { handleAgents, runChief } from "./agents.js";
+import { handleAgents, runChief, runMarket } from "./agents.js";
 
 const ACTION_TYPES = [
   "open_recipe",      // target: recipe id
@@ -144,8 +144,10 @@ export default {
     }
   },
 
-  // Cron trigger (wrangler.toml): the Chief of Staff writes the brief each morning.
+  // Cron triggers (wrangler.toml): Market intelligence on Monday mornings, then
+  // the Chief of Staff's daily brief an hour later so it can read the market brief.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runChief(env).catch((error) => console.error("Chief of Staff run failed:", error.message)));
+    const job = event.cron === "0 12 * * 1" ? ["Market intelligence", runMarket] : ["Chief of Staff", runChief];
+    ctx.waitUntil(job[1](env).catch((error) => console.error(`${job[0]} run failed:`, error.message)));
   },
 };

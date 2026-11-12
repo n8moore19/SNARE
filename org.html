@@ -214,6 +214,31 @@
     .chips button:hover { border-color: var(--ink); }
 
 
+    /* ---------- live agents: tabs ---------- */
+    .live-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+    .live-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+    .ltabs { display: flex; gap: 4px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 4px; flex-wrap: wrap; }
+    .ltabs button { border: 0; background: none; border-radius: 9px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+    .ltabs button[aria-selected="true"] { background: var(--ink); color: var(--lime); }
+    .pane-title { font-size: 17px; font-weight: 800; }
+    .mitem { border-top: 1px solid var(--line); padding: 12px 0; }
+    .mitem:first-of-type { border-top: 0; }
+    .mitem .cat { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; background: var(--soft); color: var(--forest); }
+    .mitem .cat.lead { background: var(--ink); color: var(--lime); }
+    .mitem .cat.fund { background: #FFF6D6; color: #7A5A00; }
+    .mitem h4 { margin: 6px 0 2px; font-size: 15px; line-height: 1.35; }
+    .mitem h4 a { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+    .mitem h4 a:hover { text-decoration-color: var(--ink); }
+    .mitem p { font-size: 13px; color: var(--ink); }
+    .mitem .why { color: var(--forest); margin-top: 4px; }
+    .mitem .meta2 { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+    .to { font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--ink); color: var(--ink); }
+    .routed { display: grid; gap: 10px; }
+    .routed b { display: block; font-size: 12px; font-weight: 800; }
+    .routed ul { margin: 2px 0 0; padding-left: 16px; font-size: 12.5px; color: var(--muted); }
+    .kind { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; }
+    .addtask.watchf { grid-template-columns: 1fr auto; }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -323,20 +348,47 @@
       </div>
 
       <section class="section" id="brief-section">
+        <div class="live-head">
+          <h2>Live agents</h2>
+          <div class="ltabs" role="tablist" aria-label="Live agents">
+            <button role="tab" data-ltab="chief" aria-selected="true">Chief of Staff</button>
+            <button role="tab" data-ltab="market" aria-selected="false">Market intelligence</button>
+          </div>
+        </div>
+        <div id="pass-slot"></div>
+
+        <div data-pane="chief">
         <div class="brief-head">
-          <h2>Today's brief</h2>
+          <h3 class="pane-title">Today's brief</h3>
           <span id="brief-status" class="pill gate"><i></i>Checking</span>
           <span id="brief-time" class="note" style="margin:0"></span>
           <button class="btn" id="run-chief" type="button" disabled>Run now</button>
         </div>
         <p class="sub">Written by the Chief of Staff agent every morning from your team's tasks, real GitHub activity and the other agents' latest work. App numbers are sample data until SNARE has real users.</p>
-        <div id="pass-slot"></div>
         <div class="brief-grid">
           <div class="panel brief" id="brief"></div>
           <div class="side">
             <div class="panel"><h3>Team tasks and deadlines</h3><p class="sub" id="tasks-sub">The brief reads this list.</p><ul class="tasks" id="tasks"></ul><div id="task-form"></div></div>
             <div class="panel"><h3>GitHub activity <span class="src real">Real</span></h3><p class="sub">Recent changes to the SNARE prototype.</p><ul class="gh" id="gh"><li>Loading</li></ul></div>
           </div>
+        </div>
+        </div>
+
+        <div data-pane="market" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">This week's market brief</h3>
+          <span id="m-status" class="pill gate"><i></i>Checking</span>
+          <span id="m-time" class="note" style="margin:0"></span>
+          <button class="btn" id="run-market" type="button" disabled>Run now</button>
+        </div>
+        <p class="sub">Searches the web live every Monday morning for the topics on the watchlist. Every finding links to a real source it found; anything without one is dropped. The Chief of Staff reads this brief.</p>
+        <div class="brief-grid">
+          <div class="panel brief" id="market"></div>
+          <div class="side">
+            <div class="panel"><h3>Watchlist</h3><p class="sub" id="watch-sub">What the agent searches for.</p><ul class="tasks" id="watch"></ul><div id="watch-form"></div></div>
+            <div class="panel"><h3>Sent to other agents</h3><p class="sub">Findings routed onward. Each agent reads these once it is built.</p><div id="routed"></div></div>
+          </div>
+        </div>
         </div>
       </section>
 
@@ -466,11 +518,11 @@
 This week: 84 new students (goal 75), 1,212 receipts scanned, 31,400 points earned.
 Biggest risk: weekly check ins fell from 71% to 64%. Growth agent is testing a Sunday reminder.` },
 
-      { id: 'market', name: 'Market intelligence', group: 'grow', model: 'sonnet', auto: 'auto', runs: 30, inTok: 120000, outTok: 8000, extra: 6, extraNote: '600 web searches', f: [1.3, 2],
-        job: 'Watches competitors, prices, grants and buyer news.',
-        cadence: 'Daily scan, weekly brief on Mondays',
-        does: ['Tracks food waste and rewards apps, and grocery flyer prices', 'Finds grants and pitch competitions', 'Spots buyer news, like a brand launching smaller packs', 'Feeds leads to B2B sales and ideas to Content'],
-        tools: ['Web search', 'Flyer data', 'Shared research notes'],
+      { id: 'market', name: 'Market intelligence', group: 'grow', model: 'sonnet', auto: 'auto', built: true, runs: 4, inTok: 170000, outTok: 10000, extra: 0.5, extraNote: '48 web searches', f: [1.3, 2],
+        job: 'Watches competitors, buyers, grants and policy news.',
+        cadence: 'Weekly brief, Monday mornings, plus Run now',
+        does: ['Searches the web for competitors, data buyers, policy and student food costs', 'Covers Canada, London first', 'Keeps only findings with a real source link', 'Routes buyer leads to B2B sales and post ideas to Content'],
+        tools: ['Claude web search', 'Watchlist the team edits'],
         gate: 'None. Research only.',
         talks: ['sales', 'content', 'chief'],
         sample: `Weekly brief, Nov 16
@@ -731,7 +783,7 @@ Duplicate receipts blocked: 6` },
       { id: 't7', text: 'Confirm a gift card reseller sells Loblaw gift cards in Canada', owner: 'Team', due: '', done: false },
     ];
     const PREVIEW = {
-      headline: 'Agent 1 is built. Two decisions this week, and the interviews need dates.',
+      headline: 'Two agents are built. Two decisions this week, and the interviews need dates.',
       needsYou: [
         { title: 'Set up the API key and worker', detail: 'Until then every agent stays in preview. About 10 minutes.', when: 'today' },
         { title: 'Put dates on the five validation interviews', detail: 'They have no due dates, so nothing can flag them as late.', when: 'this week' },
@@ -743,8 +795,8 @@ Duplicate receipts blocked: 6` },
       ],
       shipped: ['Rewards, receipt scanning, consent screens and the buyer view went live in the prototype.', 'The Launch Organization page went live, set to launch size.'],
       metrics: [{ label: 'New students this week', value: '84', sample: true }, { label: 'Weekly check ins', value: '64%', sample: true }, { label: 'Gift card payouts', value: '$468 of $500', sample: true }],
-      risks: ['No real users yet, so every app number is a placeholder.', 'Nine agents are not built yet, so the brief only sees tasks and GitHub.'],
-      nextSteps: ['Connect the worker, then press Run now.', 'Add due dates to open tasks.', 'Build agent 2: Market intelligence.'],
+      risks: ['No real users yet, so every app number is a placeholder.', 'Eight agents are not built yet, so the brief mostly sees tasks, GitHub and the market brief.'],
+      nextSteps: ['Connect the worker, then press Run now.', 'Add due dates to open tasks.', 'Build agent 3: Student acquisition.'],
     };
 
     const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -884,7 +936,135 @@ Duplicate receipts blocked: 6` },
       }
     });
 
-    loadLive();
+    // ---------- agent 2: Market intelligence ----------
+    const KINDS = [['competitor', 'Competitor'], ['buyer', 'Buyer'], ['funding', 'Funding'], ['policy', 'Policy'], ['market', 'Market']];
+    const DEFAULT_WATCH = [
+      { id: 'w1', topic: 'Competitors: Too Good To Go, Flashfood, Fetch rewards, Kitche and Remy, Olio, fridge and expiry tracking apps', kind: 'competitor' },
+      { id: 'w2', topic: 'Food brands in Canada changing pack sizes or packaging to cut food waste (bread, salad, produce, dairy)', kind: 'buyer' },
+      { id: 'w3', topic: 'Canadian grocers (Loblaw, Sobeys, Metro, Walmart Canada) food waste programs and data partnerships', kind: 'buyer' },
+      { id: 'w5', topic: 'Household food waste measurement and policy in Canada and the City of London, Ontario green bin program', kind: 'policy' },
+      { id: 'w6', topic: 'Student food insecurity and grocery prices in Canada, especially London, Ontario', kind: 'market' },
+    ];
+    const MARKET_PREVIEW = {
+      headline: 'Sample brief: this is the layout. Real findings appear after the first run.',
+      items: [
+        { category: 'buyer lead', title: 'Example: a bakery brand launches half loaves', summary: 'A real run would describe the news and link the article.', whyItMatters: 'Smaller packs are exactly what our bread waste report helps a brand decide.', url: '', source: 'Sample', date: '', sendTo: 'sales' },
+        { category: 'competitor', title: 'Example: a food rescue app adds London stores', summary: 'A real run would say what changed and when.', whyItMatters: 'Shows how competitors grow locally. Our angle stays the student\'s own fridge.', url: '', source: 'Sample', date: '', sendTo: 'team' },
+        { category: 'policy', title: 'Example: City of London reports green bin results', summary: 'A real run would give the numbers and link the report.', whyItMatters: 'A city that measures household food waste is a likely buyer for our baseline.', url: '', source: 'Sample', date: '', sendTo: 'sales' },
+      ],
+      watchNext: ['Real runs list what to check next week here.'],
+    };
+    const AGENT_NAMES = { sales: 'B2B sales', content: 'Content creation', growth: 'Student acquisition', team: 'The team' };
+    live.market = null; live.watch = DEFAULT_WATCH.slice(); live.mbusy = false; live.merror = '';
+
+    function statusOf(latest) {
+      if (!API) return ['gate', 'Not connected', 'Sample brief. This agent is built and runs for real once the worker and API key are set up (see worker/README.md).'];
+      if (!live.status) return ['gate', 'Worker unreachable', 'The worker did not answer. Showing a sample.'];
+      if (!live.status.hasKey) return ['gate', 'No API key', 'The worker is up but has no Anthropic API key yet. Showing a sample.'];
+      if (!latest) return ['guard', 'Connected', 'Connected. Nothing yet: press Run now, or wait for the schedule.'];
+      return ['auto', 'Live', ''];
+    }
+
+    function renderMarket() {
+      const latest = live.market;
+      const [cls, label, banner] = statusOf(latest);
+      const st = document.getElementById('m-status');
+      st.className = 'pill ' + cls; st.innerHTML = '<i></i>' + label;
+      const btn = document.getElementById('run-market');
+      btn.disabled = !API || !live.status || !live.status.hasKey || live.mbusy;
+      btn.textContent = live.mbusy ? 'Searching the web' : 'Run now';
+      document.getElementById('m-time').textContent = latest ? `Written ${fmtTime(latest.generatedAt)}` : '';
+      const m = latest ? latest.output : MARKET_PREVIEW;
+      const order = ['buyer lead', 'competitor', 'funding', 'policy', 'market'];
+      const items = m.items.slice().sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category));
+      const catCls = c => c === 'buyer lead' ? 'lead' : c === 'funding' ? 'fund' : '';
+      document.getElementById('market').innerHTML = `
+        ${banner ? `<div class="preview"><div><b>${latest ? '' : 'Preview'}</b>${esc(banner)}</div></div>` : ''}
+        <p class="headline">${esc(m.headline)}</p>
+        <div class="bsec">${items.length ? items.map(i => `<div class="mitem">
+          <span class="cat ${catCls(i.category)}">${esc(i.category)}</span>
+          <h4>${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a>` : esc(i.title)}</h4>
+          <p>${esc(i.summary)}</p>
+          <p class="why">${esc(i.whyItMatters)}</p>
+          <div class="meta2"><span>${esc(i.source)}${i.date ? ' · ' + esc(i.date) : ''}</span>${i.sendTo !== 'none' ? `<span class="to">To ${esc(AGENT_NAMES[i.sendTo] || i.sendTo)}</span>` : ''}</div>
+        </div>`).join('') : '<p class="note">No findings this week.</p>'}</div>
+        ${m.watchNext.length ? `<div class="bsec"><b>Watch next week</b><ul class="blist">${m.watchNext.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        ${live.merror ? `<p class="err">${esc(live.merror)}</p>` : ''}
+        <div class="srcs">${latest
+          ? `<span class="src real">${latest.sources.searches} web searches</span><span class="src real">${latest.sources.links} sources found</span>${latest.sources.dropped ? `<span class="src">${latest.sources.dropped} dropped, no real link</span>` : ''}`
+          : '<span class="src samp">Sample brief</span>'}</div>`;
+
+      const groups = {};
+      m.items.filter(i => i.sendTo !== 'none').forEach(i => { (groups[i.sendTo] = groups[i.sendTo] || []).push(i.title); });
+      document.getElementById('routed').innerHTML = Object.keys(groups).length
+        ? `<div class="routed">${Object.entries(groups).map(([k, list]) => `<div><b>${esc(AGENT_NAMES[k] || k)} (${list.length})</b><ul>${list.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`).join('')}</div>`
+        : '<p class="note" style="margin:0">Nothing routed yet.</p>';
+    }
+
+    function renderWatch() {
+      const edit = canEdit();
+      document.getElementById('watch-sub').textContent = edit ? 'What the agent searches for. Changes save for the whole team.' : 'What the agent searches for. Editing turns on once the worker is connected.';
+      document.getElementById('watch').innerHTML = live.watch.map(w => `<li>
+        <span></span><span><span class="kind">${esc((KINDS.find(k => k[0] === w.kind) || KINDS[4])[1])}</span><span class="tt">${esc(w.topic)}</span></span>
+        ${edit ? `<button class="x" data-wdel="${esc(w.id)}" aria-label="Remove topic">&times;</button>` : '<span></span>'}
+      </li>`).join('');
+      document.getElementById('watch-form').innerHTML = edit ? `<form class="addtask watchf" id="addwatch">
+        <input type="text" id="w-topic" placeholder="New topic to watch" maxlength="300" aria-label="Topic">
+        <select id="w-kind" aria-label="Kind">${KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
+        <button class="btn small">Add</button></form>` : '';
+    }
+
+    async function saveWatch(next) {
+      const prev = live.watch;
+      live.watch = next; renderWatch();
+      try { live.watch = (await call('/agents/watchlist', { method: 'PUT', body: JSON.stringify({ watchlist: next }) })).watchlist; live.merror = ''; }
+      catch (e) { if (e.message !== 'PASS') { live.watch = prev; live.merror = e.message; renderMarket(); } }
+      renderWatch();
+    }
+
+    async function runMarketNow() {
+      live.mbusy = true; live.merror = ''; renderMarket();
+      try { live.market = (await call('/agents/market/run', { method: 'POST' })).latest; }
+      catch (e) { if (e.message !== 'PASS') live.merror = e.message; }
+      live.mbusy = false; renderMarket();
+    }
+
+    async function loadMarket() {
+      renderMarket(); renderWatch();
+      if (!API || !live.status) return;
+      try {
+        const [w, m] = await Promise.all([call('/agents/watchlist'), call('/agents/market')]);
+        live.watch = w.watchlist; live.market = m.latest;
+      } catch (e) { /* keep defaults */ }
+      renderMarket(); renderWatch();
+    }
+
+    // Tabs for live agents; the last one opened is remembered in this browser.
+    function showTab(id) {
+      document.querySelectorAll('[data-ltab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.ltab === id)));
+      document.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== id; });
+      try { localStorage.setItem('snare.org.tab', id); } catch (e) { /* ignore */ }
+    }
+    let tab0 = 'chief';
+    try { tab0 = localStorage.getItem('snare.org.tab') || 'chief'; } catch (e) { /* ignore */ }
+    showTab(document.querySelector(`[data-ltab="${tab0}"]`) ? tab0 : 'chief');
+
+    document.addEventListener('click', e => {
+      const t = e.target.closest('[data-ltab]');
+      if (t) showTab(t.dataset.ltab);
+      if (e.target.closest('#run-market')) needPass(runMarketNow);
+      const wd = e.target.closest('[data-wdel]');
+      if (wd) needPass(() => saveWatch(live.watch.filter(w => w.id !== wd.dataset.wdel)));
+    });
+    document.addEventListener('submit', e => {
+      if (e.target.id !== 'addwatch') return;
+      e.preventDefault();
+      const topic = document.getElementById('w-topic').value.trim();
+      if (!topic) return;
+      needPass(() => saveWatch([...live.watch, { id: 'w' + Date.now().toString(36), topic, kind: document.getElementById('w-kind').value }]));
+    });
+
+    loadLive().then(loadMarket);
     render();
   })();
   </script>

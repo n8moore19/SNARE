@@ -49,8 +49,13 @@ The same worker runs the launch agents shown on `org.html`.
   (edited on the org page, saved in KV), real commits to the SNARE repo from GitHub, the
   other agents' latest outputs, and sample app metrics (labelled sample until real users).
   About 10 to 15 cents a run on Opus 5.5.
+- **Market intelligence** (built): every Monday at 12:00 UTC it searches the web (Claude's
+  web search tool, set to London, Ontario) for the watchlist on the org page: competitors,
+  data buyers, policy and student food costs. A second step turns the notes into a brief and
+  drops any finding without a real link from the search. Sonnet 5.5, about 55 to 70 cents
+  a run including searches. The Chief of Staff reads its latest brief.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)
