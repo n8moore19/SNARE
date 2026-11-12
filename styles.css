@@ -1072,12 +1072,12 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 
 @media (min-width: 1100px) {
   .pitch { display: block; max-width: 420px; color: #fff; }
-  .pitch-brand { display: flex; align-items: baseline; gap: 3px; font-weight: 800; font-size: 34px; letter-spacing: -0.04em; }
-  .pitch-brand .dot { width: 12px; height: 12px; }
-  .pitch h2 { font-size: 50px; line-height: 1.04; font-weight: 800; letter-spacing: -0.03em; margin: 22px 0 18px; }
+  .pitch-brand { display: flex; align-items: baseline; gap: 4px; font-weight: 800; font-size: 56px; line-height: 1; letter-spacing: -0.05em; }
+  .pitch-brand .dot { width: 16px; height: 16px; }
+  .pitch h2 { font-size: 46px; line-height: 1.06; font-weight: 800; letter-spacing: -0.03em; margin: 30px 0 16px; }
   .pitch p { font-size: 17px; color: #CFE5C4; }
-  .sdgs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 6px; }
-  button.pitch-brand { border: 0; background: none; color: inherit; padding: 0; cursor: pointer; font-family: inherit; }
+  .sdgs { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
+  button.pitch-brand { border: 0; background: transparent; box-shadow: none; -webkit-appearance: none; appearance: none; color: #fff; padding: 0; cursor: pointer; font-family: inherit; }
   .sdgs span { font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 14px; border-radius: 10px; color: var(--lime); border: 1.5px solid rgba(162, 220, 93, 0.5); }
   .pitch small { font-size: 12.5px; color: #8FB6A3; }
 }
@@ -1339,7 +1339,12 @@ body.touring .moment { bottom: var(--tourb, 0px); }
 }
 @media (min-width: 760px) { .pitch-link + small { display: block; } }
 @media (min-width: 760px) {
-  .pitch-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 26px 0 26px; }
+  .pitch-links { display: grid; gap: 12px; max-width: 360px; margin: 32px 0 30px; }
+  .pitch-links .pitch-link { text-align: center; }
+  .pitch-home { justify-self: start; border: 0; background: none; padding: 4px 0; font: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #CFE5C4; cursor: pointer; }
+  .pitch-home:hover { color: #fff; }
+  .pitch-home[hidden] { display: none; }
+  .tour-home { margin-top: 18px; }
   .pitch-links .pitch-link { margin: 0; }
   button.pitch-link { border: 0; font-family: inherit; cursor: pointer; }
   .pitch-link.alt { background: transparent; color: var(--lime); border: 1.5px solid rgba(162, 220, 93, 0.5); }

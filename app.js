@@ -3695,7 +3695,8 @@
       tourPanel.hidden = false;
       tourPanel.innerHTML = `<span class="tp-k">Guided demo</span><h3>Maya's first month</h3>
         <ol>${TOUR.map((x, i) => `<li class="${i < tour.step ? 'done' : i === tour.step ? 'on' : ''}"><button data-tour="go" data-i="${i}"><i>${i + 1}</i><b>${x.title}</b></button>${i === tour.step && !tour.ended ? `<p>${x.text}</p>` : ''}</li>`).join('')}</ol>
-        ${tour.ended ? '' : ctl()}${tour.paused ? '<small class="tp-paused">Paused</small>' : ''}`;
+        ${tour.ended ? '' : ctl()}${tour.paused ? '<small class="tp-paused">Paused</small>' : ''}
+        <div class="tour-home"><button class="pitch-home" type="button" data-tour="home">&larr; Back to home</button></div>`;
     } else if (!tour.ended) {
       if (tourPanel) tourPanel.hidden = true;
       tourBar.hidden = false;
@@ -3755,6 +3756,7 @@
     const a = b.dataset.tour;
     if (a === 'replay') startTour();
     else if (a === 'stop') { stopTour(); go(P().done ? 'fridge' : 'welcome'); }
+    else if (a === 'home') { stopTour(); setPhone('splash'); }
     else if (a === 'pause') { tour.paused = !tour.paused; paintTour(); }
     else if (a === 'next') goStep(tour.step + 1 < TOUR.length ? tour.step + 1 : tour.step);
     else if (a === 'back') goStep(Math.max(0, tour.step - 1));
@@ -3780,6 +3782,7 @@
     phoneEl.classList.toggle('mode-org', mode === 'org');
     splashEl.hidden = mode !== 'splash';
     orgFrame.hidden = mode !== 'org';
+    document.getElementById('home-btn').hidden = mode === 'splash';
     if (mode === 'org') orgFrame.src = 'org.html?embed=1&t=' + Date.now() + orgHash;
     else if (orgFrame.getAttribute('src')) orgFrame.removeAttribute('src');
     if (mode !== 'app') { if (tour.on) stopTour(); closeMenu(); closeMoment(); hideNotif(); state.aiOpen = false; renderAI(); }
@@ -3788,6 +3791,7 @@
   document.getElementById('org-open').addEventListener('click', () => setPhone('org'));
   document.getElementById('org-tour').addEventListener('click', () => setPhone('org', '#tour'));
   document.getElementById('home-brand').addEventListener('click', () => setPhone('splash'));
+  document.getElementById('home-btn').addEventListener('click', () => setPhone('splash'));
 
   // Skip the demo: a ready made fridge to play with.
   function loadSample() {
