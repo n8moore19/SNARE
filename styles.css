@@ -1182,6 +1182,33 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .notif { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1200; background: rgba(250, 252, 248, 0.97); backdrop-filter: blur(12px); border-radius: 18px; padding: 12px 14px; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22); transform: translateY(-140%); transition: transform 0.35s cubic-bezier(0.2, 1.2, 0.4, 1); }
 .notif.show { transform: none; }
 
+/* guided demo */
+.tour { position: absolute; left: 10px; right: 10px; top: 70px; z-index: 1400; background: #14221B; color: #fff; border-radius: 18px; padding: 12px 14px 13px; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3); animation: rise 0.35s ease both; }
+.tour[hidden] { display: none; }
+.tour.low { top: auto; bottom: 86px; }
+.tour-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.tour-dots { display: flex; gap: 4px; }
+.tour-dots i { width: 16px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.22); }
+.tour-dots i.on { background: var(--lime); }
+.tour-n { font-size: 11px; color: rgba(255, 255, 255, 0.6); font-weight: 700; }
+.tour-x { margin-left: auto; border: 0; background: rgba(255, 255, 255, 0.12); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; padding: 0; }
+.tour-x svg { width: 12px; height: 12px; fill: none; stroke: #fff; stroke-width: 2.4; }
+.tour b { display: block; font-size: 16px; color: var(--lime); margin-bottom: 2px; }
+.tour p { font-size: 13px; line-height: 1.45; color: rgba(255, 255, 255, 0.88); }
+.tour.end { top: 50%; transform: translateY(-50%); bottom: auto; background: #fff; color: var(--ink); padding: 20px 18px; border: 1px solid var(--line); animation: none; box-shadow: 0 0 0 999px rgba(12, 24, 19, 0.5), 0 14px 34px rgba(0, 0, 0, 0.3); }
+.tour.end ul { list-style: none; display: grid; gap: 12px; margin: 10px 0 16px; padding: 0; }
+.tour.end li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; }
+.tour.end li b { display: inline; font-size: inherit; color: var(--ink); }
+.tour.end li svg { flex: none; width: 30px; height: 30px; padding: 6px; border-radius: 50%; background: var(--ink); fill: none; stroke: var(--lime); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tour-end-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tour-finger { position: absolute; z-index: 1500; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; background: rgba(162, 220, 93, 0.45); border: 3px solid #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); pointer-events: none; transition: left 0.6s cubic-bezier(0.3, 0.8, 0.3, 1), top 0.6s cubic-bezier(0.3, 0.8, 0.3, 1), transform 0.15s; }
+.tour-finger[hidden] { display: none; }
+.tour-finger.press { transform: scale(0.7); background: rgba(162, 220, 93, 0.85); }
+.tour-glow { box-shadow: 0 0 0 3px var(--lime), 0 0 26px rgba(162, 220, 93, 0.7) !important; transition: box-shadow 0.4s; }
+body.touring .ai-fab { display: none; }
+body.touring .mo-sheet { max-height: 70%; }
+@media (prefers-reduced-motion: reduce) { .tour, .tour-finger { animation: none; transition: none; } }
+
 /* after a scan: points, then where the data goes */
 .moment { position: absolute; inset: 0; z-index: 1300; background: rgba(12, 24, 19, 0.45); display: flex; align-items: flex-end; opacity: 0; transition: opacity 0.25s; }
 .moment.show { opacity: 1; }
@@ -1279,6 +1306,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 @media (min-width: 760px) {
   .pitch-links { display: flex; flex-wrap: wrap; gap: 8px; margin: -10px 0 26px; }
   .pitch-links .pitch-link { margin: 0; }
+  button.pitch-link { border: 0; font-family: inherit; cursor: pointer; }
   .pitch-link.alt { background: transparent; color: var(--lime); border: 1.5px solid rgba(162, 220, 93, 0.5); }
   .pitch-link.alt:hover { background: rgba(162, 220, 93, 0.12); }
 }

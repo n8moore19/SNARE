@@ -42,6 +42,7 @@
   const PTS = { receipt: 25, checkin: 20, usedInTime: 5, rate: 10 };
   const PTS_PER_DOLLAR = 100;
   const CARD_PTS = 500;        // $5 grocery gift card
+  const tour = { on: false, run: 0 }; // the guided demo; nothing it does is sent to the real panel
   const PREMIUM_PTS = 2000;    // a year of premium ($20)
   const PREMIUM_PRICE = 20;
   const TRIAL_END = 'Dec 31';  // free premium for the fall semester
@@ -332,7 +333,7 @@
   const panelCampus = () => ({ campus: 'Western', fanshawe: 'Fanshawe' })[P().area] || 'Other';
   function trackEvent(type, f, extra = {}) {
     const url = (window.SNARE_AI_URL || '').trim();
-    if (!P().share || !url || !f || products[f.id].leftover) return;
+    if (tour.on || !P().share || !url || !f || products[f.id].leftover) return;
     panelQueue.push({ type, product: products[f.id].name, category: products[f.id].cat, days: Math.round((Date.now() - (f.added || Date.now())) / DAY * 10) / 10, source: f.src || '', t: Date.now(), ...extra });
     clearTimeout(panelTimer);
     panelTimer = setTimeout(flushPanel, 1500);
@@ -660,7 +661,7 @@
   // Anonymous counts for brands: a random id per offer, separate from everything else.
   function offerEvent(offerId, event) {
     const url = (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
-    if (!url || !P().share) return;
+    if (tour.on || !url || !P().share) return;
     let ids = {};
     try { ids = JSON.parse(localStorage.getItem('snare.osid') || '{}'); } catch (e) { /* ignore */ }
     const key = offerId + ':' + event;
@@ -708,6 +709,7 @@
     } catch (e) { return null; }
   }
   function rewardsEvent(ev) {
+    if (tour.on) return;
     const url = (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
     const rid = rewardsId();
     // Demo sessions start with sample points; they never feed real fraud checks.
@@ -869,7 +871,8 @@
       ${row('rewards', ICONS.star, 'Rewards', `${balance().toLocaleString('en-CA')} points`, ready ? '$5 ready' : '')}
       ${row('impact', ICONS.leaf, 'Impact', 'Food and money you saved')}
       ${row('profile', ICONS.user, 'Preferences', 'Food needs, budget and travel')}
-      ${row('help', ICONS.spark, 'Help', 'Points, gift cards and privacy')}`;
+      ${row('help', ICONS.spark, 'Help', 'Points, gift cards and privacy')}
+      ${row('tour', ICONS.camera, 'Watch the demo', "Maya's week in one minute")}`;
     hideNotif(); pmenu.hidden = false;
     requestAnimationFrame(() => pmenu.classList.add('open'));
     document.querySelector('.avatar-btn').setAttribute('aria-expanded', 'true');
@@ -884,7 +887,7 @@
     const b = e.target.closest('[data-pm]');
     if (!b) return;
     closeMenu();
-    if (b.dataset.pm === 'help') openHelp(); else go(b.dataset.pm);
+    if (b.dataset.pm === 'help') openHelp(); else if (b.dataset.pm === 'tour') startTour(); else go(b.dataset.pm);
   });
   document.addEventListener('click', e => { if (!pmenu.hidden && !e.target.closest('#pmenu, .avatar-btn')) closeMenu(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
@@ -923,6 +926,7 @@
         <div class="sticky">
           <button class="btn block" data-action="finishwelcome" data-id="scan">${ICONS.camera}Scan my fridge</button>
           <button class="link block-link" data-action="finishwelcome" data-id="fridge">Skip for now</button>
+          <button class="link block-link" data-action="tour">&#9654; Or watch the one minute demo</button>
         </div>
       </section>`;
   }
@@ -1044,7 +1048,10 @@
     const f = notifItem();
     if (!f) return;
     state.notified = true;
-    setTimeout(() => {
+    setTimeout(() => notifyAbout(f), 1400);
+  }
+  function notifyAbout(f) {
+    {
       if (state.screen !== 'fridge' || !state.fridge.includes(f)) return;
       const n = document.getElementById('notif');
       n.innerHTML = `
@@ -1054,7 +1061,7 @@
         <div class="notif-actions"><button data-n="used" data-id="${f.uid}">Finished it</button><button data-n="tossed" data-id="${f.uid}">Tossed it</button></div>`;
       n.hidden = false;
       requestAnimationFrame(() => n.classList.add('show'));
-    }, 1400);
+    }
   }
 
   function hideNotif() {
@@ -3214,6 +3221,7 @@
       case 'cashpick': { const c = cashOut(id); state.cashPick = false; if (c) toast(`$5 ${giftCards[id].name} ready. Code ${c.code}`); rerender(); break; }
       case 'offeradd': if (!state.items.some(it => it.id === id)) { state.items.push({ id, qty: 1, why: 'Bonus offer' }); toast(`${products[id].name} added to your list`); } rerender(); break;
       case 'help': openHelp(); break;
+      case 'tour': startTour(); break;
       case 'samplepts': samplePoints(); persist(); updatePointsPill(true); rerender(); break;
       case 'demoitem': startItemScan(null); break;
       case 'typeitems': state.scan = { mode: 'type', found: [] }; state.query = ''; go('review'); break;
@@ -3411,6 +3419,129 @@
 
   loadLiveOffers();
 
+  // ---------- guided demo: Maya's week in about a minute ----------
+  // Drives the real screens with a pointer and captions, so every pivot
+  // feature shows up in order. Nothing it does reaches the real data panel.
+  const tourEl = document.getElementById('tour');
+  const finger = document.getElementById('tour-finger');
+  const phoneEl = document.querySelector('.phone');
+  const STOP = Symbol('stop');
+  const TOUR_STEPS = 6;
+  function tourWait(ms, run) {
+    return new Promise((res, rej) => setTimeout(() => (tour.on && tour.run === run ? res() : rej(STOP)), ms));
+  }
+  function tourCaption(n, title, text, low) {
+    tourEl.className = 'tour' + (low ? ' low' : '');
+    const bar = document.querySelector('.bar').getBoundingClientRect();
+    tourEl.style.top = low ? '' : (bar.bottom - phoneEl.getBoundingClientRect().top + 8) + 'px';
+    tourEl.innerHTML = `<div class="tour-top"><span class="tour-dots">${Array.from({ length: TOUR_STEPS }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span><span class="tour-n">${n} of ${TOUR_STEPS}</span><button class="tour-x" data-tour="stop" aria-label="Stop the demo">${ICONS.cross}</button></div><b>${title}</b><p>${text}</p>`;
+    tourEl.hidden = false;
+  }
+  function pointAt(el) {
+    const a = el.getBoundingClientRect(), p = phoneEl.getBoundingClientRect();
+    finger.style.left = (a.left - p.left + a.width / 2) + 'px';
+    finger.style.top = (a.top - p.top + a.height / 2) + 'px';
+    finger.hidden = false;
+    finger.classList.remove('press');
+  }
+  async function tourTap(sel, run, scroll = true) {
+    const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
+    if (!el) return;
+    if (scroll) { el.scrollIntoView({ block: 'center', behavior: reduceMotionApp ? 'auto' : 'smooth' }); await tourWait(550, run); }
+    pointAt(el);
+    await tourWait(750, run);
+    finger.classList.add('press');
+    await tourWait(180, run);
+    el.click();
+    await tourWait(350, run);
+    finger.hidden = true;
+  }
+  function tourReset() {
+    closeMenu(); closeMoment(); hideNotif();
+    Object.assign(P(), { done: true, consented: true, share: true });
+    state.fridge = [];
+    D.demoScan.forEach(x => addToFridge(x.id, x));
+    state.points = []; samplePoints();
+    state.cards = []; state.tossLog = {}; state.items = []; state.highlight = [];
+    state.notified = true; state.cashPick = false; state.aiOpen = false;
+    persist();
+    go('fridge');
+  }
+  async function startTour() {
+    const run = ++tour.run;
+    tour.on = true;
+    document.body.classList.add('touring');
+    tourReset();
+    try {
+      tourCaption(1, 'Meet Maya', 'A Western student. She just shopped at No Frills, so she snaps her receipt. Five seconds, any store.');
+      await tourWait(2800, run);
+      await tourTap('[data-action="goscan"]', run);
+      await tourWait(700, run);
+      await tourTap('[data-action="demoreceipt"]', run);
+      await tourWait(RECEIPT_SCAN_MS + 700, run);
+      tourCaption(2, 'AI reads every line', 'Items, prices and how long each one keeps. Her Golden Crust bread earns a sponsored bonus.');
+      await tourWait(3600, run);
+      await tourTap('[data-action="receiptconfirm"]', run, false);
+      tourCaption(3, 'She earns, and her data turns anonymous', 'Points first. Then the receipt becomes a London total, with no name, photo or store visit attached.');
+      await tourWait(6200, run);
+      await tourTap('[data-mo="close"]', run);
+      tourCaption(4, 'Two days later', "Her spinach is near the end of its window. One tap from the lock screen: she tossed it.", true);
+      await tourWait(1200, run);
+      const spinach = state.fridge.find(f => f.id === 'spinach');
+      if (spinach) { notifyAbout(spinach); await tourWait(1900, run); await tourTap('#notif [data-n="tossed"]', run, false); }
+      await tourWait(1200, run);
+      tourCaption(5, 'A brand offer that fits her', 'Because she tossed spinach, Valley Greens offers its smaller bag. The match happens on her phone, not on a server.');
+      await tourTap('.avatar-btn', run, false);
+      await tourWait(500, run);
+      await tourTap('[data-pm="rewards"]', run, false);
+      await tourWait(900, run);
+      const offer = [...document.querySelectorAll('.offer.bonus')].find(o => o.textContent.includes('Valley Greens'));
+      if (offer) { offer.classList.add('tour-glow'); offer.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      await tourWait(4600, run);
+      tourCaption(6, 'Points become a $5 gift card', 'Sent by a gift card partner, so SNARE never holds money. She picks a Loblaw card for No Frills.');
+      viewport.scrollTo({ top: 0, behavior: 'smooth' });
+      await tourWait(900, run);
+      await tourTap('[data-action="cashout"]', run);
+      await tourWait(700, run);
+      await tourTap('[data-action="cashpick"][data-id="loblaw"]', run);
+      await tourWait(900, run);
+      const g = document.querySelector('.gcards');
+      if (g) g.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      await tourWait(3000, run);
+      tourEnd(run);
+    } catch (e) {
+      if (e !== STOP) { console.error(e); stopTour(); }
+    }
+  }
+  function tourEnd(run) {
+    if (tour.run !== run) return;
+    finger.hidden = true;
+    tourEl.className = 'tour end';
+    tourEl.style.top = '';
+    tourEl.innerHTML = `<span class="eyebrow">That's SNARE in one week</span>
+      <ul>
+        <li>${ICONS.star}<span><b>Maya</b> earned grocery money for logging her food, and cashed out a $5 card.</span></li>
+        <li>${ICONS.lock}<span><b>London</b> got anonymous totals on what students buy and throw out.</span></li>
+        <li>${ICONS.leaf}<span><b>Grocers, brands and the city</b> pay for those totals, which funds the points.</span></li>
+      </ul>
+      <div class="tour-end-actions"><button class="btn" data-tour="replay">Replay</button><button class="btn outline" data-tour="stop">Explore on my own</button></div>`;
+    tourEl.hidden = false;
+  }
+  function stopTour() {
+    tour.on = false; tour.run++;
+    document.body.classList.remove('touring');
+    tourEl.hidden = true; finger.hidden = true;
+    document.querySelectorAll('.tour-glow').forEach(el => el.classList.remove('tour-glow'));
+  }
+  const reduceMotionApp = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  tourEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-tour]');
+    if (!b) return;
+    if (b.dataset.tour === 'replay') startTour();
+    else { stopTour(); go('fridge'); }
+  });
+  document.getElementById('tour-start').addEventListener('click', () => startTour());
+
   // Deep links for demos: #demo loads a sample fridge, #welcome starts over,
   // #meals, #shop and #impact open those tabs.
   const hash0 = location.hash.slice(1);
@@ -3427,6 +3558,8 @@
     if (!state.cooked.length && !state.trips.length) sampleHistory();
     persist();
     go('fridge');
+  } else if (hash0 === 'tour') {
+    startTour();
   } else if (['meals', 'shop', 'impact', 'fridge', 'rewards'].includes(hash0)) {
     Object.assign(P(), { done: true, consented: true });
     go(hash0);
