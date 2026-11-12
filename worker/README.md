@@ -54,8 +54,16 @@ The same worker runs the launch agents shown on `org.html`.
   data buyers, policy and student food costs. A second step turns the notes into a brief and
   drops any finding without a real link from the search. Sonnet 5.5, about 55 to 70 cents
   a run including searches. The Chief of Staff reads its latest brief.
+- **Student acquisition** (built): every Tuesday at 12:00 UTC it searches for real student
+  groups and upcoming campus events at Western and Fanshawe, drafts a message for each new
+  group (with its own `join.html?src=` link), and reads the real waitlist. New groups go into
+  the outreach pipeline on the org page; the team sends the messages and updates the status.
+  Sonnet 5.5, about 55 to 70 cents a run.
+- **Waitlist**: `join.html` posts to `POST /agents/waitlist/join` (public, rate limited, same
+  site only). Each email is one KV key with campus, source and date in its metadata. Students
+  can remove their email on the same page. The org page only shows counts.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)

@@ -239,6 +239,39 @@
     .kind { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; }
     .addtask.watchf { grid-template-columns: 1fr auto; }
 
+
+    /* ---------- agent 3: Student acquisition ---------- */
+    .wl-big { display: flex; align-items: baseline; gap: 10px; }
+    .wl-big b { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+    .wl-big span { font-size: 12.5px; color: var(--muted); }
+    .spark { display: flex; align-items: flex-end; gap: 4px; height: 44px; margin: 12px 0 4px; }
+    .spark i { flex: 1; background: var(--lime); border-radius: 4px 4px 0 0; min-height: 3px; }
+    .spark-l { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); }
+    .wl-rows { display: grid; gap: 4px; margin-top: 12px; font-size: 12.5px; }
+    .wl-rows div { display: flex; justify-content: space-between; gap: 8px; }
+    .wl-rows b { font-variant-numeric: tabular-nums; }
+    .wl-link { display: flex; gap: 6px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .wl-link code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; background: var(--bg); border-radius: 8px; padding: 6px 8px; }
+    .pipe-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .pipe-head .chips { margin-left: auto; }
+    .chips button.on { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+    .prow { border-top: 1px solid var(--line); padding: 10px 0; }
+    .prow-top { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
+    .prow strong { font-size: 14px; }
+    .prow strong a { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+    .prow .pm { display: block; font-size: 11.5px; color: var(--muted); }
+    .prow select { font: inherit; font-size: 12px; padding: 5px 8px; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; }
+    .signups { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--soft); color: var(--forest); white-space: nowrap; }
+    .draft { margin-top: 8px; background: var(--bg); border-radius: 12px; padding: 12px; font-size: 13px; }
+    .draft .dmeta { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
+    .draft pre { white-space: pre-wrap; font: inherit; margin: 0; }
+    .draft .row2 { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .evs { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .evs li { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-size: 13px; }
+    .evs time { font-size: 11.5px; font-weight: 700; color: var(--forest); }
+    .evs span { display: block; color: var(--muted); font-size: 12.5px; }
+    @media (max-width: 900px) { .prow-top { grid-template-columns: 1fr auto; } .prow-top .signups { display: none; } }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -320,6 +353,7 @@
     <div class="links">
       <a href="index.html">Open the app prototype</a>
       <a href="insights.html">See what buyers see</a>
+      <a href="join.html">Join the waitlist</a>
     </div>
     <small>Team SNARE · Ivey Venturing Field Project · Agentic Launch Organization</small>
   </aside>
@@ -353,6 +387,7 @@
           <div class="ltabs" role="tablist" aria-label="Live agents">
             <button role="tab" data-ltab="chief" aria-selected="true">Chief of Staff</button>
             <button role="tab" data-ltab="market" aria-selected="false">Market intelligence</button>
+            <button role="tab" data-ltab="growth" aria-selected="false">Student acquisition</button>
           </div>
         </div>
         <div id="pass-slot"></div>
@@ -390,6 +425,27 @@
           </div>
         </div>
         </div>
+
+        <div data-pane="growth" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">This week's acquisition plan</h3>
+          <span id="g-status" class="pill gate"><i></i>Checking</span>
+          <span id="g-time" class="note" style="margin:0"></span>
+          <button class="btn" id="run-growth" type="button" disabled>Run now</button>
+        </div>
+        <p class="sub">Every Tuesday it searches for real student groups and campus events at Western and Fanshawe, drafts a message for each new group, and reads the real waitlist. The team sends every message.</p>
+        <div class="brief-grid">
+          <div class="panel brief" id="growth"></div>
+          <div class="side">
+            <div class="panel"><h3>Waitlist <span class="src real">Real</span></h3><p class="sub">Sign ups from the join page. Counts only here.</p><div id="wl"></div></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="pipe-head"><h3>Outreach pipeline</h3><div class="chips" id="pipe-filter"></div></div>
+          <p class="sub" id="pipe-sub">Groups the agent found. Open a message, copy it, send it yourself, then update the status.</p>
+          <div id="pipeline"></div>
+        </div>
+        </div>
       </section>
 
       <section class="section">
@@ -425,7 +481,7 @@
             <li><span class="n">2</span><div><strong>Money out above the cap</strong><span>Rewards and gift cards pay out automatically up to $500 a week. Anything above waits for approval.</span></div></li>
             <li><span class="n">3</span><div><strong>Privacy flags</strong><span>When the Privacy guard blocks something and can't fix it alone, a person decides.</span></div></li>
           </ul>
-          <p class="everything"><b>Runs alone:</b> research, outreach drafts, posts, student support, reports to existing buyers, offer matching, payouts under the cap.</p>
+          <p class="everything"><b>Runs alone:</b> research, outreach drafts, posts, student support, reports to existing buyers, offer matching, payouts under the cap. <b>Sent by the team:</b> outreach to student groups.</p>
         </div>
       </section>
 
@@ -519,7 +575,7 @@ This week: 84 new students (goal 75), 1,212 receipts scanned, 31,400 points earn
 Biggest risk: weekly check ins fell from 71% to 64%. Growth agent is testing a Sunday reminder.` },
 
       { id: 'market', name: 'Market intelligence', group: 'grow', model: 'sonnet', auto: 'auto', built: true, runs: 4, inTok: 170000, outTok: 10000, extra: 0.5, extraNote: '48 web searches', f: [1.3, 2],
-        job: 'Watches competitors, buyers, grants and policy news.',
+        job: 'Watches competitors, data buyers, policy and student food costs.',
         cadence: 'Weekly brief, Monday mornings, plus Run now',
         does: ['Searches the web for competitors, data buyers, policy and student food costs', 'Covers Canada, London first', 'Keeps only findings with a real source link', 'Routes buyer leads to B2B sales and post ideas to Content'],
         tools: ['Claude web search', 'Watchlist the team edits'],
@@ -528,19 +584,19 @@ Biggest risk: weekly check ins fell from 71% to 64%. Growth agent is testing a S
         sample: `Weekly brief, Nov 16
 - A food rescue app added two London stores. Our angle is still different: we track the student's own fridge.
 - Two bakery brands launched half loaves this fall. Strong fit for our bread waste report. Sent to B2B sales.
-- Grant: a provincial food waste fund opens in January, up to $25K. Added to the team calendar.` },
+- The City of London published green bin results. Possible baseline buyer. Sent to B2B sales.` },
 
-      { id: 'growth', name: 'Student acquisition', group: 'grow', model: 'sonnet', auto: 'guard', runs: 200, inTok: 25000, outTok: 3000, f: [2, 4],
-        job: 'Brings students in through unions, ambassadors and referrals.',
-        cadence: 'Runs all day',
-        does: ['Drafts and sends outreach to students\' union clubs and residence councils', 'Runs the campus ambassador program and referral codes', 'Tests reminders and onboarding messages', 'Tracks the sign up funnel and reports what works'],
-        tools: ['Email and social scheduling', 'Referral codes', 'App analytics'],
-        gate: 'Autonomous. The Privacy guard checks every message before it goes out.',
-        talks: ['content', 'support', 'chief'],
-        sample: `Experiment result: Sunday 6 pm check in reminder
-Group A (no reminder): 61% checked in
-Group B (reminder): 74% checked in
-Rolling out to everyone tonight. Next test: ambassador codes in first year residences.` },
+      { id: 'growth', name: 'Student acquisition', group: 'grow', model: 'sonnet', auto: 'gate', built: true, runs: 4, inTok: 150000, outTok: 14000, extra: 0.4, extraNote: '40 web searches', f: [2, 4],
+        job: 'Finds student groups, drafts outreach and runs the waitlist.',
+        cadence: 'Weekly, Tuesdays, plus Run now',
+        does: ['Finds real clubs, residence councils and union roles at Western and Fanshawe', 'Finds real campus events in the next 8 weeks', 'Drafts a message for each group with its own waitlist link', 'Tracks real waitlist sign ups by campus and by group', 'Plans the ambassador program and referrals'],
+        tools: ['Claude web search', 'Join page and waitlist', 'Outreach pipeline'],
+        gate: 'The team reviews and sends every message it drafts.',
+        talks: ['content', 'market', 'chief'],
+        sample: `New group: Western sustainability club
+Why: runs a food waste week every term.
+Draft (Instagram): Hi! We're Ivey students building SNARE, a free app that helps students waste less food and earn grocery money. Would you share our waitlist with your members? {join link}
+Waitlist this week: 12 new sign ups, 5 from this club's link.` },
 
       { id: 'content', name: 'Content creation', group: 'grow', model: 'sonnet', auto: 'guard', runs: 180, inTok: 30000, outTok: 4000, f: [2, 4],
         job: 'Makes the posts, videos and recipes students see.',
@@ -1064,7 +1120,155 @@ Duplicate receipts blocked: 6` },
       needPass(() => saveWatch([...live.watch, { id: 'w' + Date.now().toString(36), topic, kind: document.getElementById('w-kind').value }]));
     });
 
-    loadLive().then(loadMarket);
+    // ---------- agent 3: Student acquisition ----------
+    const JOIN = 'https://n8moore19.github.io/SNARE/join.html';
+    const STATUSES = ['new', 'contacted', 'replied', 'partner', 'not a fit'];
+    const slugOf = n => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'group';
+    const GROWTH_PREVIEW = {
+      headline: 'Sample plan: real groups, events and waitlist numbers appear after the first run.',
+      newGroups: [],
+      events: [
+        { date: '', campus: 'Western', event: 'Example: a sustainability week', idea: 'A table with a live fridge scan demo and waitlist QR code.', url: '' },
+        { date: '', campus: 'Fanshawe', event: 'Example: exam season', idea: 'Post cheap 10 minute meals from what is already in your fridge.', url: '' },
+      ],
+      ambassador: 'Example: one ambassador per residence building, paid in points, with a goal of 15 sign ups each.',
+      referral: 'Example: 100 points for each friend who joins, for both people.',
+      waitlistRead: 'A real run reads the waitlist numbers here.',
+      nextSteps: ['Connect the worker, then press Run now.'],
+    };
+    const SAMPLE_GROUPS = [
+      { id: 's1', name: 'Example: campus sustainability club', campus: 'Western', type: 'sustainability', why: 'Sample row. Real groups come from web search.', contact: '', url: '', channel: 'instagram', subject: '', message: 'Sample message. A real run writes one for each group, with its own waitlist link.', link: JOIN + '?src=example', status: 'new', notes: '', added: '' },
+    ];
+    live.growth = null; live.groups = []; live.wl = null; live.gbusy = false; live.gerror = ''; live.pipeFilter = 'all'; live.openDraft = null;
+
+    function renderGrowth() {
+      const latest = live.growth;
+      const [cls, label, banner] = statusOf(latest);
+      const st = document.getElementById('g-status');
+      st.className = 'pill ' + cls; st.innerHTML = '<i></i>' + label;
+      const btn = document.getElementById('run-growth');
+      btn.disabled = !API || !live.status || !live.status.hasKey || live.gbusy;
+      btn.textContent = live.gbusy ? 'Finding groups' : 'Run now';
+      document.getElementById('g-time').textContent = latest ? `Written ${fmtTime(latest.generatedAt)}` : '';
+      const g = latest ? latest.output : GROWTH_PREVIEW;
+      document.getElementById('growth').innerHTML = `
+        ${banner ? `<div class="preview"><div><b>${latest ? '' : 'Preview'}</b>${esc(banner)}</div></div>` : ''}
+        <p class="headline">${esc(g.headline)}</p>
+        <div class="bsec"><b>Waitlist</b><p style="font-size:13.5px">${esc(g.waitlistRead)}</p></div>
+        ${g.newGroups.length ? `<div class="bsec"><b>New groups this week</b><ul class="blist">${g.newGroups.map(n => `<li>${esc(n)}</li>`).join('')}</ul><p class="note">Messages for each are in the pipeline below.</p></div>` : ''}
+        ${g.events.length ? `<div class="bsec"><b>Campus calendar</b><ul class="evs">${g.events.map(e => `<li><time>${esc(e.date || 'Date TBC')}</time><div>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.event)}</a>` : esc(e.event)} · ${esc(e.campus)}<span>${esc(e.idea)}</span></div></li>`).join('')}</ul></div>` : ''}
+        <div class="bsec"><b>Ambassadors</b><p style="font-size:13.5px">${esc(g.ambassador)}</p></div>
+        <div class="bsec"><b>Referrals</b><p style="font-size:13.5px">${esc(g.referral)}</p></div>
+        ${g.nextSteps.length ? `<div class="bsec"><b>Next steps</b><ul class="blist">${g.nextSteps.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        ${live.gerror ? `<p class="err">${esc(live.gerror)}</p>` : ''}
+        <div class="srcs">${latest
+          ? `<span class="src real">${latest.sources.searches} web searches</span><span class="src real">${latest.sources.groupsAdded} new groups</span><span class="src real">Waitlist: ${latest.sources.waitlist}</span>`
+          : '<span class="src samp">Sample plan</span>'}</div>`;
+    }
+
+    function renderWaitlist() {
+      const w = live.wl;
+      const box = document.getElementById('wl');
+      const link = `<div class="wl-link"><code>${JOIN}</code><button class="btn small outline" data-copy="${JOIN}">Copy</button><a class="btn small outline" href="join.html" target="_blank" rel="noopener">Open</a></div>`;
+      if (!w) { box.innerHTML = `<p class="note" style="margin:0">The join page starts taking sign ups once the worker is connected.</p>${link}`; return; }
+      const max = Math.max(1, ...w.byWeek);
+      const top = Object.entries(w.bySource).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      box.innerHTML = `
+        <div class="wl-big"><b>${w.total}</b><span>on the waitlist · ${w.last7} this week</span></div>
+        <div class="spark" aria-label="Sign ups per week, last 8 weeks">${w.byWeek.map(n => `<i style="height:${Math.round(n / max * 100)}%" title="${n}"></i>`).join('')}</div>
+        <div class="spark-l"><span>8 weeks ago</span><span>this week</span></div>
+        <div class="wl-rows">${Object.entries(w.byCampus).map(([k, n]) => `<div><span>${esc(k)}</span><b>${n}</b></div>`).join('') || '<div><span>No sign ups yet</span></div>'}</div>
+        ${top.length ? `<div class="wl-rows" style="border-top:1px solid var(--line);padding-top:8px"><div><span><b>Top sources</b></span></div>${top.map(([k, n]) => `<div><span>${esc(k)}</span><b>${n}</b></div>`).join('')}</div>` : ''}
+        ${link}`;
+    }
+
+    function renderPipeline() {
+      const edit = canEdit();
+      const list = live.groups.length ? live.groups : SAMPLE_GROUPS;
+      const sample = !live.groups.length;
+      const counts = {};
+      list.forEach(g => { counts[g.status] = (counts[g.status] || 0) + 1; });
+      document.getElementById('pipe-filter').innerHTML = ['all', ...STATUSES].map(st => `<button class="${live.pipeFilter === st ? 'on' : ''}" data-pf="${st}">${st}${st === 'all' ? ` ${list.length}` : counts[st] ? ` ${counts[st]}` : ''}</button>`).join('');
+      document.getElementById('pipe-sub').textContent = sample
+        ? 'Sample row. Real groups appear after the first run. Open a message, copy it, send it yourself, then update the status.'
+        : `Groups the agent found. Open a message, copy it, send it yourself, then update the status.${edit ? '' : ' Status editing turns on once the worker is connected.'}`;
+      const shown = list.filter(g => live.pipeFilter === 'all' || g.status === live.pipeFilter);
+      const bySrc = live.wl ? live.wl.bySource : {};
+      document.getElementById('pipeline').innerHTML = shown.length ? shown.map(g => {
+        const src = (g.link.split('src=')[1] || '');
+        const n = bySrc[src] || 0;
+        return `<div class="prow">
+          <div class="prow-top">
+            <div><strong>${g.url ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : esc(g.name)}</strong><span class="pm">${esc(g.campus)} · ${esc(g.type)}${g.contact ? ' · ' + esc(g.contact) : ''}</span></div>
+            <span class="signups">${n} sign up${n === 1 ? '' : 's'}</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select data-gstatus="${esc(g.id)}" ${edit && !sample ? '' : 'disabled'} aria-label="Status">${STATUSES.map(st => `<option ${g.status === st ? 'selected' : ''}>${st}</option>`).join('')}</select>
+              <button class="btn small outline" data-draft="${esc(g.id)}">${live.openDraft === g.id ? 'Hide' : 'Message'}</button>
+            </div>
+          </div>
+          ${live.openDraft === g.id ? `<div class="draft">
+            <div class="dmeta">${esc(g.why)}<br>Send by ${esc(g.channel)}${g.contact ? ' to ' + esc(g.contact) : ''}</div>
+            ${g.subject ? `<p><b>Subject:</b> ${esc(g.subject)}</p>` : ''}
+            <pre>${esc(g.message)}</pre>
+            <div class="row2"><button class="btn small" data-copy="${esc((g.subject ? 'Subject: ' + g.subject + '\n\n' : '') + g.message)}">Copy message</button>${g.url ? `<a class="btn small outline" href="${esc(g.url)}" target="_blank" rel="noopener">Open their page</a>` : ''}</div>
+          </div>` : ''}
+        </div>`;
+      }).join('') : '<p class="note">No groups with this status.</p>';
+    }
+
+    async function saveGroups(next) {
+      const prev = live.groups;
+      live.groups = next; renderPipeline();
+      try { live.groups = (await call('/agents/groups', { method: 'PUT', body: JSON.stringify({ groups: next }) })).groups; live.gerror = ''; }
+      catch (e) { if (e.message !== 'PASS') { live.groups = prev; live.gerror = e.message; renderGrowth(); } }
+      renderPipeline();
+    }
+
+    async function runGrowthNow() {
+      live.gbusy = true; live.gerror = ''; renderGrowth();
+      try {
+        live.growth = (await call('/agents/growth/run', { method: 'POST' })).latest;
+        live.groups = (await call('/agents/groups')).groups;
+      } catch (e) { if (e.message !== 'PASS') live.gerror = e.message; }
+      live.gbusy = false; renderGrowth(); renderPipeline();
+    }
+
+    async function loadGrowth() {
+      renderGrowth(); renderWaitlist(); renderPipeline();
+      if (!API || !live.status) return;
+      try {
+        const [g, gr, w] = await Promise.all([call('/agents/growth'), call('/agents/groups'), call('/agents/waitlist')]);
+        live.growth = g.latest; live.groups = gr.groups; live.wl = w.summary;
+      } catch (e) { /* keep previews */ }
+      renderGrowth(); renderWaitlist(); renderPipeline();
+    }
+
+    async function copyText(text, btn) {
+      const old = btn.textContent;
+      try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; }
+      catch (e) {
+        const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); btn.textContent = 'Copied'; } catch (err) { btn.textContent = 'Select and copy'; }
+        ta.remove();
+      }
+      setTimeout(() => { btn.textContent = old; }, 1500);
+    }
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('#run-growth')) needPass(runGrowthNow);
+      const pf = e.target.closest('[data-pf]');
+      if (pf) { live.pipeFilter = pf.dataset.pf; renderPipeline(); }
+      const d = e.target.closest('[data-draft]');
+      if (d) { live.openDraft = live.openDraft === d.dataset.draft ? null : d.dataset.draft; renderPipeline(); }
+      const c = e.target.closest('[data-copy]');
+      if (c) copyText(c.dataset.copy, c);
+    });
+    document.addEventListener('change', e => {
+      const sel = e.target.closest('[data-gstatus]');
+      if (sel) needPass(() => saveGroups(live.groups.map(g => g.id === sel.dataset.gstatus ? { ...g, status: sel.value } : g)));
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth()]));
     render();
   })();
   </script>

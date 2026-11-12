@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#A2DC5D">
+  <title>Join SNARE</title>
+  <meta name="description" content="SNARE is a free digital fridge for students in London, Ontario. Join the waitlist for the pilot.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --forest: #004230; --lime: #A2DC5D; --soft: #EAF6DC; --accent: #BBD004; --ink: #1F1E1E; --muted: #5B6660; --line: #E3EADD; --bg: #F7F9F4; --warn: #9A4A12; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; font-family: 'Poppins', system-ui, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    h1, h2, p { margin: 0; }
+    .band { background: radial-gradient(130% 95% at 50% 100%, #EEF9E0 0%, #C3EA8E 38%, #A2DC5D 70%, #8FD047 100%); padding: 28px max(16px, env(safe-area-inset-left)) 40px; text-align: center; }
+    .brand { font-weight: 800; font-size: 26px; letter-spacing: -0.04em; display: inline-flex; align-items: baseline; gap: 3px; }
+    .brand i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; }
+    .eyebrow { display: block; margin-top: 26px; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--forest); }
+    h1 { font-size: clamp(34px, 8vw, 52px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.02; margin: 10px auto 14px; max-width: 12ch; text-wrap: balance; }
+    .band p { color: var(--forest); max-width: 36ch; margin: 0 auto; font-size: 15px; }
+    main { max-width: 520px; margin: -22px auto 40px; padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 20px; box-shadow: 0 1px 2px rgba(31, 30, 30, 0.04), 0 10px 30px rgba(0, 66, 48, 0.08); }
+    label.f { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 14px 0 6px; }
+    label.f:first-child { margin-top: 0; }
+    input[type="email"], select { width: 100%; font: inherit; font-size: 16px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; }
+    input[type="email"]:focus, select:focus { outline: 2px solid var(--forest); outline-offset: 1px; border-color: var(--forest); }
+    .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .seg label { position: relative; }
+    .seg input { position: absolute; opacity: 0; }
+    .seg span { display: block; text-align: center; padding: 10px 6px; border: 1.5px solid var(--ink); border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .seg input:checked + span { background: var(--ink); color: var(--lime); }
+    .seg input:focus-visible + span { outline: 2px solid var(--forest); outline-offset: 2px; }
+    .consent { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; font-size: 13px; color: var(--muted); }
+    .consent input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--forest); flex: none; }
+    button.go { width: 100%; margin-top: 16px; border: 0; background: var(--ink); color: #fff; border-radius: 12px; padding: 15px; font: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
+    button.go:disabled { opacity: 0.4; cursor: not-allowed; }
+    .msg { margin-top: 12px; font-size: 13.5px; color: var(--warn); }
+    .done { text-align: center; padding: 10px 0; }
+    .done .tick { width: 56px; height: 56px; border-radius: 50%; background: var(--lime); display: grid; place-items: center; margin: 0 auto 12px; }
+    .done .tick svg { width: 28px; height: 28px; fill: none; stroke: var(--ink); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .done h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+    .done p { color: var(--muted); margin-top: 6px; font-size: 14px; }
+    .perks { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 10px; }
+    .perks li { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; font-size: 14px; }
+    .perks i { width: 34px; height: 34px; border-radius: 10px; background: var(--soft); display: grid; place-items: center; font-style: normal; font-weight: 800; color: var(--forest); }
+    .perks b { display: block; }
+    .perks span { color: var(--muted); font-size: 13px; }
+    .fine { margin-top: 22px; font-size: 12px; color: var(--muted); text-align: center; }
+    .fine button { border: 0; background: none; padding: 0; font: inherit; color: var(--ink); text-decoration: underline; cursor: pointer; }
+    .closed { background: var(--soft); color: var(--forest); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+  <header class="band">
+    <span class="brand">snare<i></i></span>
+    <span class="eyebrow">For Western and Fanshawe students</span>
+    <h1>Cook what you have. Waste less.</h1>
+    <p>A free digital fridge. Snap your receipt, see what expires first, and earn grocery money for logging.</p>
+  </header>
+
+  <main>
+    <div class="card" id="card">
+      <form id="join" novalidate>
+        <div class="closed" id="closed" hidden>The waitlist opens soon. Check back in a few days.</div>
+        <label class="f" for="email">Your email</label>
+        <input type="email" id="email" autocomplete="email" placeholder="you@uwo.ca" required>
+        <span class="f" style="display:block;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin:14px 0 6px">Your campus</span>
+        <div class="seg" role="radiogroup" aria-label="Campus">
+          <label><input type="radio" name="campus" value="Western" checked><span>Western</span></label>
+          <label><input type="radio" name="campus" value="Fanshawe"><span>Fanshawe</span></label>
+          <label><input type="radio" name="campus" value="Other"><span>Other</span></label>
+        </div>
+        <label class="consent"><input type="checkbox" id="consent"> <span>Email me about SNARE's launch and the student pilot. I'm 18 or older. I can remove my email any time.</span></label>
+        <button class="go" id="go" type="submit">Join the waitlist</button>
+        <p class="msg" id="msg" role="alert"></p>
+      </form>
+      <div class="done" id="done" hidden>
+        <div class="tick"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <h2>You're on the list</h2>
+        <p>We'll email you when the pilot opens. Share this page with your roommates: the whole house can use one fridge.</p>
+      </div>
+      <form id="remove" hidden novalidate>
+        <label class="f" for="r-email">Remove my email</label>
+        <input type="email" id="r-email" autocomplete="email" placeholder="you@uwo.ca">
+        <button class="go" type="submit">Remove me</button>
+        <p class="msg" id="r-msg" role="alert"></p>
+      </form>
+    </div>
+
+    <ul class="perks">
+      <li><i>1</i><div><b>Snap your receipt</b><span>Five seconds. SNARE knows what you bought and when.</span></div></li>
+      <li><i>2</i><div><b>Cook what expires first</b><span>Meal ideas from what is already in your fridge.</span></div></li>
+      <li><i>3</i><div><b>Earn grocery money</b><span>Points for logging, cashed out as grocery gift cards.</span></div></li>
+    </ul>
+
+    <p class="fine">We only use your email to tell you about SNARE. No spam, never sold. <button type="button" id="show-remove">Remove my email</button><br>Team SNARE · Ivey Business School student project</p>
+  </main>
+
+  <script src="config.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const API = (window.SNARE_AI_URL || '').replace(/\/+$/, '');
+    let source = 'direct';
+    try { source = (new URLSearchParams(location.search).get('src') || 'direct').slice(0, 40); } catch (e) { /* ignore */ }
+    const $ = id => document.getElementById(id);
+    if (!API) { $('closed').hidden = false; $('go').disabled = true; }
+
+    async function post(body) {
+      const r = await fetch(API + '/agents/waitlist/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Something went wrong. Try again.');
+      return data;
+    }
+
+    $('join').addEventListener('submit', async e => {
+      e.preventDefault();
+      const email = $('email').value.trim();
+      $('msg').textContent = '';
+      if (!/^\S+@\S+\.\S+$/.test(email)) { $('msg').textContent = 'Please enter a valid email.'; return; }
+      if (!$('consent').checked) { $('msg').textContent = 'Please tick the box to agree.'; return; }
+      $('go').disabled = true; $('go').textContent = 'Joining';
+      try {
+        await post({ email, campus: document.querySelector('input[name="campus"]:checked').value, source, consent: true });
+        $('join').hidden = true; $('done').hidden = false;
+      } catch (err) { $('msg').textContent = err.message; }
+      $('go').disabled = false; $('go').textContent = 'Join the waitlist';
+    });
+
+    $('show-remove').addEventListener('click', () => { $('join').hidden = true; $('done').hidden = true; $('remove').hidden = false; $('r-email').focus(); });
+    $('remove').addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!API) { $('r-msg').textContent = 'The waitlist is not open yet, so there is nothing to remove.'; return; }
+      try { await post({ email: $('r-email').value.trim(), remove: true }); $('r-msg').style.color = 'var(--forest)'; $('r-msg').textContent = 'Removed. You will not hear from us again.'; }
+      catch (err) { $('r-msg').textContent = err.message; }
+    });
+  })();
+  </script>
+</body>
+</html>
