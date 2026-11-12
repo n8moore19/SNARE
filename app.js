@@ -42,7 +42,7 @@
   const PTS = { receipt: 25, checkin: 20, usedInTime: 5, rate: 10 };
   const PTS_PER_DOLLAR = 100;
   const CARD_PTS = 500;        // $5 grocery gift card
-  const tour = { on: false, run: 0 }; // the guided demo; nothing it does is sent to the real panel
+  const tour = { on: false, run: 0, step: 0, paused: false, ended: false }; // the guided demo; nothing it does is sent to the real panel
   const PREMIUM_PTS = 2000;    // a year of premium ($20)
   const PREMIUM_PRICE = 20;
   const TRIAL_END = 'Dec 31';  // free premium for the fall semester
@@ -872,7 +872,7 @@
       ${row('impact', ICONS.leaf, 'Impact', 'Food and money you saved')}
       ${row('profile', ICONS.user, 'Preferences', 'Food needs, budget and travel')}
       ${row('help', ICONS.spark, 'Help', 'Points, gift cards and privacy')}
-      ${row('tour', ICONS.camera, 'Watch the demo', "Maya's week in one minute")}`;
+      ${row('tour', ICONS.camera, 'Watch the demo', "Maya's first month, step by step")}`;
     hideNotif(); pmenu.hidden = false;
     requestAnimationFrame(() => pmenu.classList.add('open'));
     document.querySelector('.avatar-btn').setAttribute('aria-expanded', 'true');
@@ -926,7 +926,7 @@
         <div class="sticky">
           <button class="btn block" data-action="finishwelcome" data-id="scan">${ICONS.camera}Scan my fridge</button>
           <button class="link block-link" data-action="finishwelcome" data-id="fridge">Skip for now</button>
-          <button class="link block-link" data-action="tour">&#9654; Or watch the one minute demo</button>
+          <button class="link block-link" data-action="tour">&#9654; Or watch the guided demo</button>
         </div>
       </section>`;
   }
@@ -3419,23 +3419,34 @@
 
   loadLiveOffers();
 
-  // ---------- guided demo: Maya's week in about a minute ----------
-  // Drives the real screens with a pointer and captions, so every pivot
-  // feature shows up in order. Nothing it does reaches the real data panel.
-  const tourEl = document.getElementById('tour');
+  // ---------- guided demo: Maya's first month, step by step ----------
+  // Drives the real screens with a pointer. The narration sits beside the
+  // phone on wide screens and in a slim bar above the tabs on phones, so it
+  // never covers the app. Back, pause and next let a presenter set the pace.
+  // Nothing the demo does reaches the real data panel.
+  const tourBar = document.getElementById('tour');
+  const tourPanel = document.getElementById('tour-panel');
+  const tourEndEl = document.getElementById('tour-end');
   const finger = document.getElementById('tour-finger');
   const phoneEl = document.querySelector('.phone');
+  const pitchEl = document.querySelector('.pitch');
   const STOP = Symbol('stop');
-  const TOUR_STEPS = 6;
+  const reduceMotionApp = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const smooth = () => (reduceMotionApp ? 'auto' : 'smooth');
+
   function tourWait(ms, run) {
-    return new Promise((res, rej) => setTimeout(() => (tour.on && tour.run === run ? res() : rej(STOP)), ms));
+    return new Promise((res, rej) => {
+      let left = ms;
+      const tick = () => {
+        if (!tour.on || tour.run !== run) return rej(STOP);
+        if (!tour.paused) left -= 100;
+        if (left <= 0) res(); else setTimeout(tick, 100);
+      };
+      setTimeout(tick, 100);
+    });
   }
-  function tourCaption(n, title, text, low) {
-    tourEl.className = 'tour' + (low ? ' low' : '');
-    const bar = document.querySelector('.bar').getBoundingClientRect();
-    tourEl.style.top = low ? '' : (bar.bottom - phoneEl.getBoundingClientRect().top + 8) + 'px';
-    tourEl.innerHTML = `<div class="tour-top"><span class="tour-dots">${Array.from({ length: TOUR_STEPS }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span><span class="tour-n">${n} of ${TOUR_STEPS}</span><button class="tour-x" data-tour="stop" aria-label="Stop the demo">${ICONS.cross}</button></div><b>${title}</b><p>${text}</p>`;
-    tourEl.hidden = false;
+  async function tourUntil(test, max, run) {
+    for (let t = 0; t < max && !test(); t += 200) await tourWait(200, run);
   }
   function pointAt(el) {
     const a = el.getBoundingClientRect(), p = phoneEl.getBoundingClientRect();
@@ -3444,102 +3455,318 @@
     finger.hidden = false;
     finger.classList.remove('press');
   }
-  async function tourTap(sel, run, scroll = true) {
+  async function tourTap(sel, run, opts = {}) {
     const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
-    if (!el) return;
-    if (scroll) { el.scrollIntoView({ block: 'center', behavior: reduceMotionApp ? 'auto' : 'smooth' }); await tourWait(550, run); }
+    if (!el || el.disabled) return false;
+    if (opts.scroll !== false) { el.scrollIntoView({ block: 'center', behavior: smooth() }); await tourWait(opts.fast ? 300 : 550, run); }
     pointAt(el);
-    await tourWait(750, run);
+    await tourWait(opts.fast ? 420 : 750, run);
     finger.classList.add('press');
-    await tourWait(180, run);
+    await tourWait(160, run);
     el.click();
-    await tourWait(350, run);
+    await tourWait(opts.fast ? 200 : 350, run);
     finger.hidden = true;
+    return true;
   }
-  function tourReset() {
+  async function tourScroll(y, ms, run) { viewport.scrollTo({ top: y, behavior: smooth() }); await tourWait(ms, run); }
+
+  // Everything back to a brand new student.
+  function tourBase() {
     closeMenu(); closeMoment(); hideNotif();
-    Object.assign(P(), { done: true, consented: true, share: true });
-    state.fridge = [];
-    D.demoScan.forEach(x => addToFridge(x.id, x));
-    state.points = []; samplePoints();
-    state.cards = []; state.tossLog = {}; state.items = []; state.highlight = [];
-    state.notified = true; state.cashPick = false; state.aiOpen = false;
-    persist();
-    go('fridge');
+    state.aiOpen = false; renderAI();
+    Object.assign(state, {
+      profile: defaultProfile(), fridge: [], ratings: {}, feedback: {}, cooked: [], trips: [], tossed: 0, learn: {}, tossLog: {}, views: {},
+      points: [], cards: [], lastCheckin: Date.now() - 8 * DAY, buyLog: {}, checkin: null, notified: true, items: [], rescueAdded: [],
+      justCooked: null, highlight: [], scan: null, cashPick: false, nudgeDismissed: [],
+    });
+    result = null;
+    document.querySelectorAll('.tour-glow').forEach(el => el.classList.remove('tour-glow'));
   }
-  async function startTour() {
+  const tourItem = id => state.fridge.find(f => f.id === id);
+  const topMealId = () => { const el = document.querySelector('.meal[data-action="recipe"]'); return el && el.dataset.id; };
+  function weeksOfPoints() {
+    const mine = state.points.slice();
+    samplePoints();
+    state.points = state.points.concat(mine);
+  }
+
+  // Each step: what it says, how it plays (run), and its effect when skipped (apply).
+  const TOUR = [
+    {
+      title: 'Two quick questions', text: 'Maya opens SNARE for the first time. She picks a $30 weekly budget, then sees a plain language consent. Sharing is optional and anonymous, and she turns it on.',
+      async run(r) {
+        go('welcome');
+        await tourWait(1600, r);
+        await tourTap('[data-action="budget"][data-id="30"]', r);
+        await tourWait(600, r);
+        await tourTap('[data-action="finishwelcome"][data-id="fridge"]', r);
+        await tourWait(1800, r);
+        await tourTap('[data-action="consent"][data-id="share"]', r);
+        await tourWait(1400, r);
+        await tourTap('[data-action="consentdone"]', r);
+        await tourWait(900, r);
+      },
+      apply() { Object.assign(P(), { budget: 30, done: true, consented: true, share: true }); },
+    },
+    {
+      title: 'Scan the fridge', text: 'One photo of her fridge. The AI boxes each item, guesses how much is left and how long it keeps. She can fix anything before adding it.',
+      async run(r) {
+        go('fridge');
+        await tourTap('[data-action="goscan"]', r);
+        await tourWait(700, r);
+        await tourTap('[data-action="demoshelf"]', r);
+        await tourWait(SHELF_SCAN_MS + 600, r);
+        await tourScroll(260, 1600, r);
+        await tourTap('[data-action="rconfirm"]', r, { scroll: false });
+        await tourWait(4800, r);
+        await tourTap('[data-mo="close"]', r);
+      },
+      apply() { D.demoScan.forEach(x => addToFridge(x.id, x)); },
+    },
+    {
+      title: 'Snap the receipt', text: 'After shopping at No Frills she snaps the receipt. Every line and price is read, expiry starts from today, and her Golden Crust bread earns a sponsored bonus.',
+      async run(r) {
+        go('fridge');
+        await tourTap('[data-action="goscan"]', r);
+        await tourWait(700, r);
+        await tourTap('[data-action="demoreceipt"]', r);
+        await tourWait(RECEIPT_SCAN_MS + 600, r);
+        await tourScroll(300, 2200, r);
+        await tourTap('[data-action="receiptconfirm"]', r, { scroll: false });
+        await tourWait(6000, r);
+        await tourTap('[data-mo="close"]', r);
+      },
+      apply() {
+        D.demoReceipt.lines.forEach(l => addToFridge(l.id, { src: 'receipt' }));
+        earn(PTS.receipt, 'Receipt, No Frills', 'receipt');
+        earn(100, 'Golden Crust bonus', 'bonus');
+      },
+    },
+    {
+      title: 'Her fridge, sorted by expiry', text: 'Everything she owns, soonest first, with honest ranges instead of fake exact dates. Raw chicken gets a freeze it nudge before it is too late.',
+      async run(r) {
+        go('fridge');
+        await tourWait(1600, r);
+        await tourScroll(520, 2400, r);
+        await tourScroll(1100, 2400, r);
+        await tourScroll(0, 1000, r);
+      },
+      apply() {},
+    },
+    {
+      title: 'Cook what expires first', text: 'Meals are ranked by what is about to go off. She adds what she is missing to her list, cooks it, and rates it for 10 points.',
+      async run(r) {
+        await tourTap('#tabs [data-tab="meals"]', r, { scroll: false });
+        await tourWait(1800, r);
+        await tourTap('.meal[data-action="recipe"]', r);
+        await tourWait(1600, r);
+        await tourTap('[data-action="addmissing"]', r);
+        await tourWait(900, r);
+        await tourTap('[data-action="cook"]', r);
+        await tourWait(1400, r);
+        await tourTap('[data-action="rate"][data-id="1"]', r);
+        await tourWait(1200, r);
+      },
+      apply() {
+        go('meals');
+        const id = topMealId();
+        if (id) { addMissing(id); cook(id); state.ratings[id] = 1; }
+        earn(PTS.rate, 'Rated a SNARE recipe', 'rate');
+      },
+    },
+    {
+      title: 'Ask the AI', text: 'Not sure what to make? She asks. The answer uses her real fridge, budget and diet, with one tap buttons to act on it.',
+      async run(r) {
+        go('fridge');
+        await tourWait(600, r);
+        await tourTap('#ai-fab', r, { scroll: false });
+        await tourWait(900, r);
+        await tourTap('#ai [data-ai="ask"]', r, { scroll: false });
+        await tourUntil(() => !state.aiTyping, 15000, r);
+        await tourWait(4200, r);
+        await tourTap('#ai [data-ai="close"]', r, { scroll: false });
+      },
+      apply() {},
+    },
+    {
+      title: 'Plan the cheapest trip', text: 'Her list goes to the stores near campus. SNARE finds the cheapest way to buy only what she is missing, within her travel limit.',
+      async run(r) {
+        ['milk', 'bananas', 'bread'].forEach(id => products[id] && !state.items.some(it => it.id === id) && state.items.push({ id, qty: 1, why: 'Weekly basics' }));
+        await tourTap('#tabs [data-tab="shop"]', r, { scroll: false });
+        await tourWait(1600, r);
+        await tourTap('[data-action="find"]', r);
+        await tourUntil(() => state.screen === 'results', 9000, r);
+        await tourWait(1800, r);
+        await tourScroll(480, 2600, r);
+        await tourScroll(0, 800, r);
+      },
+      apply() { ['milk', 'bananas', 'bread'].forEach(id => products[id] && !state.items.some(it => it.id === id) && state.items.push({ id, qty: 1, why: 'Weekly basics' })); },
+    },
+    {
+      title: 'A one tap reminder', text: 'Two days later her spinach is near the end of its window. She answers from the lock screen without opening the app: tossed it.',
+      async run(r) {
+        go('fridge');
+        await tourWait(900, r);
+        const f = tourItem('spinach');
+        if (f) { notifyAbout(f); await tourWait(2200, r); await tourTap('#notif [data-n="tossed"]', r, { scroll: false }); }
+        await tourWait(1400, r);
+      },
+      apply() { const f = tourItem('spinach'); if (f) tossItem(f); },
+    },
+    {
+      title: 'The weekly check in', text: 'Thirty seconds on Sunday: used it, tossed it, or still have it, with a reason when food was wasted. That is the data buyers pay for, and she earns 20 points.',
+      async run(r) {
+        go('fridge');
+        await tourWait(500, r);
+        await tourTap('[data-action="startcheckin"]', r);
+        await tourWait(1300, r);
+        const uids = (state.checkin && state.checkin.uids) || [];
+        const plan = ['used', 'tossed', 'have', 'used', 'have', 'have'];
+        for (let i = 0; i < uids.length; i++) {
+          await tourTap(`[data-action="ci"][data-id="${uids[i]}"][data-v="${plan[i]}"]`, r, { fast: true });
+          if (plan[i] === 'tossed') await tourTap(`[data-action="cireason"][data-id="${uids[i]}"]`, r, { fast: true });
+        }
+        await tourWait(600, r);
+        await tourTap('[data-action="cifinish"]', r);
+        await tourWait(1400, r);
+      },
+      apply() { earn(PTS.checkin, 'Weekly check in', 'checkin'); state.lastCheckin = Date.now(); },
+    },
+    {
+      title: 'A brand offer that fits', text: 'Because she tossed spinach, Valley Greens offers its smaller bag. The match happens on her phone, and brands only ever see anonymous counts.',
+      async run(r) {
+        await tourTap('.avatar-btn', r, { scroll: false });
+        await tourWait(500, r);
+        await tourTap('[data-pm="rewards"]', r, { scroll: false });
+        await tourWait(900, r);
+        const offer = [...document.querySelectorAll('.offer.bonus')].find(o => o.textContent.includes('Valley Greens'));
+        if (offer) { offer.classList.add('tour-glow'); offer.scrollIntoView({ block: 'center', behavior: smooth() }); }
+        await tourWait(4600, r);
+      },
+      apply() {},
+    },
+    {
+      title: 'Cash out a gift card', text: 'Three weeks of receipts and check ins later, she reaches 500 points. A gift card partner sends a $5 Loblaw card, so SNARE never holds money.',
+      async run(r) {
+        weeksOfPoints(); persist(); updatePointsPill(true);
+        go('rewards');
+        await tourWait(1400, r);
+        await tourTap('[data-action="cashout"]', r);
+        await tourWait(700, r);
+        await tourTap('[data-action="cashpick"][data-id="loblaw"]', r);
+        await tourWait(900, r);
+        const g = document.querySelector('.gcards');
+        if (g) g.scrollIntoView({ block: 'center', behavior: smooth() });
+        await tourWait(3000, r);
+      },
+      apply() { weeksOfPoints(); cashOut('loblaw'); },
+    },
+    {
+      title: 'Her impact', text: 'After a month: meals cooked from her fridge, food rescued and money saved, next to every student in London. Less waste, toward SDG 12.3.',
+      async run(r) {
+        if (!state.cooked.length || state.cooked.length < 3) sampleHistory();
+        persist();
+        await tourTap('.avatar-btn', r, { scroll: false });
+        await tourWait(500, r);
+        await tourTap('[data-pm="impact"]', r, { scroll: false });
+        await tourWait(2000, r);
+        await tourScroll(600, 2600, r);
+        await tourScroll(1200, 2600, r);
+      },
+      apply() {},
+    },
+  ];
+
+  const isWide = () => !!pitchEl && getComputedStyle(pitchEl).display !== 'none';
+  const ctl = () => `<div class="tour-ctl">
+      <button data-tour="back" aria-label="Previous step" ${tour.step === 0 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
+      <button data-tour="pause" aria-label="${tour.paused ? 'Play' : 'Pause'}">${tour.paused ? '<svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>'}</button>
+      <button data-tour="next" aria-label="Next step"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
+      <button data-tour="stop" aria-label="End the demo">${ICONS.cross}</button>
+    </div>`;
+  function paintTour() {
+    const wide = isWide();
+    document.body.classList.toggle('tour-wide', tour.on && wide);
+    const s = TOUR[tour.step];
+    if (!tour.on || tour.ended) { tourBar.hidden = true; if (tourPanel) tourPanel.hidden = true; if (!tour.on) return; }
+    if (wide && tourPanel) {
+      tourBar.hidden = true;
+      tourPanel.hidden = false;
+      tourPanel.innerHTML = `<span class="tp-k">Guided demo</span><h3>Maya's first month</h3>
+        <ol>${TOUR.map((x, i) => `<li class="${i < tour.step ? 'done' : i === tour.step ? 'on' : ''}"><button data-tour="go" data-i="${i}"><i>${i + 1}</i><b>${x.title}</b></button>${i === tour.step && !tour.ended ? `<p>${x.text}</p>` : ''}</li>`).join('')}</ol>
+        ${tour.ended ? '' : ctl()}${tour.paused ? '<small class="tp-paused">Paused</small>' : ''}`;
+    } else if (!tour.ended) {
+      if (tourPanel) tourPanel.hidden = true;
+      tourBar.hidden = false;
+      tourBar.innerHTML = `<div class="tb-row"><span class="tb-n">${tour.step + 1}/${TOUR.length}</span><b>${s.title}</b>${ctl()}</div><p>${s.text}</p>`;
+    }
+    sizeTourBar();
+  }
+  async function goStep(i) {
+    if (i < 0 || i >= TOUR.length) return;
     const run = ++tour.run;
-    tour.on = true;
+    tour.on = true; tour.step = i; tour.ended = false;
+    finger.hidden = true; tourEndEl.hidden = true;
     document.body.classList.add('touring');
-    tourReset();
+    tourBase();
+    for (let k = 0; k < i; k++) TOUR[k].apply();
+    persist();
+    if (i > 0) go(state.screen === 'welcome' ? 'fridge' : state.screen);
+    if (i > 0 && !['fridge', 'meals', 'shop'].includes(state.screen)) go('fridge');
+    paintTour();
     try {
-      tourCaption(1, 'Meet Maya', 'A Western student. She just shopped at No Frills, so she snaps her receipt. Five seconds, any store.');
-      await tourWait(2800, run);
-      await tourTap('[data-action="goscan"]', run);
-      await tourWait(700, run);
-      await tourTap('[data-action="demoreceipt"]', run);
-      await tourWait(RECEIPT_SCAN_MS + 700, run);
-      tourCaption(2, 'AI reads every line', 'Items, prices and how long each one keeps. Her Golden Crust bread earns a sponsored bonus.');
-      await tourWait(3600, run);
-      await tourTap('[data-action="receiptconfirm"]', run, false);
-      tourCaption(3, 'She earns, and her data turns anonymous', 'Points first. Then the receipt becomes a London total, with no name, photo or store visit attached.');
-      await tourWait(6200, run);
-      await tourTap('[data-mo="close"]', run);
-      tourCaption(4, 'Two days later', "Her spinach is near the end of its window. One tap from the lock screen: she tossed it.", true);
-      await tourWait(1200, run);
-      const spinach = state.fridge.find(f => f.id === 'spinach');
-      if (spinach) { notifyAbout(spinach); await tourWait(1900, run); await tourTap('#notif [data-n="tossed"]', run, false); }
-      await tourWait(1200, run);
-      tourCaption(5, 'A brand offer that fits her', 'Because she tossed spinach, Valley Greens offers its smaller bag. The match happens on her phone, not on a server.');
-      await tourTap('.avatar-btn', run, false);
-      await tourWait(500, run);
-      await tourTap('[data-pm="rewards"]', run, false);
-      await tourWait(900, run);
-      const offer = [...document.querySelectorAll('.offer.bonus')].find(o => o.textContent.includes('Valley Greens'));
-      if (offer) { offer.classList.add('tour-glow'); offer.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
-      await tourWait(4600, run);
-      tourCaption(6, 'Points become a $5 gift card', 'Sent by a gift card partner, so SNARE never holds money. She picks a Loblaw card for No Frills.');
-      viewport.scrollTo({ top: 0, behavior: 'smooth' });
-      await tourWait(900, run);
-      await tourTap('[data-action="cashout"]', run);
-      await tourWait(700, run);
-      await tourTap('[data-action="cashpick"][data-id="loblaw"]', run);
-      await tourWait(900, run);
-      const g = document.querySelector('.gcards');
-      if (g) g.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      await tourWait(3000, run);
+      for (let k = i; k < TOUR.length; k++) {
+        if (k !== tour.step) { tour.step = k; paintTour(); }
+        await TOUR[k].run(run);
+        await tourWait(500, run);
+      }
       tourEnd(run);
     } catch (e) {
       if (e !== STOP) { console.error(e); stopTour(); }
     }
   }
+  const startTour = () => { tour.paused = false; goStep(0); };
   function tourEnd(run) {
     if (tour.run !== run) return;
+    tour.ended = true;
     finger.hidden = true;
-    tourEl.className = 'tour end';
-    tourEl.style.top = '';
-    tourEl.innerHTML = `<span class="eyebrow">That's SNARE in one week</span>
+    paintTour();
+    tourEndEl.innerHTML = `<div class="te-card"><span class="eyebrow">That's SNARE in one month</span>
       <ul>
-        <li>${ICONS.star}<span><b>Maya</b> earned grocery money for logging her food, and cashed out a $5 card.</span></li>
-        <li>${ICONS.lock}<span><b>London</b> got anonymous totals on what students buy and throw out.</span></li>
+        <li>${ICONS.star}<span><b>Maya</b> logged her food in seconds, cooked what was expiring, and cashed out a $5 card.</span></li>
+        <li>${ICONS.lock}<span><b>London</b> got anonymous totals on what students buy and throw out, and why.</span></li>
         <li>${ICONS.leaf}<span><b>Grocers, brands and the city</b> pay for those totals, which funds the points.</span></li>
       </ul>
-      <div class="tour-end-actions"><button class="btn" data-tour="replay">Replay</button><button class="btn outline" data-tour="stop">Explore on my own</button></div>`;
-    tourEl.hidden = false;
+      <div class="tour-end-actions"><button class="btn" data-tour="replay">Replay</button><button class="btn outline" data-tour="stop">Explore on my own</button></div></div>`;
+    tourEndEl.hidden = false;
   }
   function stopTour() {
-    tour.on = false; tour.run++;
-    document.body.classList.remove('touring');
-    tourEl.hidden = true; finger.hidden = true;
+    tour.on = false; tour.paused = false; tour.ended = false; tour.run++;
+    document.body.classList.remove('touring', 'tour-wide');
+    tourBar.hidden = true; tourEndEl.hidden = true; finger.hidden = true;
+    if (tourPanel) tourPanel.hidden = true;
+    sizeTourBar();
     document.querySelectorAll('.tour-glow').forEach(el => el.classList.remove('tour-glow'));
   }
-  const reduceMotionApp = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  tourEl.addEventListener('click', e => {
+  function onTourClick(e) {
     const b = e.target.closest('[data-tour]');
     if (!b) return;
-    if (b.dataset.tour === 'replay') startTour();
-    else { stopTour(); go('fridge'); }
-  });
+    const a = b.dataset.tour;
+    if (a === 'replay') startTour();
+    else if (a === 'stop') { stopTour(); go(P().done ? 'fridge' : 'welcome'); }
+    else if (a === 'pause') { tour.paused = !tour.paused; paintTour(); }
+    else if (a === 'next') goStep(tour.step + 1 < TOUR.length ? tour.step + 1 : tour.step);
+    else if (a === 'back') goStep(Math.max(0, tour.step - 1));
+    else if (a === 'go') goStep(Number(b.dataset.i));
+  }
+  [tourBar, tourPanel, tourEndEl].forEach(el => el && el.addEventListener('click', onTourClick));
+  window.addEventListener('resize', () => { if (tour.on) paintTour(); });
+  function sizeTourBar() {
+    const on = !tourBar.hidden;
+    phoneEl.style.setProperty('--tourh', on ? tourBar.offsetHeight + 'px' : '0px');
+    phoneEl.style.setProperty('--tourb', on ? (phoneEl.getBoundingClientRect().bottom - tourBar.getBoundingClientRect().top) + 'px' : '0px');
+  }
+  new ResizeObserver(sizeTourBar).observe(tourBar);
   document.getElementById('tour-start').addEventListener('click', () => startTour());
 
   // Deep links for demos: #demo loads a sample fridge, #welcome starts over,
@@ -3560,6 +3787,8 @@
     go('fridge');
   } else if (hash0 === 'tour') {
     startTour();
+  } else if (/^tour\d+$/.test(hash0)) {
+    goStep(Math.min(TOUR.length, Number(hash0.slice(4))) - 1);
   } else if (['meals', 'shop', 'impact', 'fridge', 'rewards'].includes(hash0)) {
     Object.assign(P(), { done: true, consented: true });
     go(hash0);

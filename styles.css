@@ -1182,32 +1182,51 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .notif { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1200; background: rgba(250, 252, 248, 0.97); backdrop-filter: blur(12px); border-radius: 18px; padding: 12px 14px; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22); transform: translateY(-140%); transition: transform 0.35s cubic-bezier(0.2, 1.2, 0.4, 1); }
 .notif.show { transform: none; }
 
-/* guided demo */
-.tour { position: absolute; left: 10px; right: 10px; top: 70px; z-index: 1400; background: #14221B; color: #fff; border-radius: 18px; padding: 12px 14px 13px; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3); animation: rise 0.35s ease both; }
-.tour[hidden] { display: none; }
-.tour.low { top: auto; bottom: 86px; }
-.tour-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.tour-dots { display: flex; gap: 4px; }
-.tour-dots i { width: 16px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.22); }
-.tour-dots i.on { background: var(--lime); }
-.tour-n { font-size: 11px; color: rgba(255, 255, 255, 0.6); font-weight: 700; }
-.tour-x { margin-left: auto; border: 0; background: rgba(255, 255, 255, 0.12); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; padding: 0; }
-.tour-x svg { width: 12px; height: 12px; fill: none; stroke: #fff; stroke-width: 2.4; }
-.tour b { display: block; font-size: 16px; color: var(--lime); margin-bottom: 2px; }
-.tour p { font-size: 13px; line-height: 1.45; color: rgba(255, 255, 255, 0.88); }
-.tour.end { top: 50%; transform: translateY(-50%); bottom: auto; background: #fff; color: var(--ink); padding: 20px 18px; border: 1px solid var(--line); animation: none; box-shadow: 0 0 0 999px rgba(12, 24, 19, 0.5), 0 14px 34px rgba(0, 0, 0, 0.3); }
-.tour.end ul { list-style: none; display: grid; gap: 12px; margin: 10px 0 16px; padding: 0; }
-.tour.end li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; }
-.tour.end li b { display: inline; font-size: inherit; color: var(--ink); }
-.tour.end li svg { flex: none; width: 30px; height: 30px; padding: 6px; border-radius: 50%; background: var(--ink); fill: none; stroke: var(--lime); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* guided demo: narration beside the phone (wide) or a bar above the tabs */
+.tour-bar { flex: none; background: #14221B; color: #fff; padding: 9px 12px 10px; border-top: 1px solid #0C1813; }
+.tour-bar[hidden] { display: none; }
+.tb-row { display: flex; align-items: center; gap: 8px; }
+.tb-n { font-size: 11px; font-weight: 800; color: var(--ink); background: var(--lime); border-radius: 99px; padding: 2px 7px; }
+.tb-row b { flex: 1; min-width: 0; font-size: 13.5px; color: var(--lime); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tour-bar p { font-size: 12px; line-height: 1.4; color: rgba(255, 255, 255, 0.85); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tour-ctl { display: flex; gap: 5px; flex: none; }
+.tour-ctl button { width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.13); color: #fff; font-size: 10px; display: grid; place-items: center; padding: 0; cursor: pointer; letter-spacing: -1px; }
+.tour-ctl button:hover { background: rgba(255, 255, 255, 0.25); }
+.tour-ctl button:disabled { opacity: 0.35; cursor: default; }
+.tour-ctl svg { width: 13px; height: 13px; fill: currentColor; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.tour-ctl [data-tour="stop"] svg { fill: none; }
+.tour-panel[hidden] { display: none; }
+body.tour-wide .pitch > :not(.tour-panel) { display: none; }
+.tour-panel { color: #fff; }
+.tp-k { font-size: 12px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lime); }
+.tour-panel h3 { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; margin: 6px 0 16px; line-height: 1.05; }
+.tour-panel ol { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 2px; }
+.tour-panel li button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; color: rgba(255, 255, 255, 0.55); font: inherit; text-align: left; padding: 6px 8px; border-radius: 10px; cursor: pointer; }
+.tour-panel li button:hover { background: rgba(255, 255, 255, 0.07); }
+.tour-panel li i { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.3); font-style: normal; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+.tour-panel li b { font-size: 14.5px; font-weight: 700; }
+.tour-panel li.done button { color: rgba(255, 255, 255, 0.8); }
+.tour-panel li.done i { background: rgba(162, 220, 93, 0.25); border-color: transparent; color: var(--lime); }
+.tour-panel li.on button { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.tour-panel li.on i { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.tour-panel li.on b { font-size: 16px; }
+.tour-panel li p { font-size: 15px; line-height: 1.5; color: #E4F2DA; padding: 4px 8px 10px 40px; }
+.tour-panel .tour-ctl button { width: 40px; height: 40px; font-size: 12px; }
+.tp-paused { display: inline-block; margin-left: 4px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lime); }
+.tour-end { position: absolute; inset: 0; z-index: 1400; background: rgba(12, 24, 19, 0.5); display: grid; place-items: center; padding: 14px; }
+.tour-end[hidden] { display: none; }
+.te-card { background: #fff; color: var(--ink); border-radius: 20px; padding: 20px 18px; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3); animation: rise 0.35s ease both; }
+.te-card ul { list-style: none; display: grid; gap: 12px; margin: 10px 0 16px; padding: 0; }
+.te-card li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; }
+.te-card li svg { flex: none; width: 30px; height: 30px; padding: 6px; border-radius: 50%; background: var(--ink); fill: none; stroke: var(--lime); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tour-end-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tour-finger { position: absolute; z-index: 1500; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; background: rgba(162, 220, 93, 0.45); border: 3px solid #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); pointer-events: none; transition: left 0.6s cubic-bezier(0.3, 0.8, 0.3, 1), top 0.6s cubic-bezier(0.3, 0.8, 0.3, 1), transform 0.15s; }
 .tour-finger[hidden] { display: none; }
 .tour-finger.press { transform: scale(0.7); background: rgba(162, 220, 93, 0.85); }
 .tour-glow { box-shadow: 0 0 0 3px var(--lime), 0 0 26px rgba(162, 220, 93, 0.7) !important; transition: box-shadow 0.4s; }
-body.touring .ai-fab { display: none; }
-body.touring .mo-sheet { max-height: 70%; }
-@media (prefers-reduced-motion: reduce) { .tour, .tour-finger { animation: none; transition: none; } }
+body.touring .ai-fab { translate: 0 calc(-1 * var(--tourh, 0px)); }
+body.touring .moment { bottom: var(--tourb, 0px); }
+@media (prefers-reduced-motion: reduce) { .te-card, .tour-panel li p, .tour-finger { animation: none; transition: none; } }
 
 /* after a scan: points, then where the data goes */
 .moment { position: absolute; inset: 0; z-index: 1300; background: rgba(12, 24, 19, 0.45); display: flex; align-items: flex-end; opacity: 0; transition: opacity 0.25s; }
