@@ -417,6 +417,28 @@
     .plog .iss { color: var(--muted); font-size: 11.5px; }
     @media (max-width: 900px) { .ptiles { grid-template-columns: repeat(2, 1fr); } }
 
+
+    /* ---------- agent 9: Student support ---------- */
+    .try { display: flex; gap: 6px; margin-top: 8px; }
+    .try input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 9px; }
+    .try-out { margin-top: 10px; background: var(--bg); border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+    .try-out .hand { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 700; color: var(--warn); }
+    .tk { border-top: 1px solid var(--line); padding: 10px 0; }
+    .tk:first-child { border-top: 0; }
+    .tk strong { display: block; font-size: 13.5px; }
+    .tk .pm { font-size: 11.5px; color: var(--muted); }
+    .tk details { font-size: 12px; color: var(--muted); margin: 4px 0; }
+    .tk details p { margin: 4px 0 0; }
+    .tk textarea, .art textarea, .art input { width: 100%; font: inherit; font-size: 13px; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 9px; background: #fff; resize: vertical; }
+    .tk .row2 { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .tk .sent { font-size: 12.5px; background: var(--soft); border-radius: 10px; padding: 8px 10px; margin-top: 6px; }
+    .arts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .art { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; align-content: start; }
+    .art strong { font-size: 14px; }
+    .art p { font-size: 12.5px; color: var(--muted); margin: 0; }
+    .art .used { font-size: 11px; color: var(--forest); font-weight: 700; }
+    @media (max-width: 900px) { .arts { grid-template-columns: 1fr; } }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -538,6 +560,7 @@
             <button role="tab" data-ltab="insights" aria-selected="false">Insights analyst</button>
             <button role="tab" data-ltab="router" aria-selected="false">Data and offers router</button>
             <button role="tab" data-ltab="privacy" aria-selected="false">Privacy guard</button>
+            <button role="tab" data-ltab="support" aria-selected="false">Student support</button>
           </div>
         </div>
         <div id="pass-slot"></div>
@@ -688,6 +711,23 @@
           <h3>Audit log</h3>
           <p class="sub">Every decision, newest first.</p>
           <div id="plog"></div>
+        </div>
+        </div>
+
+        <div data-pane="support" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">Help chat</h3>
+          <span id="h-status" class="pill gate"><i></i>Checking</span>
+        </div>
+        <p class="sub">Students open Help in the app's profile or rewards screen. Haiku 5.5 answers from the help center below and the student's own account numbers, which their phone sends with each question. When it can't help, the student can send the question to the team; your reply shows up in their help chat. No email or name is collected.</p>
+        <div class="brief-grid">
+          <div class="panel brief" id="support"></div>
+          <div class="side"><div class="panel"><h3>Support inbox</h3><p class="sub" id="inbox-sub">Questions students sent to the team.</p><div id="inbox"></div></div></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="pipe-head"><h3>Help center</h3><div class="chips" id="help-tools"></div></div>
+          <p class="sub" id="helpc-sub">The only source the help chat answers from.</p>
+          <div id="helpc"></div>
         </div>
         </div>
       </section>
@@ -908,15 +948,17 @@ Passed: 5. Fixed: 1 (removed a club member's phone number from a draft message).
 Held at Gate 3: 1 (a post described a group of students on one residence floor).
 Deleted 0 panel events older than 12 months.` },
 
-      { id: 'support', name: 'Student support', group: 'safe', model: 'haiku', auto: 'auto', runs: 2000, inTok: 4000, outTok: 400, f: [10, 100],
+      { id: 'support', name: 'Student support', group: 'safe', model: 'haiku', auto: 'auto', built: true, runs: 2000, inTok: 4000, outTok: 400, f: [10, 100],
         job: 'Answers students in the app, any time.',
         cadence: 'Instant replies, around the clock',
-        does: ['Answers questions about points, gift cards, premium and privacy', 'Fixes simple problems, like a receipt that did not scan', 'Passes anything unusual to a person', 'Tells Growth what students keep asking'],
-        tools: ['Help articles', 'Read only account view', 'Receipt rescan'],
-        gate: 'None. Hard cases go to the team.',
+        does: ['Answers questions in a Help chat inside the app', 'Uses only the help center the team edits, never made up answers', 'Reads the student\'s own points, gift cards and premium from their phone', 'Offers to send anything it can\'t answer to the team', 'Shows the team\'s reply in the student\'s help chat'],
+        tools: ['Help center', 'Account numbers from the phone', 'Support inbox'],
+        gate: 'None. Hard cases go to the team\'s Support inbox.',
         talks: ['rewards', 'growth'],
         sample: `Student: my receipt didn't give me points
-SNARE: Found it. The photo was blurry, so it didn't count. I reread it and added your 25 points. Next time, lay it flat in good light.` },
+SNARE: Receipts give 25 points once they're readable. If yours was blurry, snap it again flat in good light. You have 430 points right now.
+Student: I did, still nothing
+SNARE: I'm not sure what happened. Want to send this to the team? [Send to the team]` },
 
       { id: 'rewards', name: 'Rewards ops', group: 'safe', model: 'haiku', auto: 'gate', runs: 30, inTok: 50000, outTok: 3000, f: [10, 100],
         job: 'Keeps points, payouts and brand bonus billing in balance.',
@@ -2391,7 +2433,110 @@ Duplicate receipts blocked: 6` },
       if (pd) needPass(() => decide(pd.dataset.qid, pd.dataset.pdec));
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy()]));
+    // ---------- agent 9: Student support ----------
+    live.inbox = null; live.hstats = null; live.helpArts = null; live.helpEdit = false; live.try = null; live.tbusy = false; live.herror = '';
+    async function loadHelpArts() {
+      try { const r = await fetch(API ? API + '/agents/help' : 'agents/help.json'); live.helpArts = (await r.json()).articles || []; } catch (e) { live.helpArts = []; }
+    }
+
+    function renderSupport() {
+      const st = document.getElementById('h-status');
+      const ok = API && live.status && live.status.hasKey;
+      st.className = 'pill ' + (ok ? 'auto' : 'gate'); st.innerHTML = '<i></i>' + (!API ? 'Not connected' : !live.status ? 'Worker unreachable' : !live.status.hasKey ? 'No API key' : 'Live');
+      const sx = live.hstats;
+      const top = sx ? Object.entries(sx.articles).sort((a, b) => b[1] - a[1]).slice(0, 4) : [];
+      const title = id => ((live.helpArts || []).find(a => a.id === id) || { title: id }).title;
+      document.getElementById('support').innerHTML = `
+        ${!ok ? `<div class="preview"><div><b>Preview</b>${API ? 'The help chat answers once the worker has an API key.' : 'The help chat turns on once the worker and API key are set up. Until then, the app shows the help articles.'}</div></div>` : ''}
+        <p class="headline">${sx ? `${sx.asks} questions answered, ${sx.handoffs} offered to the team, ${sx.tickets} sent.` : 'Questions, hand offs and tickets appear here.'}</p>
+        ${top.length ? `<div class="bsec"><b>Most used articles</b><ul class="blist">${top.map(([id, n]) => `<li>${esc(title(id))} <span class="note">${n}</span></li>`).join('')}</ul></div>` : ''}
+        <div class="bsec"><b>Try a question</b><form class="try" id="try-form"><input id="try-q" placeholder="Like: how do I cash out?" maxlength="300" ${ok ? '' : 'disabled'} aria-label="Question"><button class="btn small" ${ok && !live.tbusy ? '' : 'disabled'}>${live.tbusy ? 'Asking' : 'Ask'}</button></form>
+          ${live.try ? `<div class="try-out">${esc(live.try.reply)}${live.try.handoff ? '<br><span class="hand">Would offer: Send to the team</span>' : ''}</div>` : '<p class="note">Answers as if a student with 430 points and anonymous sharing on asked.</p>'}</div>
+        ${live.herror ? `<p class="err">${esc(live.herror)}</p>` : ''}
+        <div class="srcs"><span class="src real">Haiku 5.5</span><span class="src real">${(live.helpArts || []).length} help articles</span></div>`;
+
+      const ib = document.getElementById('inbox');
+      if (!API || !live.status) { ib.innerHTML = '<p class="note" style="margin:0">Starts once the worker is connected.</p>'; }
+      else if (!live.inbox) { ib.innerHTML = '<p class="note" style="margin:0 0 8px">The inbox loads with the team passcode.</p><button class="btn small" data-loadinbox>Show inbox</button>'; }
+      else {
+        const open = live.inbox.filter(t => t.status === 'open');
+        document.getElementById('inbox-sub').textContent = `${open.length} open · ${live.inbox.length} total`;
+        ib.innerHTML = live.inbox.slice(0, 15).map(t => `<div class="tk"><strong>${esc(t.question)}</strong><span class="pm">${fmtTime(t.created)} · ${esc(t.status)}</span>
+          ${t.transcript.length ? `<details><summary>Chat before it was sent</summary>${t.transcript.map(m => `<p><b>${m.role === 'user' ? 'Student' : 'Help'}:</b> ${esc(m.content)}</p>`).join('')}</details>` : ''}
+          ${t.status === 'open' ? `<textarea id="rep-${esc(t.id)}" rows="3" placeholder="Your reply shows up in the student's help chat" aria-label="Reply"></textarea>
+            <div class="row2"><button class="btn small" data-reply="${esc(t.id)}">Send reply</button><button class="btn small outline" data-tclose="${esc(t.id)}">Close without reply</button></div>`
+            : t.reply ? `<div class="sent">${esc(t.reply)}</div>` : ''}</div>`).join('') || '<p class="note" style="margin:0">No questions yet.</p>';
+      }
+
+      const arts = live.helpArts || [];
+      const edit = live.helpEdit && canEdit();
+      document.getElementById('help-tools').innerHTML = canEdit() ? (edit ? '<button class="on" data-hsave>Save articles</button><button data-hadd>Add article</button><button data-hcancel>Cancel</button>' : '<button data-hedit>Edit articles</button>') : '';
+      document.getElementById('helpc-sub').textContent = canEdit() ? 'The only source the help chat answers from. Edit an article and save; the chat uses it on the next question.' : 'The only source the help chat answers from. Editing turns on once the worker is connected.';
+      document.getElementById('helpc').innerHTML = `<div class="arts">${arts.map((a, i) => edit
+        ? `<div class="art"><input data-hart="${i}" data-f="title" value="${esc(a.title)}" maxlength="120" aria-label="Title"><textarea data-hart="${i}" data-f="body" rows="5" maxlength="2000" aria-label="Article">${esc(a.body)}</textarea><button class="x" data-hdel="${i}" aria-label="Delete article" style="justify-self:end">&times;</button></div>`
+        : `<div class="art"><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p>${sx && sx.articles[a.id] ? `<span class="used">Used ${sx.articles[a.id]} times</span>` : ''}</div>`).join('')}</div>`;
+    }
+
+    async function loadInbox() {
+      try { const d = await call('/agents/support/inbox'); live.inbox = d.tickets; live.hstats = d.stats; live.herror = ''; }
+      catch (e) { if (e.message !== 'PASS') live.herror = e.message; }
+      renderSupport();
+    }
+
+    async function updateTicket(id, status, reply) {
+      try { live.inbox = (await call('/agents/support/inbox', { method: 'PUT', body: JSON.stringify({ id, status, reply }) })).tickets; live.herror = ''; }
+      catch (e) { if (e.message !== 'PASS') live.herror = e.message; }
+      renderSupport();
+    }
+
+    async function saveHelp() {
+      try { live.helpArts = (await call('/agents/help', { method: 'PUT', body: JSON.stringify({ articles: live.helpArts }) })).articles; live.helpEdit = false; live.herror = ''; }
+      catch (e) { if (e.message !== 'PASS') live.herror = e.message; }
+      renderSupport();
+    }
+
+    async function tryQuestion(q) {
+      live.tbusy = true; renderSupport();
+      try {
+        const r = await fetch(API + '/agents/support/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content: q }], account: { points: 430, cards: 0, premium: 'Free trial until Dec 31', share: true, budget: 50, house: false } }) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Help is busy');
+        live.try = d; live.herror = '';
+      } catch (e) { live.herror = e.message; }
+      live.tbusy = false; renderSupport();
+    }
+
+    async function loadSupport() {
+      await loadHelpArts();
+      renderSupport();
+      if (API && live.status && teamKey) await loadInbox();
+    }
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('[data-loadinbox]')) needPass(loadInbox);
+      const rp = e.target.closest('[data-reply]');
+      if (rp) { const t = document.getElementById('rep-' + rp.dataset.reply); const v = t ? t.value.trim() : ''; if (!v) { live.herror = 'Write a reply first.'; renderSupport(); } else needPass(() => updateTicket(rp.dataset.reply, 'answered', v)); }
+      const tc = e.target.closest('[data-tclose]');
+      if (tc) needPass(() => updateTicket(tc.dataset.tclose, 'closed'));
+      if (e.target.closest('[data-hedit]')) { live.helpEdit = true; renderSupport(); }
+      if (e.target.closest('[data-hcancel]')) { live.helpEdit = false; loadHelpArts().then(renderSupport); }
+      if (e.target.closest('[data-hadd]')) { live.helpArts.push({ id: 'h' + Date.now().toString(36), title: 'New article', body: 'Write the answer here.' }); renderSupport(); }
+      const hd = e.target.closest('[data-hdel]');
+      if (hd) { live.helpArts.splice(Number(hd.dataset.hdel), 1); renderSupport(); }
+      if (e.target.closest('[data-hsave]')) needPass(saveHelp);
+    });
+    document.addEventListener('input', e => {
+      const f = e.target.closest('[data-hart]');
+      if (f) live.helpArts[Number(f.dataset.hart)][f.dataset.f] = f.value;
+    });
+    document.addEventListener('submit', e => {
+      if (e.target.id !== 'try-form') return;
+      e.preventDefault();
+      const q = document.getElementById('try-q').value.trim();
+      if (q) tryQuestion(q);
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy(), loadSupport()]));
     render();
   })();
   </script>

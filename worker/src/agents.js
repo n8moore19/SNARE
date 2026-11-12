@@ -1432,6 +1432,119 @@ export async function runPrivacy(env) {
   });
 }
 
+// ---------- agent 9: Student support ----------
+// A help chat inside the app. Haiku 5.5 answers only from the help center
+// (editable on the org page, starting from agents/help.json) and the account
+// snapshot the student's own phone sends (points, cards, premium). When it
+// can't help, the student can send the question to the team; the reply shows
+// up in their help chat. No email or name is collected.
+
+const SUPPORT_SCHEMA = {
+  type: "object",
+  properties: {
+    reply: { type: "string" },
+    articleIds: { type: "array", items: { type: "string" } },
+    handoff: { type: "boolean" },
+  },
+  required: ["reply", "articleIds", "handoff"],
+  additionalProperties: false,
+};
+
+const SUPPORT_SYSTEM = `You are SNARE's student support assistant, inside SNARE's help chat. SNARE is a free digital fridge app for students in London, Ontario, run by a student team at the Ivey Business School. It is a pilot.
+Answer only from the help articles and the student's account details you are given. If they don't cover the question, say you're not sure and set handoff to true so the student can send it to the team. Also set handoff to true for bugs, missing points or gift cards, anything about money, complaints, and anything personal or upsetting.
+Rules:
+- Short, warm and plain: 1 to 4 sentences. Use the student's account numbers when they help.
+- Never invent features, policies, prices, dates or promises. Never say a problem is fixed.
+- Food safety: expiry dates are estimates; when in doubt, throw it out. Never say food is safe to eat.
+- Don't ask for an email, phone number, name or address.
+- articleIds: the ids of the articles you used.
+- No em dashes or hyphens used as dashes. Plain text only.`;
+
+async function getHelp(env) {
+  const saved = env.AGENTS ? await env.AGENTS.get("help", "json") : null;
+  if (saved) return saved;
+  try {
+    const r = await fetch(`${SITE_URL}/agents/help.json`);
+    return r.ok ? (await r.json()).articles : [];
+  } catch {
+    return [];
+  }
+}
+
+function validHelp(list) {
+  if (!Array.isArray(list) || list.length > 60) return null;
+  const clean = [];
+  for (const a of list) {
+    if (!a || typeof a.title !== "string" || !a.title.trim() || typeof a.body !== "string" || !a.body.trim()) return null;
+    clean.push({ id: String(a.id || "h" + Date.now().toString(36)).replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "h" + Date.now().toString(36), title: a.title.trim().slice(0, 120), body: a.body.trim().slice(0, 2000) });
+  }
+  return clean;
+}
+
+const validSid = (v) => /^[a-z0-9]{12,40}$/.test(String(v || ""));
+
+async function bumpSupport(env, fields) {
+  if (!env.AGENTS) return;
+  const st = (await env.AGENTS.get("support:stats", "json")) || { asks: 0, handoffs: 0, tickets: 0, articles: {}, since: new Date().toISOString() };
+  st.asks += fields.asks || 0; st.handoffs += fields.handoffs || 0; st.tickets += fields.tickets || 0;
+  for (const id of fields.articles || []) st.articles[id] = (st.articles[id] || 0) + 1;
+  await env.AGENTS.put("support:stats", JSON.stringify(st));
+}
+
+async function supportAsk(request, env, cors) {
+  if (!env.ANTHROPIC_API_KEY) return json({ error: "Help chat is offline" }, 503, cors);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+  const msgs = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+  if (!msgs.length || !msgs.every((m) => ["user", "assistant"].includes(m.role) && typeof m.content === "string" && m.content.length > 0 && m.content.length <= 1000) || msgs[0].role !== "user" || msgs[msgs.length - 1].role !== "user") return json({ error: "Invalid request" }, 400, cors);
+  const a = body.account || {};
+  const account = {
+    points: Number(a.points) || 0, unusedGiftCards: Number(a.cards) || 0, premium: String(a.premium || "").slice(0, 80),
+    anonymousSharing: !!a.share, weeklyBudget: Number(a.budget) || 0, sharedHouseFridge: !!a.house,
+  };
+  const help = await getHelp(env);
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  try {
+    const r = await client.messages.create({
+      model: env.SUPPORT_MODEL || "claude-haiku-5-5",
+      max_tokens: 4000,
+      output_config: { effort: "low", format: { type: "json_schema", schema: SUPPORT_SCHEMA } },
+      system: [
+        { type: "text", text: SUPPORT_SYSTEM },
+        { type: "text", text: `Help articles (JSON):\n${JSON.stringify(help)}`, cache_control: { type: "ephemeral" } },
+        { type: "text", text: `This student's account (from their phone):\n${JSON.stringify(account)}` },
+      ],
+      messages: msgs,
+    });
+    if (r.stop_reason === "refusal") return json({ reply: "I can't help with that one here. You can send it to the team instead.", articleIds: [], handoff: true }, 200, cors);
+    const out = JSON.parse(textOf(r));
+    out.articleIds = out.articleIds.filter((id) => help.some((h) => h.id === id));
+    await bumpSupport(env, { asks: 1, handoffs: out.handoff ? 1 : 0, articles: out.articleIds });
+    return json(out, 200, cors);
+  } catch (error) {
+    return agentError(error, cors);
+  }
+}
+
+async function getTickets(env) { return (env.AGENTS ? await env.AGENTS.get("tickets", "json") : null) || []; }
+
+async function supportTicket(request, env, cors) {
+  if (!env.AGENTS) return json({ error: "Support inbox is not set up" }, 503, cors);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+  if (!validSid(body.sid) || typeof body.question !== "string" || !body.question.trim()) return json({ error: "Invalid ticket" }, 400, cors);
+  // Strip any email or phone number a student typed; replies come back in the app.
+  const clean = (t) => hardRules({ fields: { t: String(t).slice(0, 1000) } }).fields.t;
+  const transcript = (Array.isArray(body.transcript) ? body.transcript.slice(-6) : []).filter((m) => m && typeof m.content === "string").map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: clean(m.content) }));
+  const tickets = await getTickets(env);
+  if (tickets.filter((t) => t.sid === body.sid && t.status === "open").length >= 5) return json({ error: "You already have 5 open questions. The team will reply soon." }, 429, cors);
+  const t = { id: crypto.randomUUID(), sid: body.sid, question: clean(body.question), transcript, status: "open", reply: "", created: new Date().toISOString() };
+  tickets.push(t);
+  await env.AGENTS.put("tickets", JSON.stringify(tickets.slice(-500)));
+  await bumpSupport(env, { tickets: 1 });
+  return json({ ticket: { id: t.id, question: t.question, status: t.status, created: t.created } }, 200, cors);
+}
+
 async function getPostStatus(env) {
   return (env.AGENTS ? await env.AGENTS.get("postStatus", "json") : null) || {};
 }
@@ -1479,6 +1592,22 @@ export async function handleAgents(request, env, cors) {
   if (request.method === "POST" && path === "/agents/offers/event") {
     if (tooManyRuns("offer:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 120)) return json({ error: "Too many events" }, 429, cors);
     return recordOfferEvent(request, env, cors);
+  }
+  // Public: the app's help chat.
+  if (request.method === "GET" && path === "/agents/help") return json({ articles: await getHelp(env) }, 200, cors);
+  if (request.method === "POST" && path === "/agents/support/ask") {
+    if (tooManyRuns("support:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 30)) return json({ error: "Too many questions this hour. Try again later." }, 429, cors);
+    return supportAsk(request, env, cors);
+  }
+  if (request.method === "POST" && path === "/agents/support/ticket") {
+    if (tooManyRuns("ticket:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 10)) return json({ error: "Too many tickets" }, 429, cors);
+    return supportTicket(request, env, cors);
+  }
+  // A student's own tickets, by the random id only their phone knows.
+  if (request.method === "GET" && path === "/agents/support/mine") {
+    const sid = new URL(request.url).searchParams.get("sid");
+    if (!validSid(sid)) return json({ error: "Invalid id" }, 400, cors);
+    return json({ tickets: (await getTickets(env)).filter((t) => t.sid === sid).map(({ id, question, status, reply, created, answeredAt }) => ({ id, question, status, reply, created, answeredAt })) }, 200, cors);
   }
   // Public with a secret token: a buyer's private report page.
   if (request.method === "GET" && path === "/agents/buyer") {
@@ -1598,6 +1727,30 @@ export async function handleAgents(request, env, cors) {
     return json({ offers }, 200, cors);
   }
 
+  if (request.method === "GET" && path === "/agents/support/inbox") {
+    const [tickets, stats] = await Promise.all([getTickets(env), env.AGENTS ? env.AGENTS.get("support:stats", "json") : null]);
+    return json({ tickets: tickets.slice().reverse().map(({ sid, ...t }) => t), stats }, 200, cors);
+  }
+  if (request.method === "PUT" && path === "/agents/support/inbox") {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+    const tickets = await getTickets(env);
+    const t = tickets.find((x) => x.id === body.id);
+    if (!t || !["answered", "closed", "open"].includes(body.status)) return json({ error: "Invalid update" }, 400, cors);
+    if (typeof body.reply === "string") t.reply = body.reply.slice(0, 2000);
+    t.status = body.status;
+    if (body.status === "answered") t.answeredAt = new Date().toISOString();
+    await env.AGENTS.put("tickets", JSON.stringify(tickets));
+    return json({ tickets: tickets.slice().reverse().map(({ sid, ...x }) => x) }, 200, cors);
+  }
+  if (request.method === "PUT" && path === "/agents/help") {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+    const help = validHelp(body.articles);
+    if (!help || !env.AGENTS) return json({ error: "Invalid help articles" }, 400, cors);
+    await env.AGENTS.put("help", JSON.stringify(help));
+    return json({ articles: help }, 200, cors);
+  }
   if (request.method === "GET" && path === "/agents/privacy") {
     const [log, queue, retention, latest] = await Promise.all(["privacy:log", "privacy:queue", "privacy:retention", "latest:privacy"].map((k) => (env.AGENTS ? env.AGENTS.get(k, "json") : null)));
     return json({ log: (log || []).slice(-100).reverse(), queue: (queue || []).filter((x) => x.status === "held"), retention, latest }, 200, cors);

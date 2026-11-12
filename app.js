@@ -1903,6 +1903,7 @@
           <li><div><strong>Brand bonuses</strong><span>Paid for by brands</span></div><b>+50 to 200</b></li>
         </ul>
         <p class="footnote">About 270 points ($2.70) a month before bonuses. No points for throwing food out, so nobody is paid to fake waste.</p>
+        <button class="help-link" data-action="help">${ICONS.user}Questions about points or gift cards? Get help</button>
 
         <h2 class="section-title">Recent points</h2>
         ${recent.length
@@ -1933,6 +1934,7 @@
         <div class="card"><h2>Food needs</h2>${chipsHtml('diet', DIETS, v => P().diet.includes(v))}</div>
         <div class="card"><h2>Weekly food budget</h2>${chipsHtml('budget', BUDGETS.map(b => [b, '$' + b]), v => P().budget === Number(v))}</div>
         <div class="card"><h2>Home and travel</h2>${areaSelect('area')}<div style="margin-top:10px">${modeSeg()}</div></div>
+        <button class="help-link" data-action="help">${ICONS.user}Help and questions</button>
         <div class="card memory">
           <h2>${ICONS.spark} What SNARE remembers</h2>
           <p class="card-note">Learned from your chats and ratings. Tap × to forget something.</p>
@@ -2676,6 +2678,125 @@
     return done;
   }
 
+  // ---------- help chat (agent 9: Student support) ----------
+  // Separate from the cooking assistant. Answers come from the help center and
+  // this phone's own account numbers; anything it can't answer can be sent to
+  // the team, whose reply shows up here. No email or name is collected.
+  const helpBox = document.getElementById('help');
+  const HELP_CHIPS = ['How do points work?', 'Where is my gift card?', 'How is my data used?', 'When does premium cost money?'];
+  const help = { open: false, msgs: [], busy: false, articles: null, openArticle: null };
+  const helpUrl = () => (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
+  function supportId() {
+    try {
+      let id = localStorage.getItem('snare.sid');
+      if (!id) { id = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 20); localStorage.setItem('snare.sid', id); }
+      return id;
+    } catch (e) { return null; }
+  }
+  const helpAccount = () => ({ points: balance(), cards: openCards().length, premium: `Free trial until ${TRIAL_END}`, share: P().share, budget: P().budget, house: P().house });
+
+  async function loadHelpArticles() {
+    if (help.articles) return;
+    try {
+      const r = await fetch(helpUrl() ? helpUrl() + '/agents/help' : 'agents/help.json');
+      help.articles = (await r.json()).articles || [];
+    } catch (e) { help.articles = []; }
+  }
+
+  // Team replies to this phone's tickets, shown once each.
+  async function loadReplies() {
+    const sid = supportId();
+    if (!helpUrl() || !sid) return;
+    try {
+      const r = await fetch(`${helpUrl()}/agents/support/mine?sid=${sid}`);
+      const list = (await r.json()).tickets || [];
+      let seen = [];
+      try { seen = JSON.parse(localStorage.getItem('snare.seenReplies') || '[]'); } catch (e) { /* ignore */ }
+      for (const t of list.filter(x => x.reply && !seen.includes(x.id))) {
+        help.msgs.push({ from: 'team', text: t.reply, q: t.question });
+        seen.push(t.id);
+      }
+      try { localStorage.setItem('snare.seenReplies', JSON.stringify(seen.slice(-100))); } catch (e) { /* ignore */ }
+    } catch (e) { /* offline */ }
+  }
+
+  function renderHelp() {
+    helpBox.hidden = !help.open;
+    if (!help.open) return;
+    const live = !!helpUrl();
+    const arts = help.articles || [];
+    helpBox.innerHTML = `
+      <div class="ai-head"><span>${ICONS.user}<strong>SNARE Help</strong><small>${live ? 'Questions about points, gift cards, premium or privacy' : 'Help articles'}</small></span><button class="icon-btn" data-help="close" aria-label="Close">${ICONS.cross}</button></div>
+      <div class="ai-msgs" id="help-msgs">
+        ${live ? help.msgs.map((m, i) => m.from === 'team'
+          ? `<div class="msg team"><b>Team SNARE replied</b>${m.q ? `<span class="q">To: "${esc(m.q)}"</span>` : ''}<p>${esc(m.text)}</p></div>`
+          : `<div class="msg ${m.from === 'you' ? 'you' : 'ai'}">${esc(m.text)}${m.handoff && !m.sent ? `<div class="msg-actions"><button class="btn small" data-help="ticket" data-i="${i}">Send to the team</button></div>` : ''}${m.sent ? '<div class="ai-done">Sent. The team\'s reply will show up here.</div>' : ''}</div>`).join('')
+          : `<div class="msg ai">Live help chat turns on once SNARE's server is connected. Here are the help articles.</div>`}
+        ${help.busy ? '<div class="msg ai typing"><span></span><span></span><span></span></div>' : ''}
+        ${!live || !help.msgs.length ? `<div class="help-arts">${arts.map(a => `<button class="help-art ${help.openArticle === a.id ? 'open' : ''}" data-help="art" data-id="${esc(a.id)}"><strong>${esc(a.title)}</strong>${help.openArticle === a.id ? `<span>${esc(a.body)}</span>` : ''}</button>`).join('')}</div>` : ''}
+      </div>
+      ${live ? `<div class="ai-chips">${HELP_CHIPS.map(c => `<button class="chip" data-help="ask" data-q="${esc(c)}">${c}</button>`).join('')}</div>
+      <form class="ai-input" data-help="form"><input id="help-text" placeholder="Ask a question" autocomplete="off" maxlength="1000"><button class="btn small" aria-label="Send">${ICONS.send}</button></form>
+      <p class="ai-note">Answers come from SNARE's help articles. Please don't share your email, phone or address here.</p>` : ''}`;
+    const m = document.getElementById('help-msgs');
+    m.scrollTop = m.scrollHeight;
+  }
+
+  async function openHelp() {
+    help.open = true; state.aiOpen = false; renderAI();
+    renderHelp();
+    await Promise.all([loadHelpArticles(), loadReplies()]);
+    if (helpUrl() && !help.msgs.length) help.msgs.push({ from: 'ai', text: `Hi! Ask me about points, gift cards, premium, receipts or privacy. You have ${balance()} points right now.` });
+    renderHelp();
+    setTimeout(() => { const i = document.getElementById('help-text'); if (i) i.focus(); }, 50);
+  }
+
+  async function askHelp(text) {
+    text = String(text || '').trim();
+    if (!text || help.busy) return;
+    help.msgs.push({ from: 'you', text });
+    help.busy = true; renderHelp();
+    const messages = help.msgs.filter(m => m.from !== 'team').map(m => ({ role: m.from === 'you' ? 'user' : 'assistant', content: m.text })).slice(-12);
+    while (messages.length && messages[0].role !== 'user') messages.shift();
+    try {
+      const r = await fetch(helpUrl() + '/agents/support/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, account: helpAccount() }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Help is busy');
+      help.msgs.push({ from: 'ai', text: d.reply, handoff: d.handoff, question: text });
+    } catch (e) {
+      // Students never see server errors; they get a way to reach the team.
+      help.msgs.push({ from: 'ai', text: /too many/i.test(e.message) ? 'You have asked a lot this hour. Try again a bit later, or send this to the team.' : "Help is having trouble answering right now. You can send your question to the team instead.", handoff: true, question: text });
+    }
+    help.busy = false; renderHelp();
+  }
+
+  async function sendTicket(i) {
+    const m = help.msgs[i];
+    if (!m || m.sent) return;
+    const transcript = help.msgs.slice(0, i + 1).filter(x => x.from !== 'team').map(x => ({ role: x.from === 'you' ? 'user' : 'assistant', content: x.text }));
+    try {
+      const r = await fetch(helpUrl() + '/agents/support/ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sid: supportId(), question: m.question, transcript }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Could not send');
+      m.sent = true;
+    } catch (e) { toast(e.message); }
+    renderHelp();
+  }
+
+  helpBox.addEventListener('click', e => {
+    const b = e.target.closest('[data-help]');
+    if (!b) return;
+    if (b.dataset.help === 'close') { help.open = false; renderHelp(); }
+    if (b.dataset.help === 'ask') askHelp(b.dataset.q);
+    if (b.dataset.help === 'ticket') sendTicket(Number(b.dataset.i));
+    if (b.dataset.help === 'art') { help.openArticle = help.openArticle === b.dataset.id ? null : b.dataset.id; renderHelp(); }
+  });
+  helpBox.addEventListener('submit', e => {
+    e.preventDefault();
+    const i = document.getElementById('help-text');
+    askHelp(i.value);
+  });
+
   // ---------- maps ----------
 
   const HOME_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>';
@@ -2906,6 +3027,7 @@
       case 'cashout': state.cashPick = true; rerender(); break;
       case 'cashpick': { const c = cashOut(id); state.cashPick = false; if (c) toast(`$5 ${giftCards[id].name} ready. Code ${c.code}`); rerender(); break; }
       case 'offeradd': if (!state.items.some(it => it.id === id)) { state.items.push({ id, qty: 1, why: 'Bonus offer' }); toast(`${products[id].name} added to your list`); } rerender(); break;
+      case 'help': openHelp(); break;
       case 'samplepts': samplePoints(); persist(); updatePointsPill(true); rerender(); break;
       case 'demoitem': startItemScan(null); break;
       case 'typeitems': state.scan = { mode: 'type', found: [] }; state.query = ''; go('review'); break;
@@ -3069,7 +3191,7 @@
     if (f && state.screen === 'fridge') rerender();
   });
 
-  aiFab.addEventListener('click', openAI);
+  aiFab.addEventListener('click', () => { help.open = false; renderHelp(); openAI(); });
   aiBox.addEventListener('click', e => {
     const a = e.target.closest('[data-ai]');
     if (a && a.dataset.ai === 'close') { state.aiOpen = false; renderAI(); return; }

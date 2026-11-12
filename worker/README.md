@@ -98,6 +98,12 @@ The same worker runs the launch agents shown on `org.html`.
   couldn't review) is held at Gate 3 on the org page, where a person approves or rejects it.
   Every decision goes to an audit log. Panel events older than 12 months are deleted daily.
   A few cents a week.
+- **Student support** (built): a Help chat in the app (profile and rewards screens), separate
+  from the cooking assistant. Haiku 5.5 answers only from the help center (starts from
+  `agents/help.json`, editable on the org page) and the account numbers the student's phone
+  sends with each question. When it can't help, the student can send the question to the
+  team; emails and phone numbers are stripped, and the reply shows up in their help chat by
+  a random id only their phone knows. About $1 a month at launch.
 - **Schedule**: two cron triggers. 12:00 UTC runs the weekday's agent (Mon market, Tue
   acquisition, Wed content, Thu sales, Fri insights, Sat router); 13:00 UTC collects insights,
   deletes panel events older than 12 months, delivers new reports to buyers, then the
@@ -106,7 +112,7 @@ The same worker runs the launch agents shown on `org.html`.
   site only). Each email is one KV key with campus, source and date in its metadata. Students
   can remove their email on the same page. The org page only shows counts.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`, `GET /agents/offers`, `POST /agents/offers/event`, `GET /agents/buyer`, and with the passcode `GET /agents/buyers`, `PUT /agents/buyers`, `GET /agents/offers/all`, `PUT /agents/offers`, `GET /agents/router`, `POST /agents/router/run`, `GET /agents/privacy`, `PUT /agents/privacy`, `POST /agents/privacy/run`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`, `GET /agents/offers`, `POST /agents/offers/event`, `GET /agents/buyer`, and with the passcode `GET /agents/buyers`, `PUT /agents/buyers`, `GET /agents/offers/all`, `PUT /agents/offers`, `GET /agents/router`, `POST /agents/router/run`, `GET /agents/privacy`, `PUT /agents/privacy`, `POST /agents/privacy/run`, `GET /agents/help`, `POST /agents/support/ask`, `POST /agents/support/ticket`, `GET /agents/support/mine`, and with the passcode `GET /agents/support/inbox`, `PUT /agents/support/inbox`, `PUT /agents/help`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)

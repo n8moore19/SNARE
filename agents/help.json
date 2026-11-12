@@ -1,0 +1,54 @@
+{
+ "articles": [
+  {
+   "id": "points",
+   "title": "How points work",
+   "body": "100 points = $1. You earn 25 points for each grocery receipt you snap, 20 for the weekly check in, 5 for each item you use before it expires, and 10 for cooking and rating a SNARE recipe. Brand bonuses add 50 to 200 points when a receipt includes a sponsored product. There are no points for throwing food out. A typical student earns about 270 points a month before bonuses."
+  },
+  {
+   "id": "giftcards",
+   "title": "Cashing out gift cards",
+   "body": "At 500 points you can cash out a $5 grocery gift card in the Rewards tab. Pick a Loblaw gift card (works at No Frills and Loblaws), a Walmart gift card, or a prepaid Visa. The code appears in the app right away; show it at the till. Cards come from a gift card partner, so SNARE never holds your money. Unused cards count toward your budget when you plan a trip. In this prototype, codes are demo codes."
+  },
+  {
+   "id": "premium",
+   "title": "Premium and the free trial",
+   "body": "Premium is free until December 31 for the fall semester. After that it is $20 a year, or you can renew it with 2,000 points. Premium adds unlimited AI chat, a weekly meal planner, nutrition tracking and price alerts. Your fridge, receipts, reminders, recipes and rewards stay free forever. Points go to either a gift card or premium, your choice."
+  },
+  {
+   "id": "receipts",
+   "title": "Snapping receipts",
+   "body": "Tap Scan, then Snap your receipt. Lay the receipt flat in good light so every line is readable. SNARE reads the items, adds food to your fridge with today's date, and gives you 25 points. Untick anything that isn't food for the fridge before you add it. Receipts from any store work. If a receipt didn't give points, it was probably too blurry to read: snap it again."
+  },
+  {
+   "id": "checkin",
+   "title": "The weekly check in",
+   "body": "Once a week SNARE asks what happened to the food that was close to expiring: used it, tossed it, or still have it. It takes about 30 seconds and earns 20 points, plus 5 for each item you used in time. If you tossed something, you can say why. Points are for checking in, not for your answers, so answer honestly."
+  },
+  {
+   "id": "privacy",
+   "title": "Your privacy and anonymous sharing",
+   "body": "SNARE asks two separate questions: track my food (needed for the app) and share anonymously to cut food waste (optional). If you share, what you use and toss is added to totals across many students under a random id that is never linked to your name or email. Buyers only ever see totals covering at least 50 students. Location is off and fridge photos are deleted after scanning. Turn sharing off any time in your profile and everything you shared is deleted. Anonymous panel data is deleted after 12 months."
+  },
+  {
+   "id": "offers",
+   "title": "Sponsored offers and brand bonuses",
+   "body": "Brands pay for bonus offers in the Rewards tab, which is how SNARE funds your points. Every offer is labelled Sponsored and never changes your meal ideas or your cheapest trip. Offers are matched on your own phone, for example to students who often throw out spinach, so nothing about you is sent to the brand. Brands only see anonymous counts. Brand bonuses need anonymous sharing turned on."
+  },
+  {
+   "id": "expiry",
+   "title": "Expiry estimates",
+   "body": "Each item shows a range of days it should last, based on typical fridge storage (USDA FoodKeeper and Health Canada). Dates read from a label or a receipt are exact. Mark an item opened or frozen to update it. SNARE learns from your answers, so estimates get closer over time. Estimates are a guide only: when in doubt, throw it out."
+  },
+  {
+   "id": "house",
+   "title": "Sharing a fridge with roommates",
+   "body": "Turn on Shared house fridge in your fridge or profile to see everyone's food in one place. Your roommates' items are labelled with their name, and meal ideas that use their food remind you to ask first. One person can snap receipts and check in for the whole house."
+  },
+  {
+   "id": "delete",
+   "title": "Deleting your data",
+   "body": "In this prototype everything stays in your own browser. Clear my data and start over in your profile removes it. If you turned on anonymous sharing, turning it off deletes what you shared. Waitlist emails can be removed on the join page with Remove my email."
+  }
+ ]
+}

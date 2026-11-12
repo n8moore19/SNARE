@@ -19,6 +19,7 @@ SALES_MODEL = "claude-opus-5-5"      # B2B sales (judgement on fit and tone matt
 INSIGHTS_MODEL = "claude-opus-5-5"   # Insights analyst (runs as a half price batch)
 ROUTER_MODEL = "claude-sonnet-5-5"   # Data and offers router (offer ideas; deliveries need no model)
 PRIVACY_MODEL = "claude-sonnet-5-5"  # Privacy guard (reviews posts, outreach, offers and deliveries)
+SUPPORT_MODEL = "claude-haiku-5-5"   # Student support help chat (fast and very cheap)
 
 # Storage for the agents: team tasks and each agent's latest output.
 # Create it once with: npx wrangler kv namespace create AGENTS
