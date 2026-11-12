@@ -292,10 +292,35 @@ function plainError(e) {
 }
 
 // Wraps a run so the org page can see it start, work and finish.
+// ---------- estimated spend ----------
+// Claude reports tokens on every call; the worker adds up an estimated cost
+// per month (list prices, cache discounts not counted) for the hub scoreboard.
+const PRICES = { opus: [4, 20], sonnet: [2, 10], haiku: [0.1, 0.5] };
+const tierOf = (model) => (String(model).includes("haiku") ? "haiku" : String(model).includes("sonnet") ? "sonnet" : "opus");
+const AGENT_MODEL_VAR = { chief: "AGENT_MODEL", market: "MARKET_MODEL", growth: "GROWTH_MODEL", content: "CONTENT_MODEL", sales: "SALES_MODEL", insights: "INSIGHTS_MODEL", router: "ROUTER_MODEL", privacy: "PRIVACY_MODEL", rewards: "REWARDS_MODEL" };
+const DEFAULT_MODEL = { chief: "claude-opus-5-5", market: "claude-sonnet-5-5", growth: "claude-sonnet-5-5", content: "claude-sonnet-5-5", sales: "claude-opus-5-5", insights: "claude-opus-5-5", router: "claude-sonnet-5-5", privacy: "claude-sonnet-5-5", rewards: "claude-haiku-5-5" };
+export const modelFor = (env, id) => env[AGENT_MODEL_VAR[id]] || DEFAULT_MODEL[id] || "claude-opus-5-5";
+
+export async function addSpend(env, model, inTok = 0, outTok = 0, extraUsd = 0, factor = 1) {
+  if (!env.AGENTS || (!inTok && !outTok && !extraUsd)) return;
+  try {
+    const [pin, pout] = PRICES[tierOf(model)];
+    const usd = ((inTok * pin + outTok * pout) / 1e6) * factor + extraUsd;
+    const key = `spend:${new Date().toISOString().slice(0, 7)}`;
+    const cur = (await env.AGENTS.get(key, "json")) || { usd: 0, calls: 0 };
+    cur.usd = Math.round((cur.usd + usd) * 10000) / 10000;
+    cur.calls += 1;
+    await env.AGENTS.put(key, JSON.stringify(cur));
+  } catch (e) {
+    console.error("Spend log failed:", e.message);
+  }
+}
+
 export async function tracked(env, id, fn) {
   await activity(env, { agent: id, type: "start", from: READS[id] || [], text: "Started" }, [id, true]);
   try {
     const rec = await fn(env);
+    if (rec && rec.usage) await addSpend(env, modelFor(env, id), rec.usage.input, rec.usage.output, ((rec.sources && rec.sources.searches) || 0) * 0.01);
     await activity(env, { agent: id, type: "done", to: rec && rec.pending ? [] : SENDS[id] || [], text: runSummary(id, rec).slice(0, 200) }, [id, false]);
     return rec;
   } catch (error) {
@@ -1096,6 +1121,7 @@ export async function collectInsights(env) {
     else reports[r.custom_id.replace(/^report-/, "")] = out;
   }
   if (brief && pending.mode !== "real") brief.contentStats = []; // never share sample numbers
+  await addSpend(env, env.INSIGHTS_MODEL || "claude-opus-5-5", inTok, outTok, 0, 0.5); // batch: half price
   await env.AGENTS.delete("insights:pending");
   if (!brief && !Object.keys(reports).length) return null;
   await activity(env, { agent: "insights", type: "done", to: SENDS.insights, text: `Batch back: weekly brief and ${Object.keys(reports).length} prospect reports (${pending.mode} panel)` });
@@ -1282,6 +1308,7 @@ export async function guard(env, items) {
         content: `Items (JSON):\n${JSON.stringify(items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, context: i.context || "", fields: hard[i.id].fields })))}`,
       });
       reviews = Object.fromEntries(f.output.reviews.map((r) => [r.id, r]));
+      await addSpend(env, env.PRIVACY_MODEL || "claude-sonnet-5-5", f.inTok, f.outTok);
       reviewed = true;
     } catch (e) {
       console.error("Privacy review failed:", e.message);
@@ -1604,6 +1631,7 @@ async function supportAsk(request, env, cors) {
     const out = JSON.parse(textOf(r));
     out.articleIds = out.articleIds.filter((id) => help.some((h) => h.id === id));
     await bumpSupport(env, { asks: 1, handoffs: out.handoff ? 1 : 0, articles: out.articleIds });
+    await addSpend(env, env.SUPPORT_MODEL || "claude-haiku-5-5", r.usage.input_tokens, r.usage.output_tokens);
     // One activity line a minute at most, so a busy help chat doesn't flood the log.
     const last = (await readActivity(env)).events.filter((e) => e.agent === "support").pop();
     if (!last || Date.now() - Date.parse(last.t) > 60e3) await activity(env, { agent: "support", type: "chat", text: out.handoff ? "Answered a student and offered to pass it to the team" : "Answered a student question" });
@@ -1869,6 +1897,7 @@ async function chiefAsk(request, env, cors) {
     });
     if (r.stop_reason === "refusal") return json({ reply: "I can't help with that one. Ask me about the organization.", actions: [] }, 200, cors);
     const out = JSON.parse(textOf(r));
+    await addSpend(env, env.AGENT_MODEL || "claude-opus-5-5", r.usage.input_tokens, r.usage.output_tokens);
     out.actions = out.actions.filter((a) => (a.type === "run" && RUN_IDS.includes(a.agent)) || (a.type === "open" && ALL_IDS.includes(a.agent)) || (a.type === "addTask" && a.task.trim() && a.task.length <= 200)).slice(0, 3);
     return json(out, 200, cors);
   } catch (error) {
@@ -1918,6 +1947,11 @@ export async function handleAgents(request, env, cors) {
     return recordEvents(request, env, cors);
   }
   if (request.method === "GET" && path === "/agents/panel") return json(await panelSnapshot(env), 200, cors);
+  if (request.method === "GET" && path === "/agents/spend") {
+    const month = new Date().toISOString().slice(0, 7);
+    const cur = (env.AGENTS ? await env.AGENTS.get(`spend:${month}`, "json") : null) || { usd: 0, calls: 0 };
+    return json({ month, usd: cur.usd, calls: cur.calls, limit: Number(env.SPEND_LIMIT) || 30 }, 200, cors);
+  }
   if (request.method === "GET" && path === "/agents/activity") {
     const a = await readActivity(env);
     const now = Date.now();

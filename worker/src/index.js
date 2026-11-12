@@ -3,6 +3,7 @@
 // of app actions. The website never sees the API key.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { addSpend } from "./agents.js";
 import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales, runInsights, collectInsights, runRouter, deliverAll, runRetention, runRewards, tracked } from "./agents.js";
 
 const ACTION_TYPES = [
@@ -133,6 +134,7 @@ export default {
       }
       const text = response.content.find((b) => b.type === "text");
       if (!text) return json({ error: "Empty reply" }, 502, cors);
+      await addSpend(env, env.MODEL || "claude-opus-5-5", response.usage.input_tokens, response.usage.output_tokens);
       return json(JSON.parse(text.text), 200, cors);
     } catch (error) {
       if (error instanceof Anthropic.AuthenticationError) return json({ error: "Server API key is missing or invalid" }, 500, cors);

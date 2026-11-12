@@ -533,6 +533,25 @@
     @media (prefers-reduced-motion: reduce) { .edge-flow { animation: none; } .nd.working .nd-ring { animation: none; } }
 
 
+    /* ---------- live scoreboard ---------- */
+    .score { margin-bottom: 26px; container-type: inline-size; }
+    .score-greet { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .score-greet #greet { font-size: 15px; font-weight: 700; color: var(--forest); }
+    .score-greet #greet-date { font-size: 12.5px; color: var(--muted); }
+    .score-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+    .tile { text-align: left; font: inherit; color: inherit; display: grid; gap: 3px; align-content: start; padding: 14px 14px 12px; border-radius: 16px; border: 1px solid #DCEBD1; background: linear-gradient(160deg, #FFFFFF 0%, #F3F9EE 100%); box-shadow: var(--shadow); min-width: 0; transition: transform 0.15s, border-color 0.15s; }
+    button.tile { cursor: pointer; }
+    button.tile:hover { transform: translateY(-2px); border-color: var(--lime); }
+    .tile .tk { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    .tile b { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .tile .ts { font-size: 12px; color: var(--muted); }
+    .tile .ts.up { color: var(--forest); font-weight: 700; }
+    .tile .ts.warn { color: var(--warn); font-weight: 700; }
+    .tbar { display: block; height: 6px; border-radius: 99px; background: #E3EEDB; overflow: hidden; margin: 3px 0 2px; }
+    .tbar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #1E8A4C, var(--lime)); transition: width 0.8s ease; }
+    .tbar i.hot { background: linear-gradient(90deg, #F0A066, var(--warn)); }
+    @container (max-width: 900px) { .score-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
     /* ---------- hub: the organization as people ---------- */
     .view[hidden] { display: none !important; }
     .hub-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -762,11 +781,22 @@
       <div id="pass-slot"></div>
 
       <div class="view" data-view="home">
+        <section class="score" id="score" aria-label="Live scoreboard">
+          <div class="score-greet"><span id="greet">Welcome, Team SNARE</span><span id="greet-date"></span></div>
+          <div class="score-tiles">
+            <button class="tile" data-agent="growth" type="button"><span class="tk">Waitlist sign ups</span><b id="sc-wl">–</b><span class="ts" id="sc-wl-sub">&nbsp;</span></button>
+            <button class="tile" data-agent="insights" type="button"><span class="tk">Students sharing data</span><b id="sc-share">–</b><span class="tbar"><i id="sc-share-bar"></i></span><span class="ts" id="sc-share-sub">Real data unlocks at 50</span></button>
+            <button class="tile" data-scroll="feed" type="button"><span class="tk">Agent runs this week</span><b id="sc-runs">–</b><span class="ts" id="sc-runs-sub">&nbsp;</span></button>
+            <button class="tile" data-loadwait type="button"><span class="tk">Waiting for you</span><b id="sc-wait">–</b><span class="ts" id="sc-wait-sub">&nbsp;</span></button>
+            <div class="tile"><span class="tk">AI spend this month</span><b id="sc-spend">–</b><span class="tbar"><i id="sc-spend-bar"></i></span><span class="ts" id="sc-spend-sub">Estimated from usage</span></div>
+          </div>
+        </section>
+
         <section class="hub">
           <div class="hub-head">
             <div>
               <span class="eyebrow">Launch organization</span>
-              <h1>Your team</h1>
+              <h1>THE DREAM TEAM</h1>
               <p class="hub-state"><span class="live-dot" id="hub-dot"></span><span id="hub-state">Connecting</span> <span class="hub-sub" id="hub-sub"></span></p>
             </div>
             <button class="btn outline small" id="mc-replay" type="button">Replay the week</button>
@@ -3033,7 +3063,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       }
       mc.events = d.events || [];
       mc.first = false;
-      paintNodes(); renderFeed();
+      paintNodes(); renderFeed(); paintRuns();
     }
 
     async function runFromMap(id) {
@@ -3135,8 +3165,65 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     }
     async function loadWaiting() {
       try { waiting = await call('/agents/waiting'); } catch (e) { /* passcode prompt or offline */ }
-      renderWaiting();
+      renderWaiting(); paintWaiting();
     }
+    // ----- live scoreboard -----
+    const scoreNum = (id, v, fmt) => {
+      const el = document.getElementById(id);
+      const start = Number(el.dataset.v || 0), end = Number(v), t0 = performance.now();
+      el.dataset.v = end;
+      const show = x => { el.textContent = fmt ? fmt(x) : Math.round(x).toLocaleString('en-CA'); };
+      if (reduceMotion || start === end) { show(end); return; }
+      (function tick(now) { const k = Math.min(1, (now - t0) / 700); show(start + (end - start) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); })(t0);
+    };
+    function greet() {
+      const h = new Date().getHours();
+      document.getElementById('greet').textContent = `Good ${h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'}, Team SNARE`;
+      document.getElementById('greet-date').textContent = new Date().toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+    }
+    function paintRuns() {
+      if (!API) return;
+      const week = Date.now() - 7 * 864e5;
+      const done = mc.events.filter(e => e.type === 'done' && Date.parse(e.t) > week);
+      scoreNum('sc-runs', done.length);
+      const last = done[done.length - 1];
+      document.getElementById('sc-runs-sub').textContent = last ? `Last: ${NAME(last.agent)}, ${ago(last.t)}` : 'None yet this week';
+    }
+    function paintWaiting() {
+      const el = document.getElementById('sc-wait'), sub = document.getElementById('sc-wait-sub');
+      if (!API) return;
+      if (!waiting) { el.textContent = '?'; sub.textContent = 'Tap to enter the passcode'; sub.className = 'ts'; return; }
+      const n = waiting.gate1.length + waiting.gate1held.length + (waiting.gate2 && waiting.gate2.over ? 1 : 0) + waiting.gate3.length + waiting.support.length;
+      scoreNum('sc-wait', n);
+      sub.textContent = n ? 'Gates and student questions' : 'All clear';
+      sub.className = 'ts ' + (n ? 'warn' : 'up');
+    }
+    async function loadScore() {
+      greet();
+      if (!API) { ['sc-wl-sub', 'sc-runs-sub', 'sc-wait-sub'].forEach(i => { document.getElementById(i).textContent = 'Connect the worker'; }); return; }
+      const get = path => fetch(API + path).then(r => r.ok ? r.json() : null).catch(() => null);
+      const [wl, panel, spend] = await Promise.all([get('/agents/waitlist'), get('/agents/panel'), get('/agents/spend')]);
+      if (wl) {
+        scoreNum('sc-wl', wl.summary.total);
+        const s2 = document.getElementById('sc-wl-sub');
+        s2.textContent = wl.summary.last7 ? `+${wl.summary.last7} this week` : 'No new sign ups this week';
+        s2.className = 'ts' + (wl.summary.last7 ? ' up' : '');
+      }
+      if (panel) {
+        scoreNum('sc-share', panel.realStudents, x => `${Math.round(x)}/${panel.k}`);
+        document.getElementById('sc-share-bar').style.width = Math.min(100, panel.realStudents / panel.k * 100) + '%';
+        document.getElementById('sc-share-sub').textContent = panel.mode === 'real' ? 'Real data is on' : `Real data unlocks at ${panel.k}`;
+      }
+      if (spend) {
+        scoreNum('sc-spend', spend.usd, x => '$' + x.toFixed(2));
+        const pct = spend.usd / spend.limit * 100;
+        const bar = document.getElementById('sc-spend-bar');
+        bar.style.width = Math.min(100, pct) + '%'; bar.classList.toggle('hot', pct > 80);
+        document.getElementById('sc-spend-sub').textContent = `of your $${spend.limit} limit · estimated`;
+      }
+      paintRuns(); paintWaiting();
+    }
+
 
     // ----- agent pages -----
     function renderAgentHead(id) {
@@ -3168,7 +3255,8 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     }
     window.addEventListener('hashchange', route);
 
-    buildTeam(); paintNodes(); renderFeed(); renderChat(); renderHubBrief(); renderWaiting(); route();
+    buildTeam(); paintNodes(); renderFeed(); renderChat(); renderHubBrief(); renderWaiting(); route(); greet();
+    setInterval(() => { if (!document.hidden && homeVisible()) loadScore(); }, 60000);
     setInterval(() => { if (Object.keys(mc.running).length || Object.keys(mc.localRun).length) paintNodes(); }, 1000);
     setInterval(pollActivity, 5000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) pollActivity(); });
@@ -3181,7 +3269,9 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       if (q) askChief(q.dataset.ccq);
       const ca = e.target.closest('[data-cca]');
       if (ca) { const [i, k] = ca.dataset.cca.split(':').map(Number); chiefAction(i, k); }
-      if (e.target.closest('[data-loadwait]')) needPass(loadWaiting);
+      if (e.target.closest('[data-loadwait]')) { if (waiting) document.getElementById('hub-waiting').scrollIntoView({ behavior: 'smooth', block: 'center' }); else needPass(loadWaiting); }
+      const sc = e.target.closest('[data-scroll]');
+      if (sc) document.getElementById(sc.dataset.scroll).scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
     document.addEventListener('submit', e => {
       if (e.target.id !== 'cc-form') return;
@@ -3192,7 +3282,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     });
 
     loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy(), loadSupport(), loadRewardsTab()])).then(() => {
-      paintNodes(); pollActivity(); renderChat(); renderHubBrief();
+      paintNodes(); pollActivity(); renderChat(); renderHubBrief(); loadScore();
       if (API && live.status && teamKey) loadWaiting(); else renderWaiting();
     });
     render();
