@@ -546,7 +546,14 @@
     .hub { container-type: inline-size; }
     .hub-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 16px; align-items: stretch; }
     @container (min-width: 1180px) { .hub-grid { grid-template-columns: minmax(0, 1fr) 360px; } .chief-chat { max-height: none; } }
-    .stage-card { background: #FFFFFF; border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); padding: 10px 10px 12px; min-width: 0; }
+    .stage-card { background: radial-gradient(120% 90% at 50% 0%, #FBFEF8 0%, #F2F9EC 55%, #E9F4E1 100%); border: 1px solid #DCEBD1; border-radius: 22px; box-shadow: var(--shadow); padding: 10px 10px 12px; min-width: 0; }
+    .link-layer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: visible; }
+    .lk-halo { fill: none; stroke: rgba(76, 190, 80, 0.55); stroke-width: 14; stroke-linecap: round; filter: url(#lk-glow); }
+    .lk-core { fill: none; stroke: url(#lk-core); stroke-width: 3.4; stroke-linecap: round; }
+    .lk-spark { fill: none; stroke: #FFFFFF; stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 3 16; opacity: 0.85; animation: lkflow 0.7s linear infinite; }
+    @keyframes lkflow { to { stroke-dashoffset: -38; } }
+    .lk-bead-glow { fill: #7BD34A; opacity: 0.85; filter: url(#lk-bead); }
+    .lk-bead { fill: url(#lk-beadfill); stroke: #FFFFFF; stroke-width: 1.5; }
     .stage-scroll { overflow-x: auto; }
     .team-stage { position: relative; min-width: 700px; aspect-ratio: 1000 / 880; }
     .col-label { position: absolute; top: 22.5%; transform: translateX(-50%); font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #9AA59E; }
@@ -772,6 +779,15 @@
                   <div class="col-label" style="left:50%">Sell data</div>
                   <div class="col-label" style="left:84%">Run safely</div>
                   <div id="members"></div>
+                  <svg class="link-layer" id="link-layer" viewBox="0 0 1000 880" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="lk-core" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1E8A4C"/><stop offset="0.5" stop-color="#5FBF3F"/><stop offset="1" stop-color="#1E8A4C"/></linearGradient>
+                      <filter id="lk-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="5"/></filter>
+                      <filter id="lk-bead" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="6"/></filter>
+                      <radialGradient id="lk-beadfill"><stop offset="0" stop-color="#FFFFFF"/><stop offset="0.45" stop-color="#E9FFC9"/><stop offset="1" stop-color="#7BD34A"/></radialGradient>
+                    </defs>
+                    <g id="link-g"></g>
+                  </svg>
                   <div id="talk-layer"></div>
                   <div class="replay-tag" id="mc-replaying" hidden>Replay · animation only, nothing is running</div>
                 </div>
@@ -2948,15 +2964,44 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
         layer.appendChild(m);
         const dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy) || 1;
         const cx = (A[0] + B[0]) / 2 - dy / len * 50, cy = (A[1] + B[1]) / 2 + dx / len * 50 - 30;
+        drawLink(A, B, cx, cy, 900 + len * 1.1);
         const frames = Array.from({ length: 16 }, (_, i) => {
           const t = i / 15, x = (1 - t) * (1 - t) * A[0] + 2 * (1 - t) * t * cx + t * t * B[0], y = (1 - t) * (1 - t) * A[1] + 2 * (1 - t) * t * cy + t * t * B[1];
           return { left: x / 10 + '%', top: y / H * 100 + '%', opacity: t < 0.08 ? 0 : t > 0.92 ? 0 : 1, transform: `scale(${0.7 + Math.sin(t * Math.PI) * 0.4})` };
         });
-        m.animate(frames, { duration: 900 + len * 1.1, easing: 'ease-in-out' }).onfinish = () => {
+        m.animate(frames, { duration: 900 + len * 1.1, easing: 'ease-in-out', delay: 220, fill: 'backwards' }).onfinish = () => {
           m.remove();
           if (li) { li.classList.add('listening'); setTimeout(() => li.classList.remove('listening'), 1300); }
         };
       }, delay);
+    }
+    // A glowing line between two people, drawn in, with a bead travelling
+    // along it to the listener; it stays lit briefly, then fades.
+    function drawLink(A, B, cx, cy, travel) {
+      const g = document.getElementById('link-g');
+      const NS = 'http://www.w3.org/2000/svg';
+      const d = `M${A[0]} ${A[1]} Q${cx} ${cy} ${B[0]} ${B[1]}`;
+      const group = document.createElementNS(NS, 'g');
+      group.innerHTML = `<path class="lk-halo" d="${d}"/><path class="lk-core" d="${d}"/><path class="lk-spark" d="${d}"/><circle class="lk-bead-glow" r="13"/><circle class="lk-bead" r="6"/>`;
+      g.appendChild(group);
+      const [halo, core, spark, glow, bead] = group.children;
+      const total = core.getTotalLength();
+      [halo, core, spark].forEach(el => {
+        el.style.strokeDasharray = el === spark ? '3 16' : `${total} ${total}`;
+        if (el !== spark) el.animate([{ strokeDashoffset: total }, { strokeDashoffset: 0 }], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+      });
+      spark.animate([{ opacity: 0 }, { opacity: 0.85 }], { duration: 420, fill: 'forwards' });
+      const t0 = performance.now() + 220;
+      (function step(now) {
+        const k = Math.max(0, Math.min(1, (now - t0) / travel));
+        const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        const pt = core.getPointAtLength(e * total);
+        [glow, bead].forEach(c => { c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y); });
+        const pulse = 1 + Math.sin(now / 90) * 0.12;
+        glow.setAttribute('r', 13 * pulse);
+        if (k < 1) requestAnimationFrame(step);
+        else group.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, delay: 900, fill: 'forwards' }).onfinish = () => group.remove();
+      })(performance.now());
     }
     function animateEvent(ev) {
       (ev.from || []).forEach((f, i) => speak(f, ev.agent, i ? '' : SAY[f], i * 220));
