@@ -195,7 +195,7 @@ window.SNARE_DATA = {
     lines: [
       { id: 'ground_beef', name: 'GRND BEEF MED', price: 4.99 },
       { id: 'tomatoes', name: 'TOMATOES ON VINE', price: 2.69 },
-      { id: 'bread', name: 'GLDN CRST WW BREAD', price: 3.29, bonus: 'crust' },
+      { id: 'bread', name: 'GLDN CRST WW BREAD', price: 3.29 },
       { id: 'black_beans', name: 'BLACK BEANS 540ML', price: 1.29 },
       { id: 'onions', name: 'YELLOW ONIONS 3LB', price: 3.19 },
       { id: 'cheddar', name: 'CHEDDAR MED 400G', price: 6.99 },
@@ -205,10 +205,13 @@ window.SNARE_DATA = {
 
   // Sponsored bonus offers, paid for by brands. Brand names are made up for
   // the prototype. Offers never change meal ranking or the cheapest trip.
+  // rule: who sees it, matched on the student's own phone (everyone, students
+  // who tossed a product at least minTimes, or bought it at least minTimes).
+  // When the live worker is connected, the team's offers replace these.
   offers: [
-    { id: 'crust', brand: 'Golden Crust', product: 'bread', pts: 100, text: 'Buy any Golden Crust bread', note: 'Tip: freeze half the loaf to keep it fresh.' },
-    { id: 'greens', brand: 'Valley Greens', product: 'spinach', pts: 75, text: 'Try the new small 142 g spinach bag', note: 'Sized for one person, so less goes in the bin.' },
-    { id: 'pantry', brand: 'Hearty Pantry', product: 'black_beans', pts: 50, text: 'Buy 2 cans of Hearty Pantry beans', note: 'Keeps for a year in the cupboard.' },
+    { id: 'crust', brand: 'Golden Crust', product: 'bread', points: 100, text: 'Buy any Golden Crust bread', note: 'Tip: freeze half the loaf to keep it fresh.', rule: { type: 'everyone' } },
+    { id: 'greens', brand: 'Valley Greens', product: 'spinach', points: 75, text: 'Try the new small 142 g spinach bag', note: 'Sized for one person, so less goes in the bin.', rule: { type: 'tossed', product: 'spinach', minTimes: 1 } },
+    { id: 'pantry', brand: 'Hearty Pantry', product: 'black_beans', points: 50, text: 'Buy 2 cans of Hearty Pantry beans', note: 'Keeps for a year in the cupboard.', rule: { type: 'bought', product: 'black_beans', minTimes: 2 } },
   ],
 
   // Gift cards a student can cash points out for. Sent by a gift card partner,

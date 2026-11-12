@@ -999,6 +999,187 @@ export async function collectInsights(env) {
   });
 }
 
+// ---------- agent 7: Data and offers router ----------
+// Deliveries: every prospect marked "won" becomes a buyer with a private link
+// (buyer.html?t=token). The first delivery waits at Gate 1 for a person; after
+// that, each new insight report for that buyer is delivered on the daily run.
+// Offers: the team manages them on the org page; the app downloads the active
+// list and matches rules on the student's own phone. Only anonymous shown and
+// redeemed counts come back, and brands only see counts of 50 or more.
+
+const OFFER_RULES = ["everyone", "tossed", "bought"];
+
+async function getBuyers(env) { return (env.AGENTS ? await env.AGENTS.get("buyers", "json") : null) || []; }
+async function getOffers(env) { return (env.AGENTS ? await env.AGENTS.get("offers", "json") : null) || []; }
+
+function newToken() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function validOffers(list) {
+  if (!Array.isArray(list) || list.length > 100) return null;
+  const clean = [];
+  for (const o of list) {
+    if (!o || typeof o.brand !== "string" || !o.brand.trim() || typeof o.product !== "string" || !/^[a-z_]{2,30}$/.test(o.product)) return null;
+    const rule = o.rule && OFFER_RULES.includes(o.rule.type) ? o.rule : { type: "everyone" };
+    const str = (v, n) => (typeof v === "string" ? v.slice(0, n) : "");
+    clean.push({
+      id: str(o.id, 40) || "o" + Date.now().toString(36),
+      brand: o.brand.trim().slice(0, 60), product: o.product, text: str(o.text, 120) || `Buy ${o.product}`, note: str(o.note, 160),
+      points: Math.max(10, Math.min(500, Math.round(Number(o.points) || 50))),
+      rule: { type: rule.type, product: /^[a-z_]{0,30}$/.test(rule.product || "") ? rule.product || "" : "", minTimes: Math.max(1, Math.min(10, Math.round(Number(rule.minTimes) || 1))) },
+      buyerId: str(o.buyerId, 40), active: o.active !== false, created: str(o.created, 30) || new Date().toISOString().slice(0, 10),
+    });
+  }
+  return clean;
+}
+
+async function ensureOfferTable(env) {
+  await env.PANEL.prepare("CREATE TABLE IF NOT EXISTS offer_events (id INTEGER PRIMARY KEY, offer TEXT NOT NULL, event TEXT NOT NULL, sid TEXT NOT NULL, t INTEGER NOT NULL, UNIQUE (offer, event, sid))").run();
+}
+
+async function recordOfferEvent(request, env, cors) {
+  if (!env.PANEL) return json({ error: "Panel storage is not set up" }, 503, cors);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+  if (!["shown", "redeemed"].includes(body.event) || !/^[a-z0-9]{12,40}$/.test(String(body.sid || "")) || !/^[a-z0-9_-]{1,40}$/i.test(String(body.offer || ""))) return json({ error: "Invalid event" }, 400, cors);
+  await ensureOfferTable(env);
+  await env.PANEL.prepare("INSERT OR IGNORE INTO offer_events (offer, event, sid, t) VALUES (?, ?, ?, ?)").bind(body.offer, body.event, body.sid, Date.now()).run();
+  return json({ ok: true }, 200, cors);
+}
+
+// Distinct students per offer. Counts under 50 are hidden from brands.
+async function offerStats(env) {
+  if (!env.PANEL) return {};
+  await ensureOfferTable(env);
+  const rows = (await env.PANEL.prepare("SELECT offer, event, COUNT(DISTINCT sid) AS n FROM offer_events GROUP BY offer, event").all()).results;
+  const stats = {};
+  for (const r of rows) {
+    stats[r.offer] = stats[r.offer] || { shown: 0, redeemed: 0 };
+    stats[r.offer][r.event] = r.n;
+  }
+  return stats;
+}
+const forBrand = (n) => (n >= K ? n : `fewer than ${K}`);
+
+// Buyers come from won prospects; new ones wait at Gate 1.
+async function syncBuyers(env) {
+  const [buyers, prospects] = await Promise.all([getBuyers(env), getProspects(env)]);
+  let changed = false;
+  for (const p of prospects.filter((x) => x.status === "won")) {
+    if (!buyers.some((b) => b.id === p.id)) {
+      buyers.push({ id: p.id, org: p.org, type: p.type, offer: p.offerText || p.offer, token: newToken(), approved: false, revoked: false, deliveries: [], created: new Date().toISOString() });
+      changed = true;
+    }
+  }
+  if (changed && env.AGENTS) await env.AGENTS.put("buyers", JSON.stringify(buyers));
+  return buyers;
+}
+
+// Placeholder for agent 8. Today it checks the rules already enforced in code.
+function privacyCheck(delivery) {
+  const checks = ["Every panel number covers at least 50 students (enforced by the Insights analyst)", "No names, emails or locations in the report"];
+  if (delivery.mode !== "real") checks.push("Marked as a sample report");
+  return { ok: true, checks };
+}
+
+async function deliverOne(env, buyer, insights, stats, offers) {
+  const report = insights && insights.output.reports ? insights.output.reports[buyer.id] : null;
+  if (!report) return null;
+  const last = buyer.deliveries[buyer.deliveries.length - 1];
+  if (last && last.reportAt === insights.generatedAt) return null;
+  const panel = insights.output.panel || {};
+  const delivery = {
+    org: buyer.org, mode: insights.output.mode, report, reportAt: insights.generatedAt, deliveredAt: new Date().toISOString(),
+    panel: { students: panel.students, period: panel.period, products: (panel.products || []).filter((x) => report.chartProducts.some((n) => n.toLowerCase() === x.product.toLowerCase())) },
+    offers: offers.filter((o) => o.buyerId === buyer.id).map((o) => ({ text: o.text, points: o.points, shown: forBrand((stats[o.id] || {}).shown || 0), redeemed: forBrand((stats[o.id] || {}).redeemed || 0) })),
+  };
+  delivery.privacy = privacyCheck(delivery);
+  if (!delivery.privacy.ok) return null;
+  await env.AGENTS.put(`delivery:${buyer.token}`, JSON.stringify(delivery));
+  buyer.deliveries.push({ reportAt: insights.generatedAt, deliveredAt: delivery.deliveredAt, title: report.title, mode: delivery.mode });
+  return delivery;
+}
+
+// Daily: deliver any new report to approved buyers. No model call, so it's free.
+export async function deliverAll(env) {
+  if (!env.AGENTS) return { delivered: 0 };
+  const buyers = await syncBuyers(env);
+  const [insights, stats, offers] = await Promise.all([env.AGENTS.get("latest:insights", "json"), offerStats(env), getOffers(env)]);
+  let delivered = 0;
+  for (const b of buyers.filter((x) => x.approved && !x.revoked)) if (await deliverOne(env, b, insights, stats, offers)) delivered++;
+  await env.AGENTS.put("buyers", JSON.stringify(buyers));
+  return { delivered, buyers: buyers.length, waiting: buyers.filter((b) => !b.approved && !b.revoked).length };
+}
+
+async function updateBuyer(env, id, action) {
+  const buyers = await syncBuyers(env);
+  const b = buyers.find((x) => x.id === id);
+  if (!b || !["approve", "revoke", "restore"].includes(action)) return null;
+  if (action === "approve") b.approved = true;
+  if (action === "revoke") { b.revoked = true; await env.AGENTS.delete(`delivery:${b.token}`); }
+  if (action === "restore") { b.revoked = false; b.token = newToken(); b.deliveries = []; }
+  await env.AGENTS.put("buyers", JSON.stringify(buyers));
+  if (b.approved && !b.revoked) {
+    const [insights, stats, offers] = await Promise.all([env.AGENTS.get("latest:insights", "json"), offerStats(env), getOffers(env)]);
+    await deliverOne(env, b, insights, stats, offers);
+    await env.AGENTS.put("buyers", JSON.stringify(buyers));
+  }
+  return buyers;
+}
+
+const ROUTER_SCHEMA = {
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    offerIdeas: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          brandType: { type: "string" }, product: { type: "string" }, ruleType: { type: "string", enum: OFFER_RULES }, ruleProduct: { type: "string" },
+          offerText: { type: "string" }, points: { type: "integer" }, pitch: { type: "string" }, prospect: { type: "string" },
+        },
+        required: ["brandType", "product", "ruleType", "ruleProduct", "offerText", "points", "pitch", "prospect"],
+        additionalProperties: false,
+      },
+    },
+    nextSteps: { type: "array", items: { type: "string" } },
+  },
+  required: ["headline", "offerIdeas", "nextSteps"],
+  additionalProperties: false,
+};
+
+const ROUTER_SYSTEM = `You are SNARE's Data and offers router. SNARE matches sponsored offers to students on their own phones by simple rules: "everyone", "tossed" (students who threw out a product at least N times) or "bought" (bought a product at least N times). Brands pay for offers and get anonymous counts only.
+From the insights brief, the panel, the sales pipeline and current offers, suggest up to 4 new offers worth pitching to brands: which product, which rule, the offer text a student sees (under 12 words, like "Try the small spinach bag"), points (50 to 200), and a one sentence pitch to the brand. product and ruleProduct must be ids from the product list ("" for ruleProduct when the rule is everyone). prospect: the org name from the pipeline it fits, or "". Prefer offers that cut waste (smaller packs, freezer tips, longer life products), never offers that push students to buy more than they need. If the panel is a sample, say the ideas are based on sample data.
+Plain, short sentences. No em dashes or hyphens used as dashes.`;
+
+const PRODUCT_IDS = ["bananas", "apples", "carrots", "potatoes", "onions", "garlic", "spinach", "tomatoes", "lettuce", "broccoli", "bell_pepper", "mushrooms", "cucumber", "green_onions", "frozen_spinach", "frozen_veg", "milk", "cheddar", "yogurt", "butter", "eggs", "chicken_thighs", "chicken_breast", "ground_beef", "tofu", "lentils", "black_beans", "tuna", "pasta", "pasta_sauce", "rice", "oats", "salsa", "bread", "tortillas"];
+
+export async function runRouter(env) {
+  if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
+  if (!env.AGENTS) throw new Error("NO_STORE");
+  const delivery = await deliverAll(env);
+  const [insights, offers, prospects, stats] = await Promise.all([env.AGENTS.get("latest:insights", "json"), getOffers(env), getProspects(env), offerStats(env)]);
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const f = await structure(client, {
+    model: env.ROUTER_MODEL || "claude-sonnet-5-5", system: ROUTER_SYSTEM, schema: ROUTER_SCHEMA,
+    content: `Today is ${today()}.\nProduct ids: ${PRODUCT_IDS.join(", ")}\nInsights (JSON): ${JSON.stringify(insights ? { mode: insights.output.mode, brief: insights.output.brief, panel: insights.output.panel } : "none yet")}\nPipeline: ${JSON.stringify(prospects.filter((p) => p.status !== "lost").map((p) => ({ org: p.org, type: p.type, status: p.status, question: p.question })))}\nCurrent offers: ${JSON.stringify(offers.map((o) => ({ brand: o.brand, product: o.product, rule: o.rule, text: o.text })))}`,
+  });
+  const ideas = f.output.offerIdeas.filter((i) => PRODUCT_IDS.includes(i.product) && (i.ruleType === "everyone" || PRODUCT_IDS.includes(i.ruleProduct)));
+  return save(env, "router", {
+    agent: "router",
+    generatedAt: new Date().toISOString(),
+    output: {
+      headline: f.output.headline, offerIdeas: ideas, nextSteps: f.output.nextSteps,
+      deliveries: delivery,
+      offerStats: offers.map((o) => ({ brand: o.brand, text: o.text, shown: forBrand((stats[o.id] || {}).shown || 0), redeemed: forBrand((stats[o.id] || {}).redeemed || 0) })),
+    },
+    sources: { insights: insights ? insights.output.mode : "none", offers: offers.length, buyers: delivery.buyers },
+    usage: { input: f.inTok, output: f.outTok },
+  });
+}
+
 async function getPostStatus(env) {
   return (env.AGENTS ? await env.AGENTS.get("postStatus", "json") : null) || {};
 }
@@ -1041,6 +1222,26 @@ export async function handleAgents(request, env, cors) {
     return recordEvents(request, env, cors);
   }
   if (request.method === "GET" && path === "/agents/panel") return json(await panelSnapshot(env), 200, cors);
+  // Public: the app downloads active offers and reports anonymous shown and redeemed events.
+  if (request.method === "GET" && path === "/agents/offers") return json({ offers: (await getOffers(env)).filter((o) => o.active).map(({ id, brand, product, text, note, points, rule }) => ({ id, brand, product, text, note, points, rule })) }, 200, cors);
+  if (request.method === "POST" && path === "/agents/offers/event") {
+    if (tooManyRuns("offer:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 120)) return json({ error: "Too many events" }, 429, cors);
+    return recordOfferEvent(request, env, cors);
+  }
+  // Public with a secret token: a buyer's private report page.
+  if (request.method === "GET" && path === "/agents/buyer") {
+    const t = new URL(request.url).searchParams.get("t") || "";
+    if (!/^[a-f0-9]{36}$/.test(t) || !env.AGENTS) return json({ error: "This link is not valid" }, 404, cors);
+    const d = await env.AGENTS.get(`delivery:${t}`, "json");
+    const buyer = (await getBuyers(env)).find((b) => b.token === t && !b.revoked);
+    if (!buyer) return json({ error: "This link is not valid" }, 404, cors);
+    // Offer counts are read fresh; brands only ever see counts of 50 or more.
+    if (d) {
+      const [offers, stats] = await Promise.all([getOffers(env), offerStats(env)]);
+      d.offers = offers.filter((o) => o.buyerId === buyer.id).map((o) => ({ text: o.text, points: o.points, shown: forBrand((stats[o.id] || {}).shown || 0), redeemed: forBrand((stats[o.id] || {}).redeemed || 0) }));
+    }
+    return json({ org: buyer.org, delivery: d, history: buyer.deliveries.map(({ title, deliveredAt, mode }) => ({ title, deliveredAt, mode })) }, 200, cors);
+  }
   if (request.method === "GET" && path === "/agents/insights") {
     let latest = null;
     try { latest = await collectInsights(env); } catch { /* try again next time */ }
@@ -1052,7 +1253,7 @@ export async function handleAgents(request, env, cors) {
     if (tooManyRuns("join:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 10)) return json({ error: "Too many tries, wait a bit" }, 429, cors);
     return joinWaitlist(request, env, cors);
   }
-  const latestMatch = path.match(/^\/agents\/(chief|market|growth|content|sales)$/);
+  const latestMatch = path.match(/^\/agents\/(chief|market|growth|content|sales|router)$/);
   if (request.method === "GET" && latestMatch) {
     const latest = env.AGENTS ? await env.AGENTS.get(`latest:${latestMatch[1]}`, "json") : null;
     return json({ latest }, 200, cors);
@@ -1113,12 +1314,29 @@ export async function handleAgents(request, env, cors) {
     return json({ prospects: list }, 200, cors);
   }
 
+  // Buyer links are secret, so even reading them needs the passcode.
+  if (request.method === "GET" && path === "/agents/buyers") return json({ buyers: await syncBuyers(env) }, 200, cors);
+  if (request.method === "GET" && path === "/agents/offers/all") return json({ offers: await getOffers(env), stats: await offerStats(env), k: K }, 200, cors);
+  if (request.method === "PUT" && (path === "/agents/buyers" || path === "/agents/offers")) {
+    if (!env.AGENTS) return json({ error: "Storage is not set up on the worker" }, 500, cors);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+    if (path === "/agents/buyers") {
+      const buyers = await updateBuyer(env, String(body.id || ""), body.action);
+      return buyers ? json({ buyers }, 200, cors) : json({ error: "Invalid update" }, 400, cors);
+    }
+    const offers = validOffers(body.offers);
+    if (!offers) return json({ error: "Invalid offer list" }, 400, cors);
+    await env.AGENTS.put("offers", JSON.stringify(offers));
+    return json({ offers }, 200, cors);
+  }
+
   if (request.method === "POST" && path === "/agents/insights/run") {
     try { return json(await runInsights(env), 200, cors); } catch (error) { return agentError(error, cors); }
   }
 
-  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales };
-  const runMatch = path.match(/^\/agents\/(chief|market|growth|content|sales)\/run$/);
+  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales, router: runRouter };
+  const runMatch = path.match(/^\/agents\/(chief|market|growth|content|sales|router)\/run$/);
   if (request.method === "POST" && runMatch) {
     if (tooManyRuns(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many runs this hour" }, 429, cors);
     try {

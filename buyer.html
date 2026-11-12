@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>SNARE Buyer Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --forest: #004230; --lime: #A2DC5D; --soft: #EAF6DC; --accent: #BBD004; --ink: #1F1E1E; --muted: #5B6660; --line: #E3EADD; --bg: #F7F9F4; --warn: #B4541A; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Poppins', system-ui, sans-serif; font-size: 15px; line-height: 1.55; }
+    h1, h2, p { margin: 0; }
+    .top { background: var(--forest); color: #fff; }
+    .wrap { max-width: 860px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+    .top .wrap { display: flex; align-items: center; gap: 12px; padding-block: 14px; flex-wrap: wrap; }
+    .brand { font-weight: 800; font-size: 24px; letter-spacing: -0.04em; display: flex; align-items: baseline; gap: 3px; }
+    .brand i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+    .brand small { font-size: 13px; font-weight: 600; color: var(--lime); margin-left: 8px; }
+    .top button { margin-left: auto; font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; border: 1.5px solid #fff; background: none; color: #fff; border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+    main .wrap { padding-block: 28px 50px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 28px; box-shadow: 0 1px 2px rgba(31,30,30,0.04), 0 6px 18px rgba(0,66,48,0.06); }
+    .eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--forest); }
+    h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.12; margin: 8px 0 10px; text-wrap: balance; }
+    .lead { color: var(--muted); font-size: 16px; }
+    h2 { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--forest); margin: 24px 0 10px; }
+    .flag { background: #FFF6D6; color: #7A5A00; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+    .finds { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+    .finds li { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: baseline; }
+    .finds b { font-size: 22px; font-weight: 800; color: var(--forest); }
+    .bars { display: grid; gap: 8px; }
+    .bar { display: grid; grid-template-columns: 150px 1fr 48px; gap: 10px; align-items: center; font-size: 13.5px; }
+    .bar .trk { height: 14px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+    .bar .trk i { display: block; height: 100%; background: var(--forest); border-radius: 99px; }
+    .bar b { text-align: right; font-variant-numeric: tabular-nums; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+    th { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    td.n { text-align: right; font-variant-numeric: tabular-nums; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .foot { margin-top: 18px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .hist { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; font-size: 13px; }
+    @media (max-width: 600px) { .bar { grid-template-columns: 110px 1fr 40px; } .finds li { grid-template-columns: 72px 1fr; } .card { padding: 20px; } }
+    @media print { .top button { display: none; } body { background: #fff; } .card { box-shadow: none; border: 0; padding: 0; } }
+  </style>
+</head>
+<body>
+  <header class="top"><div class="wrap"><span class="brand">snare<i></i><small>Buyer report</small></span><button type="button" id="print">Print or save PDF</button></div></header>
+  <main><div class="wrap"><div class="card" id="out"><p class="muted">Loading your report.</p></div></div></main>
+  <script src="config.js"></script>
+  <script>
+  (async function () {
+    'use strict';
+    const out = document.getElementById('out');
+    const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const pct = v => Math.round(v * 100) + '%';
+    const fmt = iso => new Date(iso).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('print').addEventListener('click', () => window.print());
+    const API = (window.SNARE_AI_URL || '').replace(/\/+$/, '');
+    let t = '';
+    try { t = new URLSearchParams(location.search).get('t') || ''; } catch (e) { /* ignore */ }
+    if (!API || !t) { out.innerHTML = '<h1>No report here</h1><p class="lead">This page opens with the private link SNARE sent you. If your link stopped working, ask the team for a new one.</p>'; return; }
+    let d;
+    try {
+      const r = await fetch(`${API}/agents/buyer?t=${encodeURIComponent(t)}`);
+      d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'This link is not valid');
+    } catch (e) { out.innerHTML = `<h1>This link isn't working</h1><p class="lead">${esc(e.message)}. It may have been replaced or switched off. Ask the SNARE team for a new link.</p>`; return; }
+    document.title = `SNARE Report for ${d.org}`;
+    const del = d.delivery;
+    if (!del) { out.innerHTML = `<span class="eyebrow">For ${esc(d.org)}</span><h1>Your first report is on its way</h1><p class="lead">The team is reviewing your first delivery. This page updates automatically when it's ready.</p>`; return; }
+    const r = del.report, sample = del.mode !== 'real';
+    const max = Math.max(0.01, ...del.panel.products.map(x => x.wasteShare));
+    out.innerHTML = `
+      ${sample ? '<div class="flag">Sample panel: this report shows the format with illustrative numbers until 50 real students share.</div>' : ''}
+      <span class="eyebrow">For ${esc(d.org)} · delivered ${esc(fmt(del.deliveredAt))}</span>
+      <h1>${esc(r.title)}</h1>
+      <p class="lead">${esc(r.answer)}</p>
+      ${r.findings.length ? `<h2>Key findings</h2><ul class="finds">${r.findings.map(f => `<li><b>${esc(f.figure)}</b><span>${esc(f.finding)}</span></li>`).join('')}</ul>` : ''}
+      ${del.panel.products.length ? `<h2>Share thrown out, by product</h2><div class="bars">${del.panel.products.map(x => `<div class="bar"><span>${esc(x.product)}</span><span class="trk"><i style="width:${x.wasteShare / max * 100}%"></i></span><b>${pct(x.wasteShare)}</b></div>`).join('')}</div>` : ''}
+      <h2>What to do</h2><p>${esc(r.recommendation)}</p>
+      ${del.offers.length ? `<h2>Your sponsored offers</h2><table><thead><tr><th>Offer</th><th class="n">Points</th><th class="n">Students reached</th><th class="n">Redeemed</th></tr></thead><tbody>${del.offers.map(o => `<tr><td>${esc(o.text)}</td><td class="n">${o.points}</td><td class="n">${esc(o.shown)}</td><td class="n">${esc(o.redeemed)}</td></tr>`).join('')}</tbody></table><p class="muted" style="margin-top:6px">Counts under 50 students are not shown.</p>` : ''}
+      <h2>Method</h2><p class="muted">${esc(r.method)} Panel: ${esc(String(del.panel.students || ''))} students, ${esc(del.panel.period || '')}. ${esc(del.privacy.checks.join('. '))}.</p>
+      ${d.history.length > 1 ? `<h2>Earlier reports</h2><ul class="hist">${d.history.slice(0, -1).reverse().map(h => `<li>${esc(fmt(h.deliveredAt))} · ${esc(h.title)}${h.mode !== 'real' ? ' (sample)' : ''}</li>`).join('')}</ul>` : ''}
+      <div class="foot"><span>Team SNARE · Ivey Business School student venture · London, Ontario</span><span>Private link. Please don't share it outside your team.</span></div>`;
+  })();
+  </script>
+</body>
+</html>

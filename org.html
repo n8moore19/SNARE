@@ -368,6 +368,32 @@
     .op .finds li { display: grid; grid-template-columns: 90px 1fr; gap: 12px; align-items: baseline; font-size: 14px; }
     .op .finds b { font-size: 20px; font-weight: 800; color: var(--forest); }
 
+
+    /* ---------- agent 7: Data and offers router ---------- */
+    .brow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+    .brow:first-child { border-top: 0; }
+    .brow strong { font-size: 14px; }
+    .brow .pm { display: block; font-size: 11.5px; color: var(--muted); }
+    .brow .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+    .bst { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+    .bst.wait { background: var(--warn-bg); color: var(--warn); }
+    .bst.on { background: var(--soft); color: var(--forest); }
+    .bst.off { background: #EEF1EC; color: var(--muted); }
+    .orow { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
+    .orow:first-child { border-top: 0; }
+    .orow strong { display: block; font-size: 14px; }
+    .orow .pm { font-size: 11.5px; color: var(--muted); }
+    .ostat { font-size: 11.5px; color: var(--muted); text-align: right; white-space: nowrap; }
+    .ostat b { color: var(--ink); }
+    .oform { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .oform input, .oform select { font: inherit; font-size: 12.5px; padding: 7px 9px; border: 1.5px solid var(--line); border-radius: 9px; background: #fff; min-width: 0; }
+    .oform .wide { grid-column: span 2; }
+    .oform .btn { grid-column: span 4; }
+    .idea { border: 1.5px dashed var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 8px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    .idea strong { display: block; font-size: 13.5px; }
+    .idea span { font-size: 12px; color: var(--muted); }
+    @media (max-width: 900px) { .oform { grid-template-columns: 1fr 1fr; } .oform .btn, .oform .wide { grid-column: span 2; } .orow { grid-template-columns: 1fr auto; } .orow .ostat { grid-column: 1 / -1; text-align: left; } }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -487,6 +513,7 @@
             <button role="tab" data-ltab="content" aria-selected="false">Content creation</button>
             <button role="tab" data-ltab="sales" aria-selected="false">B2B sales</button>
             <button role="tab" data-ltab="insights" aria-selected="false">Insights analyst</button>
+            <button role="tab" data-ltab="router" aria-selected="false">Data and offers router</button>
           </div>
         </div>
         <div id="pass-slot"></div>
@@ -595,6 +622,31 @@
           <div id="reports"></div>
         </div>
         </div>
+
+        <div data-pane="router" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">Deliveries and offers</h3>
+          <span id="r-status" class="pill gate"><i></i>Checking</span>
+          <span id="r-time" class="note" style="margin:0"></span>
+          <button class="btn" id="run-router" type="button" disabled>Run now</button>
+        </div>
+        <p class="sub">Every day it delivers new insight reports to approved buyers through their private link. Every Saturday it suggests new sponsored offers to pitch. Offers are matched on each student's phone, so brands only ever get anonymous counts of 50 or more.</p>
+        <div class="brief-grid">
+          <div class="panel brief" id="router"></div>
+          <div class="side"><div class="panel"><h3>Gate 1</h3><p class="sub">First deliveries waiting for a person.</p><div id="gate1"></div></div></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <h3>Buyers and deliveries</h3>
+          <p class="sub" id="buyers-sub">Prospects marked won in B2B sales become buyers here.</p>
+          <div id="buyers"></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <h3>Sponsored offers</h3>
+          <p class="sub" id="offers-sub">Shown in the app's Rewards tab to students who match the rule and have anonymous sharing on.</p>
+          <div id="offers"></div>
+          <div id="offer-form"></div>
+        </div>
+        </div>
       </section>
 
       <section class="section">
@@ -696,6 +748,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="config.js"></script>
+  <script src="data.js"></script>
   <script>
   (function () {
     'use strict';
@@ -788,20 +841,17 @@ When: waste peaks in exam weeks.
 Why: "went off" leads at 44%.
 Report for a bakery brand: full loaves are thrown out more than half loaves.` },
 
-      { id: 'router', name: 'Data and offers router', group: 'sell', model: 'sonnet', auto: 'gate', isNew: true, runs: 300, inTok: 20000, outTok: 2000, f: [3, 10],
-        job: 'Knows which buyer gets what data, and which students see which offer.',
-        cadence: 'Runs all day',
-        does: ['Keeps the list of buyers, what each one bought and when it is due', 'Packages approved totals and delivers them to each buyer', 'Matches sponsored offers to student groups inside the app', 'Sends buyers counts back: reached, redeemed, waste change', 'Tracks consent: drops anyone who turns sharing off'],
-        tools: ['Buyer list', 'Consent records', 'Offer engine in the app', 'Secure report delivery'],
-        gate: 'Gate 1 for a new buyer\'s first delivery. Repeat deliveries run alone after the Privacy guard passes them.',
-        talks: ['insights', 'privacy', 'rewards', 'sales'],
-        sample: `Delivery queue
-- Valley Greens: spinach pack fit report. Privacy passed (smallest group 62 students). Sends Monday.
-- Discount grocer: first delivery. Waiting at Gate 1.
-
-Offer matching
-- Golden Crust bonus shown to 184 students who tossed bread twice this month.
-- Brand receives: 184 reached, 41 redeemed. No names, no list.` },
+      { id: 'router', name: 'Data and offers router', group: 'sell', model: 'sonnet', auto: 'gate', isNew: true, built: true, runs: 4, inTok: 20000, outTok: 3000, f: [3, 10],
+        job: 'Delivers reports to buyers and matches offers to students.',
+        cadence: 'Deliveries daily, offer ideas Saturdays',
+        does: ['Turns won prospects into buyers with a private report link', 'Holds each first delivery for Gate 1, then delivers new reports daily', 'Lets the team create sponsored offers with simple targeting rules', 'Matches offers on each student\'s phone, so no data leaves it', 'Reports anonymous reached and redeemed counts, 50 or more only', 'Suggests new offers to pitch to brands'],
+        tools: ['Buyer links', 'Offer manager', 'Anonymous offer counts'],
+        gate: 'Gate 1 for each new buyer\'s first delivery. Revoke a link any time.',
+        talks: ['insights', 'sales', 'rewards'],
+        sample: `Deliveries: 1 report delivered to a produce brand. 1 waiting at Gate 1.
+Offer: Valley Greens small spinach bag, shown to students who threw out spinach.
+Brand sees: reached 184, redeemed 41. No names, no list.
+Idea to pitch: a freezer tip bonus for bread, for students who tossed bread twice.` },
 
       { id: 'privacy', name: 'Privacy guard', group: 'safe', model: 'sonnet', auto: 'gate', runs: 250, inTok: 15000, outTok: 1000, f: [2.5, 8],
         job: 'Checks everything that uses student data before it leaves.',
@@ -2064,7 +2114,151 @@ Duplicate receipts blocked: 6` },
       if (rp) openReport(rp.dataset.report);
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights()]));
+    // ---------- agent 7: Data and offers router ----------
+    const PROD = Object.fromEntries((window.SNARE_DATA ? window.SNARE_DATA.products : []).filter(p => !p.leftover).map(p => [p.id, p.name]));
+    const DEMO_OFFERS = window.SNARE_DATA ? window.SNARE_DATA.offers : [];
+    live.router = null; live.buyers = null; live.offersAll = null; live.ostats = {}; live.rbusy = false; live.rerror = '';
+    const ruleDesc = r => !r || r.type === 'everyone' ? 'Everyone with sharing on' : `Students who ${r.type === 'tossed' ? 'threw out' : 'bought'} ${(PROD[r.product] || r.product).toLowerCase()} ${r.minTimes > 1 ? r.minTimes + ' or more times' : 'at least once'}`;
+    const kfmt = n => n >= 50 ? n : (n ? `${n} (under 50, hidden from brand)` : '0');
+    const buyerLink = b => `${location.origin}${location.pathname.replace(/org\.html$/, '')}buyer.html?t=${b.token}`;
+
+    function renderRouter() {
+      const latest = live.router;
+      const [cls, label, banner] = statusOf(latest);
+      const st = document.getElementById('r-status');
+      st.className = 'pill ' + cls; st.innerHTML = '<i></i>' + label;
+      const btn = document.getElementById('run-router');
+      btn.disabled = !API || !live.status || !live.status.hasKey || live.rbusy;
+      btn.textContent = live.rbusy ? 'Routing' : 'Run now';
+      document.getElementById('r-time').textContent = latest ? `Written ${fmtTime(latest.generatedAt)}` : '';
+      const o = latest ? latest.output : { headline: 'Sample: offer ideas and delivery results appear after the first run.', offerIdeas: [{ brandType: 'bakery brand', product: 'bread', ruleType: 'tossed', ruleProduct: 'bread', offerText: 'Freeze half your loaf, earn 75 points', points: 75, pitch: 'Sample idea. A real run bases this on the insights brief.', prospect: '' }], nextSteps: ['Connect the worker, then press Run now.'], deliveries: null };
+      document.getElementById('router').innerHTML = `
+        ${banner ? `<div class="preview"><div><b>${latest ? '' : 'Preview'}</b>${esc(banner)}</div></div>` : ''}
+        <p class="headline">${esc(o.headline)}</p>
+        ${o.deliveries ? `<div class="bsec"><b>Deliveries</b><p style="font-size:13.5px">${o.deliveries.delivered} delivered on this run · ${o.deliveries.buyers} buyers · ${o.deliveries.waiting} waiting at Gate 1</p></div>` : ''}
+        ${o.offerIdeas.length ? `<div class="bsec"><b>Offer ideas to pitch</b>${o.offerIdeas.map((i, k) => `<div class="idea"><div><strong>${esc(i.offerText)} · +${i.points}</strong><span>${esc(i.brandType)}${i.prospect ? ' · fits ' + esc(i.prospect) : ''} · ${esc(ruleDesc({ type: i.ruleType, product: i.ruleProduct, minTimes: 1 }))}<br>${esc(i.pitch)}</span></div>${latest && canEdit() ? `<button class="btn small outline" data-idea="${k}">Use as offer</button>` : ''}</div>`).join('')}</div>` : ''}
+        ${o.nextSteps.length ? `<div class="bsec"><b>Next steps</b><ul class="blist">${o.nextSteps.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        ${live.rerror ? `<p class="err">${esc(live.rerror)}</p>` : ''}
+        <div class="srcs">${latest ? `<span class="src ${latest.sources.insights === 'real' ? 'real' : 'samp'}">Insights: ${esc(latest.sources.insights)}</span><span class="src real">${latest.sources.offers} offers</span><span class="src real">${latest.sources.buyers} buyers</span>` : '<span class="src samp">Sample</span>'}</div>`;
+      renderBuyers(); renderOffers();
+    }
+
+    function renderBuyers() {
+      const box = document.getElementById('buyers'), gate = document.getElementById('gate1');
+      if (!API || !live.status) {
+        box.innerHTML = '<div class="brow"><div><strong>Example: a produce brand</strong><span class="pm">Sample row. Won prospects appear here with a private report link.</span></div><div class="acts"><span class="bst wait">Waiting for Gate 1</span></div></div>';
+        gate.innerHTML = '<p class="note" style="margin:0">Starts once the worker is connected.</p>'; return;
+      }
+      if (!live.buyers) {
+        box.innerHTML = '<p class="note" style="margin:0 0 8px">Buyer links are private, so they only load with the team passcode.</p><button class="btn small" data-loadbuyers>Show buyers</button>';
+        gate.innerHTML = '<p class="note" style="margin:0">Enter the passcode to see who is waiting.</p>'; return;
+      }
+      const waiting = live.buyers.filter(b => !b.approved && !b.revoked);
+      gate.innerHTML = waiting.length ? waiting.map(b => `<div class="brow"><div><strong>${esc(b.org)}</strong><span class="pm">First delivery waiting</span></div><div class="acts"><button class="btn small" data-bact="approve" data-bid="${esc(b.id)}">Approve</button></div></div>`).join('') : '<p class="note" style="margin:0">Nothing waiting.</p>';
+      document.getElementById('buyers-sub').textContent = 'Prospects marked won in B2B sales become buyers here. Send each one their private link once.';
+      box.innerHTML = live.buyers.length ? live.buyers.map(b => {
+        const last = b.deliveries[b.deliveries.length - 1];
+        const state = b.revoked ? ['off', 'Link revoked'] : !b.approved ? ['wait', 'Waiting for Gate 1'] : ['on', 'Active'];
+        return `<div class="brow"><div><strong>${esc(b.org)}</strong><span class="pm">${esc(b.type)} · ${esc(b.offer || '')} · ${last ? `last delivery ${fmtTime(last.deliveredAt)}: ${esc(last.title)}${last.mode !== 'real' ? ' (sample)' : ''}` : 'no deliveries yet'}</span></div>
+          <div class="acts"><span class="bst ${state[0]}">${state[1]}</span>
+            ${!b.approved && !b.revoked ? `<button class="btn small" data-bact="approve" data-bid="${esc(b.id)}">Approve first delivery</button>` : ''}
+            ${!b.revoked ? `<button class="btn small outline" data-copy="${esc(buyerLink(b))}">Copy link</button><a class="btn small outline" href="${esc(buyerLink(b))}" target="_blank" rel="noopener">Open</a><button class="btn small outline" data-bact="revoke" data-bid="${esc(b.id)}">Revoke</button>` : `<button class="btn small outline" data-bact="restore" data-bid="${esc(b.id)}">New link</button>`}
+          </div></div>`;
+      }).join('') : '<p class="note" style="margin:0">No buyers yet. Mark a prospect as won in the B2B sales tab.</p>';
+    }
+
+    function renderOffers() {
+      const edit = canEdit() && !!live.offersAll;
+      const list = live.offersAll || (API && live.status ? [] : DEMO_OFFERS);
+      document.getElementById('offers-sub').textContent = live.offersAll
+        ? 'Shown in the app\'s Rewards tab to students who match the rule and have anonymous sharing on. Counts are distinct students.'
+        : API && live.status ? 'Offers and their counts load with the team passcode.' : 'These are the app\'s demo offers. Once the worker is connected, the team\'s offers replace them.';
+      document.getElementById('offers').innerHTML = (list.length ? list.map(o => {
+        const st = live.ostats[o.id] || { shown: 0, redeemed: 0 };
+        return `<div class="orow"><div><strong>${esc(o.brand)}: ${esc(o.text)}</strong><span class="pm">${esc(PROD[o.product] || o.product)} · +${o.points || o.pts} points · ${esc(ruleDesc(o.rule))}${o.active === false ? ' · paused' : ''}</span></div>
+          <div class="ostat">${live.offersAll ? `Reached <b>${kfmt(st.shown)}</b><br>Redeemed <b>${kfmt(st.redeemed)}</b>` : ''}</div>
+          <div class="acts" style="display:flex;gap:6px">${edit ? `<button class="btn small outline" data-otoggle="${esc(o.id)}">${o.active === false ? 'Resume' : 'Pause'}</button><button class="x" data-odel="${esc(o.id)}" aria-label="Delete offer">&times;</button>` : ''}</div></div>`;
+      }).join('') : '<p class="note" style="margin:0">No offers yet.</p>') + (API && live.status && !live.offersAll ? '<button class="btn small" data-loadbuyers style="margin-top:8px">Show offers and counts</button>' : '');
+      const prodOpts = Object.entries(PROD).map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('');
+      document.getElementById('offer-form').innerHTML = edit ? `<form class="oform" id="addoffer">
+        <input id="of-brand" placeholder="Brand" maxlength="60" aria-label="Brand">
+        <select id="of-product" aria-label="Product">${prodOpts}</select>
+        <input id="of-points" type="number" min="10" max="500" value="75" aria-label="Points">
+        <select id="of-buyer" aria-label="Buyer">${'<option value="">No buyer link</option>' + (live.buyers || []).map(b => `<option value="${esc(b.id)}">${esc(b.org)}</option>`).join('')}</select>
+        <input id="of-text" class="wide" placeholder="What students see, like: Try the small spinach bag" maxlength="120" aria-label="Offer text">
+        <input id="of-note" class="wide" placeholder="Short note, like: Sized for one person" maxlength="160" aria-label="Note">
+        <select id="of-rule" aria-label="Who sees it"><option value="everyone">Everyone</option><option value="tossed">Threw out a product</option><option value="bought">Bought a product</option></select>
+        <select id="of-rprod" aria-label="Rule product">${prodOpts}</select>
+        <input id="of-min" type="number" min="1" max="10" value="1" aria-label="At least this many times">
+        <span></span>
+        <button class="btn small">Add offer</button></form>` : '';
+    }
+
+    async function loadPrivate() {
+      try {
+        const [b, o] = await Promise.all([call('/agents/buyers'), call('/agents/offers/all')]);
+        live.buyers = b.buyers; live.offersAll = o.offers; live.ostats = o.stats;
+      } catch (e) { if (e.message !== 'PASS') live.rerror = e.message; }
+      renderRouter();
+    }
+
+    async function saveOffers(next) {
+      const prev = live.offersAll;
+      live.offersAll = next; renderOffers();
+      try { live.offersAll = (await call('/agents/offers', { method: 'PUT', body: JSON.stringify({ offers: next }) })).offers; live.rerror = ''; }
+      catch (e) { if (e.message !== 'PASS') { live.offersAll = prev; live.rerror = e.message; } }
+      renderRouter();
+    }
+
+    async function buyerAction(id, action) {
+      try { live.buyers = (await call('/agents/buyers', { method: 'PUT', body: JSON.stringify({ id, action }) })).buyers; live.rerror = ''; }
+      catch (e) { if (e.message !== 'PASS') live.rerror = e.message; }
+      renderRouter();
+    }
+
+    async function runRouterNow() {
+      live.rbusy = true; live.rerror = ''; renderRouter();
+      try { live.router = (await call('/agents/router/run', { method: 'POST' })).latest; await loadPrivate(); }
+      catch (e) { if (e.message !== 'PASS') live.rerror = e.message; }
+      live.rbusy = false; renderRouter();
+    }
+
+    async function loadRouter() {
+      renderRouter();
+      if (!API || !live.status) return;
+      try { live.router = (await call('/agents/router')).latest; } catch (e) { /* keep preview */ }
+      if (teamKey) await loadPrivate(); else renderRouter();
+    }
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('#run-router')) needPass(runRouterNow);
+      if (e.target.closest('[data-loadbuyers]')) needPass(loadPrivate);
+      const ba = e.target.closest('[data-bact]');
+      if (ba) needPass(() => buyerAction(ba.dataset.bid, ba.dataset.bact));
+      const ot = e.target.closest('[data-otoggle]');
+      if (ot) needPass(() => saveOffers(live.offersAll.map(o => o.id === ot.dataset.otoggle ? { ...o, active: o.active === false } : o)));
+      const od = e.target.closest('[data-odel]');
+      if (od) needPass(() => saveOffers(live.offersAll.filter(o => o.id !== od.dataset.odel)));
+      const idea = e.target.closest('[data-idea]');
+      if (idea && live.router) {
+        const i = live.router.output.offerIdeas[Number(idea.dataset.idea)];
+        renderOffers();
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        set('of-product', i.product); set('of-points', i.points); set('of-text', i.offerText); set('of-rule', i.ruleType); if (i.ruleProduct) set('of-rprod', i.ruleProduct);
+        const f = document.getElementById('of-brand'); if (f) { f.focus(); f.scrollIntoView({ block: 'center' }); }
+      }
+    });
+    document.addEventListener('submit', e => {
+      if (e.target.id !== 'addoffer') return;
+      e.preventDefault();
+      const v = id => document.getElementById(id).value.trim();
+      if (!v('of-brand') || !v('of-text')) { live.rerror = 'Add a brand and the text students see.'; renderRouter(); return; }
+      const offer = { id: 'o' + Date.now().toString(36), brand: v('of-brand'), product: v('of-product'), points: Number(v('of-points')), text: v('of-text'), note: v('of-note'),
+        rule: { type: v('of-rule'), product: v('of-rule') === 'everyone' ? '' : v('of-rprod'), minTimes: Number(v('of-min')) }, buyerId: v('of-buyer'), active: true };
+      needPass(() => saveOffers([...(live.offersAll || []), offer]));
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter()]));
     render();
   })();
   </script>

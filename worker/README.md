@@ -82,14 +82,22 @@ The same worker runs the launch agents shown on `org.html`.
   prospect; results are collected at the next 13:00 UTC run or when the org page loads. Real
   stats (never sample) go to Content creation. `insights.html` reads `GET /agents/panel` live.
   Opus 5.5, about 30 to 40 cents a week.
+- **Data and offers router** (built): prospects marked won become buyers with a private link
+  (`buyer.html?t=...`). Each buyer's first delivery waits at Gate 1 on the org page; after
+  that, new insight reports are delivered on the daily 13:00 UTC run (no model call). Links
+  can be revoked or replaced. The team manages sponsored offers on the org page; the app
+  downloads active offers (`GET /agents/offers`) and checks each rule (everyone, tossed or
+  bought a product N times) on the student's own phone. Only anonymous shown and redeemed
+  events come back, counted as distinct students; brands see counts of 50 or more only.
+  Saturdays it suggests new offers to pitch (Sonnet 5.5, a few cents).
 - **Schedule**: two cron triggers. 12:00 UTC runs the weekday's agent (Mon market, Tue
-  acquisition, Wed content, Thu sales, Fri insights); 13:00 UTC collects insights, then the
-  Chief of Staff writes the daily brief.
+  acquisition, Wed content, Thu sales, Fri insights, Sat router); 13:00 UTC collects insights,
+  delivers new reports to buyers, then the Chief of Staff writes the daily brief.
 - **Waitlist**: `join.html` posts to `POST /agents/waitlist/join` (public, rate limited, same
   site only). Each email is one KV key with campus, source and date in its metadata. Students
   can remove their email on the same page. The org page only shows counts.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`, `GET /agents/offers`, `POST /agents/offers/event`, `GET /agents/buyer`, and with the passcode `GET /agents/buyers`, `PUT /agents/buyers`, `GET /agents/offers/all`, `PUT /agents/offers`, `GET /agents/router`, `POST /agents/router/run`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)

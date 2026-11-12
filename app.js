@@ -64,7 +64,7 @@
         profile: state.profile, fridge: state.fridge, ratings: state.ratings, feedback: state.feedback,
         cooked: state.cooked, trips: state.trips, tossed: state.tossed,
         learn: state.learn, tossLog: state.tossLog, views: state.views,
-        points: state.points, cards: state.cards, lastCheckin: state.lastCheckin,
+        points: state.points, cards: state.cards, lastCheckin: state.lastCheckin, buyLog: state.buyLog,
       }));
     } catch (e) { /* storage blocked, keep working in memory */ }
   }
@@ -86,6 +86,8 @@
     points: saved.points || [],        // ledger: { t, pts, label }
     cards: saved.cards || [],          // gift cards: { uid, card, amt, code, used, t }
     lastCheckin: saved.lastCheckin || 0,
+    buyLog: saved.buyLog || {},        // product id: times bought (receipts and trips), for offer rules
+    liveOffers: null,                  // offers from the worker; demo offers until then
     checkin: null,                     // { uids, answers } during a weekly check in
     notified: false,                   // the demo phone notification shows once per visit
     afterConsent: 'fridge',
@@ -374,7 +376,7 @@
     };
     setRange(item, days, exact);
     state.fridge.push(item);
-    if (['receipt', 'trip'].includes(item.src)) trackEvent('bought', item);
+    if (['receipt', 'trip'].includes(item.src)) { trackEvent('bought', item); state.buyLog[id] = (state.buyLog[id] || 0) + 1; }
     return item;
   }
 
@@ -643,7 +645,41 @@
 
   // ---------- rewards ----------
 
-  const offers = byId(D.offers);
+  // Offers: the team's live list when the worker is connected, demo ones until
+  // then. Rules are checked here, on the student's phone, against their own
+  // history; nothing about the student is sent to match them.
+  const allOffers = () => state.liveOffers || D.offers;
+  function ruleMatches(o) {
+    const r = o.rule || { type: 'everyone' };
+    if (r.type === 'tossed') return (state.tossLog[r.product] || 0) >= (r.minTimes || 1);
+    if (r.type === 'bought') return (state.buyLog[r.product] || 0) >= (r.minTimes || 1);
+    return true;
+  }
+  const matchedOffers = () => allOffers().filter(o => products[o.product] && ruleMatches(o));
+  const ruleText = o => { const r = o.rule || {}; const n = products[r.product] ? lower(products[r.product].name) : ''; return r.type === 'tossed' ? `Because you've thrown out ${n}` : r.type === 'bought' ? `Because you buy ${n}` : ''; };
+  // Anonymous counts for brands: a random id per offer, separate from everything else.
+  function offerEvent(offerId, event) {
+    const url = (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
+    if (!url || !P().share) return;
+    let ids = {};
+    try { ids = JSON.parse(localStorage.getItem('snare.osid') || '{}'); } catch (e) { /* ignore */ }
+    const key = offerId + ':' + event;
+    if (ids[key] === 'sent') return;
+    const sid = ids[offerId] || (ids[offerId] = Array.from(crypto.getRandomValues(new Uint8Array(10)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 16));
+    ids[key] = 'sent';
+    try { localStorage.setItem('snare.osid', JSON.stringify(ids)); } catch (e) { /* ignore */ }
+    fetch(url + '/agents/offers/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ offer: offerId, event, sid }) }).catch(() => {});
+  }
+  async function loadLiveOffers() {
+    const url = (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
+    if (!url) return;
+    try {
+      const r = await fetch(url + '/agents/offers');
+      if (!r.ok) return;
+      const list = (await r.json()).offers;
+      if (Array.isArray(list) && list.length) { state.liveOffers = list; if (['rewards', 'review'].includes(state.screen)) rerender(); }
+    } catch (e) { /* keep demo offers */ }
+  }
   const giftCards = byId(D.giftCards);
   const balance = () => state.points.reduce((t, x) => t + x.pts, 0);
   const earnedTotal = () => state.points.filter(x => x.pts > 0).reduce((t, x) => t + x.pts, 0);
@@ -1154,15 +1190,15 @@
   // Offers this receipt earns: a bought line matches a sponsored product.
   function receiptBonuses(lines) {
     if (!P().share) return [];
-    return [...new Set(lines.filter(l => l.keep && l.bonus).map(l => l.bonus))].map(id => offers[id]);
+    return matchedOffers().filter(o => lines.some(l => l.keep && l.id === o.product));
   }
 
   function renderReceiptReview() {
     const s = state.scan;
     const kept = s.found.filter(f => f.keep);
     const bonus = receiptBonuses(s.found);
-    const lockedBonus = !P().share && s.found.some(l => l.bonus);
-    const pts = PTS.receipt + bonus.reduce((t, o) => t + o.pts, 0);
+    const lockedBonus = !P().share && allOffers().some(o => ruleMatches(o) && s.found.some(l => l.id === o.product));
+    const pts = PTS.receipt + bonus.reduce((t, o) => t + o.points, 0);
     const total = s.found.reduce((t, l) => t + l.price, 0);
     app.innerHTML = `
       <section class="screen">
@@ -1170,7 +1206,7 @@
         <ul class="review-list receipt-list">
           ${s.found.map((f, i) => `<li class="${f.keep ? '' : 'off'}">
             <button class="tick ${f.keep ? 'on' : ''}" data-action="rkeep" data-id="${i}" aria-label="Keep this item">${ICONS.check}</button>
-            <div class="rv-main"><strong>${products[f.id].name}${f.bonus && P().share ? '<b class="tag">Bonus</b>' : ''}</strong><span class="mono">${esc(f.name)} · ${money(f.price)}</span></div>
+            <div class="rv-main"><strong>${products[f.id].name}${bonus.some(o => o.product === f.id) ? '<b class="tag">Bonus</b>' : ''}</strong><span class="mono">${esc(f.name)} · ${money(f.price)}</span></div>
             <span class="exp ${urgency(estimateRange(f.days)[0])}">${rangeFromDays(f.days)}</span>
           </li>`).join('')}
         </ul>
@@ -1178,7 +1214,7 @@
           <span class="eyebrow">${ICONS.star} You earn</span>
           <ul>
             <li><span>Receipt scanned</span><b>+${PTS.receipt}</b></li>
-            ${bonus.map(o => `<li><span>${esc(o.brand)} bonus <em class="sponsored">Sponsored</em></span><b>+${o.pts}</b></li>`).join('')}
+            ${bonus.map(o => `<li><span>${esc(o.brand)} bonus <em class="sponsored">Sponsored</em></span><b>+${o.points}</b></li>`).join('')}
           </ul>
           ${lockedBonus ? '<p>A brand bonus is on this receipt. Turn on anonymous sharing in your profile to collect brand bonuses.</p>' : ''}
         </div>
@@ -1195,7 +1231,7 @@
     const added = kept.map(f => addToFridge(f.id, { src: 'receipt' }));
     state.items = state.items.filter(it => !kept.some(k => k.id === it.id)); // bought, so off the list
     let pts = earn(PTS.receipt, `Receipt, ${stores[s.store].name}`);
-    receiptBonuses(s.found).forEach(o => { pts += earn(o.pts, `${o.brand} bonus`); });
+    receiptBonuses(s.found).forEach(o => { pts += earn(o.points, `${o.brand} bonus`); offerEvent(o.id, 'redeemed'); });
     state.highlight = added.map(a => a.uid);
     persist();
     toast(`${plural(added.length, 'item')} added · +${pts} points`);
@@ -1848,10 +1884,10 @@
 
         <h2 class="section-title">Bonus offers <small>Sponsored</small></h2>
         ${!P().share ? `<div class="banner info"><strong>Brand bonuses are off</strong>They need anonymous sharing on. You still earn points for receipts and check ins.<div class="actions"><button class="btn small" data-action="consent" data-id="share">Turn on sharing</button></div></div>` : ''}
-        ${D.offers.map(o => { const p = products[o.product]; return `<div class="offer bonus ${P().share ? '' : 'locked'}">
+        ${(P().share ? matchedOffers() : allOffers().filter(o => products[o.product] && (o.rule || {}).type !== 'tossed' && (o.rule || {}).type !== 'bought')).map(o => { const p = products[o.product]; if (P().share) offerEvent(o.id, 'shown'); return `<div class="offer bonus ${P().share ? '' : 'locked'}">
           <div class="offer-top">
-            <div><span class="kind">Sponsored · ${esc(o.brand)}</span><h3>${esc(o.text)}</h3><p>${esc(o.note)}</p></div>
-            <div class="price"><b>+${o.pts}</b><s style="text-decoration:none">points</s></div>
+            <div><span class="kind">Sponsored · ${esc(o.brand)}</span><h3>${esc(o.text)}</h3><p>${esc(o.note)}</p>${ruleText(o) ? `<p class="why-offer">${esc(ruleText(o))}</p>` : ''}</div>
+            <div class="price"><b>+${o.points}</b><s style="text-decoration:none">points</s></div>
           </div>
           <div class="offer-foot"><small>Scan a receipt with ${lower(p.name)} from any store</small>
             <button class="btn small ${state.items.some(it => it.id === o.product) ? 'added' : 'outline'}" data-action="offeradd" data-id="${o.product}">${state.items.some(it => it.id === o.product) ? 'On your list' : 'Add to list'}</button></div>
@@ -3064,6 +3100,8 @@
     const to = { scan: 'fridge', review: 'scan', recipe: 'meals', results: 'shop', profile: 'fridge', checkin: 'fridge' }[state.screen];
     if (to) go(to);
   });
+
+  loadLiveOffers();
 
   // Deep links for demos: #demo loads a sample fridge, #welcome starts over,
   // #meals, #shop and #impact open those tabs.
