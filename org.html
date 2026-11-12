@@ -32,6 +32,8 @@
     .brand { font-weight: 800; font-size: 22px; letter-spacing: -0.04em; display: flex; align-items: baseline; gap: 3px; }
     .brand i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
     .brand small { font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; color: var(--forest); margin-left: 8px; }
+    .stage { margin-left: auto; display: inline-flex; flex-direction: column; align-items: center; background: var(--ink); color: var(--lime); border-radius: 10px; padding: 5px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1.3; }
+    .stage span { font-size: 9.5px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; opacity: 0.8; }
     .seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 10px; overflow: hidden; margin-left: auto; }
     .seg button { border: 0; background: #fff; padding: 6px 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
     .seg button + button { border-left: 1.5px solid var(--ink); }
@@ -224,7 +226,7 @@
       .step:last-child { border-radius: 0 0 16px 16px; }
       .step::after { right: auto; left: 24px; top: auto; bottom: -9px; transform: rotate(135deg); }
       .match, .compare, .sheet-body { grid-template-columns: 1fr; }
-      .seg { margin-left: 0; }
+      .stage { margin-left: 0; }
       .titlebar .grow { display: none; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -246,11 +248,7 @@
     <div class="titlebar">
       <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
       <span class="brand">snare<i></i><small>Launch Organization</small></span>
-      <div class="seg" role="group" aria-label="Number of students">
-        <button data-scale="0" class="on">Launch<span>500 students</span></button>
-        <button data-scale="1">Growth<span>5,000</span></button>
-        <button data-scale="2">Scale<span>50,000</span></button>
-      </div>
+      <span class="stage">Launch<span>500 students</span></span>
       <button class="expand" id="expand" type="button"></button>
     </div>
 
@@ -370,11 +368,7 @@
     'use strict';
 
     const PRICE = { opus: [4, 20, 'Claude Opus 5.5'], sonnet: [2, 10, 'Claude Sonnet 5.5'], haiku: [0.1, 0.5, 'Claude Haiku 5.5'] };
-    const SCALES = [
-      { label: 'Launch', students: 500, tools: 25, hires: 3, hours: 3 },
-      { label: 'Growth', students: 5000, tools: 80, hires: 5, hours: 5 },
-      { label: 'Scale', students: 50000, tools: 300, hires: 9, hours: 8 },
-    ];
+    const SCALES = [{ label: 'Launch', students: 500, tools: 25, hires: 3, hours: 3 }];
     const HIRE_MONTH = 4300;
     const GROUPS = [
       ['grow', 'Grow students', '#2F7D5B'],
@@ -567,13 +561,13 @@ Duplicate receipts blocked: 6` },
       document.getElementById('k-hours').textContent = s.hours + ' hrs';
       document.getElementById('k-hire').textContent = money(s.hires * HIRE_MONTH);
       document.getElementById('human-line').textContent = `Approve the three gates and read the daily brief. About ${s.hours} hours a week in total.`;
-      document.getElementById('cost-sub').textContent = `${s.label}: ${s.students.toLocaleString('en-CA')} students. Student support and rewards grow with students; research and sales grow slowly.`;
+      document.getElementById('cost-sub').textContent = `Launch month, ${s.students.toLocaleString('en-CA')} students. Every cost is shown with the math behind it.`;
       document.getElementById('cost-rows').innerHTML = AGENTS.map(a => `<tr><td>${a.name}</td><td>${PRICE[a.model][2].replace('Claude ', '')}</td><td class="math">${mathText(a)}${scale ? ` · × ${a.f[scale - 1]} at ${s.label.toLowerCase()}` : ''}</td><td class="num">${money(cost(a))}</td></tr>`).join('');
       document.getElementById('cost-foot').innerHTML = `<tr><td colspan="3">AI agents</td><td class="num">${money(ai)}</td></tr><tr><td colspan="3">Tools: CRM, scheduler, Canva, hosting</td><td class="num">${money(s.tools)}</td></tr><tr><td colspan="3">Total</td><td class="num">${money(ai + s.tools)}</td></tr>`;
       document.getElementById('c-ai').textContent = money(ai + s.tools);
       document.getElementById('c-ai-sub').textContent = `10 agents, ${s.hours} human hours a week`;
       document.getElementById('c-hire').textContent = money(s.hires * HIRE_MONTH);
-      document.getElementById('c-hire-sub').textContent = `${s.hires} junior hires: marketing, sales, analyst${s.hires > 3 ? ', support and operations' : ''}`;
+      document.getElementById('c-hire-sub').textContent = `${s.hires} junior hires: marketing, sales and an analyst`;
       document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', Number(b.dataset.scale) === scale));
     }
 
