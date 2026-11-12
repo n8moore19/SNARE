@@ -342,6 +342,32 @@
       .op { box-shadow: none; margin: 0; padding: 0.4in 0.5in; }
     }
 
+
+    /* ---------- agent 6: Insights analyst ---------- */
+    .modechip { display: inline-block; font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; }
+    .modechip.sample { background: #FFF6D6; color: #7A5A00; }
+    .modechip.real { background: var(--forest); color: var(--lime); }
+    .pbig { display: flex; align-items: baseline; gap: 8px; }
+    .pbig b { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+    .pbig span { font-size: 12.5px; color: var(--muted); }
+    .tw { display: grid; gap: 8px; }
+    .tw div { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13px; }
+    .tw b { font-variant-numeric: tabular-nums; }
+    .tw span { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+    .rrow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+    .rrow:first-child { border-top: 0; }
+    .rrow strong { font-size: 14px; }
+    .rrow span { font-size: 12px; color: var(--muted); flex: 1; min-width: 200px; }
+    .op .sampleflag { background: #FFF6D6; color: #7A5A00; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 600; margin-top: 14px; }
+    .op .bars { display: grid; gap: 7px; margin-top: 6px; }
+    .op .bar-r { display: grid; grid-template-columns: 150px 1fr 48px; gap: 10px; align-items: center; font-size: 13px; }
+    .op .bar-r .trk { height: 14px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+    .op .bar-r .trk i { display: block; height: 100%; background: var(--forest); border-radius: 99px; }
+    .op .bar-r b { text-align: right; font-variant-numeric: tabular-nums; }
+    .op .finds { list-style: none; padding: 0; display: grid; gap: 8px; }
+    .op .finds li { display: grid; grid-template-columns: 90px 1fr; gap: 12px; align-items: baseline; font-size: 14px; }
+    .op .finds b { font-size: 20px; font-weight: 800; color: var(--forest); }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -460,6 +486,7 @@
             <button role="tab" data-ltab="growth" aria-selected="false">Student acquisition</button>
             <button role="tab" data-ltab="content" aria-selected="false">Content creation</button>
             <button role="tab" data-ltab="sales" aria-selected="false">B2B sales</button>
+            <button role="tab" data-ltab="insights" aria-selected="false">Insights analyst</button>
           </div>
         </div>
         <div id="pass-slot"></div>
@@ -547,6 +574,25 @@
           <div class="pipe-head"><h3>Prospects</h3><div class="chips" id="pros-filter"></div></div>
           <p class="sub" id="pros-sub"></p>
           <div id="prospects"></div>
+        </div>
+        </div>
+
+        <div data-pane="insights" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">This week's insights</h3>
+          <span id="i-status" class="pill gate"><i></i>Checking</span>
+          <span id="i-time" class="note" style="margin:0"></span>
+          <button class="btn" id="run-insights" type="button" disabled>Run now</button>
+        </div>
+        <p class="sub">Every Friday it turns the student panel into a weekly brief, a report for each prospect, and stats for Content creation. It runs as a half price batch, so results arrive within about an hour. Every number covers at least 50 students. Until 50 real students share, it works on a clearly labelled sample panel.</p>
+        <div class="brief-grid">
+          <div class="panel brief" id="insights"></div>
+          <div class="side"><div class="panel"><h3>Student panel</h3><p class="sub">Students sharing anonymously from the app.</p><div id="panelbox"></div></div></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <h3>Reports for prospects</h3>
+          <p class="sub" id="reports-sub">One report per prospect in the B2B sales pipeline, answering their question.</p>
+          <div id="reports"></div>
         </div>
         </div>
       </section>
@@ -729,18 +775,18 @@ Reach: Director of Consumer Insights, via the partnerships page.
 Question we answer: how much of a full loaf do students throw out, and when?
 Email and one page pitch ready to send.` },
 
-      { id: 'insights', name: 'Insights analyst', group: 'sell', model: 'opus', auto: 'auto', runs: 8, inTok: 1500000, outTok: 40000, batch: true, f: [3, 10],
-        job: 'Turns the panel into reports buyers pay for.',
-        cadence: 'Weekly totals, monthly and quarterly reports',
-        does: ['Builds totals: waste by product, pack size, week of term and reason', 'Writes buyer reports with charts', 'Answers buyer questions from the data', 'Flags surprising patterns to Content and Sales'],
-        tools: ['Panel database (anonymous events only)', 'Code execution for charts', 'Report templates'],
-        gate: 'None directly. Every report goes through the Privacy guard and the router.',
-        talks: ['privacy', 'router', 'sales'],
-        sample: `Pack fit, spinach (Fall 2026, 1,240 students)
-Large 312 g bag: 41% thrown out, median 4 days to bin
-Small 142 g bag: 12% thrown out
-Students living alone waste 3 times more of the large bag.
-Recommendation: lead with the small bag near campus.` },
+      { id: 'insights', name: 'Insights analyst', group: 'sell', model: 'opus', auto: 'auto', built: true, runs: 28, inTok: 8000, outTok: 3000, batch: true, f: [3, 10],
+        job: 'Turns the student panel into reports buyers pay for.',
+        cadence: 'Weekly, Fridays, as a half price batch',
+        does: ['Collects real used and tossed events from students who opt in', 'Counts every number over at least 50 distinct students', 'Writes a weekly brief: what was wasted, when and why', 'Writes a report for each prospect in the sales pipeline', 'Sends real stats to Content creation, never sample ones', 'Works on a labelled sample panel until 50 real students share'],
+        tools: ['Student panel database (anonymous)', 'Message Batches at half price', 'Live buyer view page'],
+        gate: 'None directly. Reports go through the Privacy guard and the router.',
+        talks: ['sales', 'content', 'router'],
+        sample: `Weekly brief (sample panel)
+Most wasted: fresh spinach, 41% of what was used or tossed.
+When: waste peaks in exam weeks.
+Why: "went off" leads at 44%.
+Report for a bakery brand: full loaves are thrown out more than half loaves.` },
 
       { id: 'router', name: 'Data and offers router', group: 'sell', model: 'sonnet', auto: 'gate', isNew: true, runs: 300, inTok: 20000, outTok: 2000, f: [3, 10],
         job: 'Knows which buyer gets what data, and which students see which offer.',
@@ -1922,7 +1968,103 @@ Duplicate receipts blocked: 6` },
       if (sel) needPass(() => setProspect(sel.dataset.prstat, sel.value));
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales()]));
+    // ---------- agent 6: Insights analyst ----------
+    live.ins = null; live.ipending = null; live.panel = null; live.ibusy = false; live.ierror = '';
+    const pct = v => Math.round(v * 100) + '%';
+
+    function renderInsights() {
+      const latest = live.ins;
+      const st = document.getElementById('i-status');
+      let [cls, label, banner] = statusOf(latest);
+      if (live.ipending) { cls = 'guard'; label = 'Batch running'; banner = `Batch submitted ${fmtTime(live.ipending.submittedAt)}. Results usually arrive within an hour; this page picks them up when you reload.`; }
+      st.className = 'pill ' + cls; st.innerHTML = '<i></i>' + label;
+      const btn = document.getElementById('run-insights');
+      btn.disabled = !API || !live.status || !live.status.hasKey || live.ibusy || !!live.ipending;
+      btn.textContent = live.ibusy ? 'Submitting' : 'Run now';
+      document.getElementById('i-time').textContent = latest ? `Written ${fmtTime(latest.generatedAt)}` : '';
+      const mode = latest ? latest.output.mode : 'sample';
+      const b = latest && latest.output.brief ? latest.output.brief : {
+        headline: 'Sample: the weekly brief appears after the first batch.', topWaste: [{ item: 'Fresh spinach', figure: '41%', note: 'Sample panel figure.' }, { item: 'Whole wheat bread', figure: '31%', note: 'Sample panel figure.' }],
+        timing: 'Sample: waste peaks in exam weeks.', reasons: 'Sample: "went off" is the top reason.', forBuyers: ['Sample: smaller packs near campus.'], contentStats: [], nextSteps: ['Connect the worker, then press Run now.'] };
+      document.getElementById('insights').innerHTML = `
+        ${banner ? `<div class="preview"><div><b>${latest ? '' : 'Preview'}</b>${esc(banner)}</div></div>` : ''}
+        <p><span class="modechip ${mode}">${mode === 'real' ? 'Real panel' : 'Sample panel'}</span></p>
+        <p class="headline" style="margin-top:8px">${esc(b.headline)}</p>
+        ${b.topWaste.length ? `<div class="bsec"><b>Most wasted</b><div class="tw">${b.topWaste.map(x => `<div>${esc(x.item)}<b>${esc(x.figure)}</b><span>${esc(x.note)}</span></div>`).join('')}</div></div>` : ''}
+        <div class="bsec"><b>When</b><p style="font-size:13.5px">${esc(b.timing)}</p></div>
+        <div class="bsec"><b>Why</b><p style="font-size:13.5px">${esc(b.reasons)}</p></div>
+        ${b.forBuyers.length ? `<div class="bsec"><b>For buyers</b><ul class="blist">${b.forBuyers.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        <div class="bsec"><b>Sent to Content creation</b>${b.contentStats.length ? `<ul class="blist">${b.contentStats.map(x => `<li>${esc(x.stat)} <span class="note">${esc(x.context)}</span></li>`).join('')}</ul>` : `<p class="note" style="margin:0">${mode === 'real' ? 'No shareable stats this week.' : 'Nothing: sample numbers are never shared publicly.'}</p>`}</div>
+        ${b.nextSteps.length ? `<div class="bsec"><b>Next steps</b><ul class="blist">${b.nextSteps.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        ${live.ierror ? `<p class="err">${esc(live.ierror)}</p>` : ''}
+        <div class="srcs">${latest ? `<span class="src ${mode === 'real' ? 'real' : 'samp'}">${mode === 'real' ? 'Real panel' : 'Sample panel'}</span><span class="src real">${latest.sources.reports} prospect reports</span><span class="src real">Half price batch</span>` : '<span class="src samp">Sample</span>'}</div>`;
+
+      const p = live.panel;
+      const real = p ? p.realStudents : 0;
+      document.getElementById('panelbox').innerHTML = `
+        <div class="pbig"><b>${real}</b><span>real students sharing (last 28 days)</span></div>
+        <div class="meter" style="margin:10px 0 6px;height:10px;border-radius:99px;background:var(--line);overflow:hidden"><span style="display:block;height:100%;width:${Math.min(100, real / 50 * 100)}%;background:var(--forest)"></span></div>
+        <p class="note" style="margin:0">${real >= 50 ? 'Real data is on. Reports use the real panel.' : `${50 - real} more needed before real numbers can be shown. Until then, reports use the sample panel.`}</p>
+        <p class="note">${API ? 'Events arrive when pilot students turn on anonymous sharing in the app.' : 'Starts counting once the worker is connected.'}</p>`;
+
+      const reps = latest ? latest.output.reports || {} : {};
+      const pros = latest ? latest.output.prospects || [] : [];
+      document.getElementById('reports-sub').textContent = latest ? `One report per prospect, on the ${mode === 'real' ? 'real' : 'sample'} panel.` : 'One report per prospect in the B2B sales pipeline. They appear after the first batch.';
+      document.getElementById('reports').innerHTML = pros.filter(x => reps[x.id]).map(x => `<div class="rrow"><strong>${esc(x.org)}</strong><span>${esc(reps[x.id].title)}</span><button class="btn small" data-report="${esc(x.id)}">Open report</button></div>`).join('')
+        || '<p class="note" style="margin:0">No reports yet.</p>';
+    }
+
+    function openReport(id) {
+      const latest = live.ins; if (!latest) return;
+      const r = latest.output.reports[id]; const pro = latest.output.prospects.find(x => x.id === id);
+      if (!r || !pro) return;
+      const panel = latest.output.panel || {};
+      const rows = (panel.products || []).filter(x => r.chartProducts.some(n => n.toLowerCase() === x.product.toLowerCase()));
+      const max = Math.max(0.01, ...rows.map(x => x.wasteShare));
+      const sample = latest.output.mode !== 'real';
+      const m = document.getElementById('op-modal');
+      m.innerHTML = `<div class="op-wrap">
+        <div class="op-bar"><button class="btn small" data-print>Print or save PDF</button><button class="btn small outline" data-opclose>Close</button></div>
+        <article class="op">
+          <div class="op-top"><span class="brand">snare<i></i></span><span>Insight report for ${esc(pro.org)}<br>${new Date(latest.generatedAt).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
+          ${sample ? '<div class="sampleflag">Sample panel: this report shows the format with illustrative numbers. It is not real data yet.</div>' : ''}
+          <h1>${esc(r.title)}</h1>
+          <p class="lead">${esc(r.answer)}</p>
+          ${r.findings.length ? `<h2>Key findings</h2><ul class="finds">${r.findings.map(f => `<li><b>${esc(f.figure)}</b><span>${esc(f.finding)}</span></li>`).join('')}</ul>` : ''}
+          ${rows.length ? `<h2>Share thrown out, by product</h2><div class="bars">${rows.map(x => `<div class="bar-r"><span>${esc(x.product)}</span><span class="trk"><i style="width:${x.wasteShare / max * 100}%"></i></span><b>${pct(x.wasteShare)}</b></div>`).join('')}</div>` : ''}
+          <h2>What to do</h2><p style="font-size:14.5px">${esc(r.recommendation)}</p>
+          <h2>Method</h2><p style="font-size:13px;color:var(--muted)">${esc(r.method)} Panel: ${esc(String(panel.students || ''))} students, ${esc(panel.period || '')}.</p>
+          <div class="op-foot"><span>Team SNARE · Ivey Business School student venture · London, Ontario</span><span>${sample ? 'Sample panel' : 'Real student panel, every number covers 50+ students'}</span></div>
+        </article>
+      </div>`;
+      m.hidden = false;
+      m.querySelector('[data-opclose]').focus();
+    }
+
+    async function runInsightsNow() {
+      live.ibusy = true; live.ierror = ''; renderInsights();
+      try { live.ipending = (await call('/agents/insights/run', { method: 'POST' })).pending; }
+      catch (e) { if (e.message !== 'PASS') live.ierror = e.message; }
+      live.ibusy = false; renderInsights();
+    }
+
+    async function loadInsights() {
+      renderInsights();
+      if (!API || !live.status) return;
+      try {
+        const [i, p] = await Promise.all([call('/agents/insights'), call('/agents/panel')]);
+        live.ins = i.latest; live.ipending = i.pending; live.panel = p;
+      } catch (e) { /* keep preview */ }
+      renderInsights();
+    }
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('#run-insights')) needPass(runInsightsNow);
+      const rp = e.target.closest('[data-report]');
+      if (rp) openReport(rp.dataset.report);
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights()]));
     render();
   })();
   </script>

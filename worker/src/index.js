@@ -3,7 +3,7 @@
 // of app actions. The website never sees the API key.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales } from "./agents.js";
+import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales, runInsights, collectInsights } from "./agents.js";
 
 const ACTION_TYPES = [
   "open_recipe",      // target: recipe id
@@ -144,13 +144,17 @@ export default {
     }
   },
 
-  // Cron triggers (wrangler.toml): Market intelligence on Mondays, Student
-  // acquisition on Tuesdays, Content creation on Wednesdays and B2B sales on
-  // Thursdays at 12:00 UTC, then the Chief of Staff's daily brief
-  // at 13:00 UTC so it reads their latest work.
+  // Two daily cron triggers (wrangler.toml), so the worker fits the free plan's
+  // trigger limit. 12:00 UTC runs that weekday's agent; 13:00 UTC collects any
+  // finished insights batch, then the Chief of Staff writes the daily brief.
   async scheduled(event, env, ctx) {
-    const JOBS = { "0 12 * * 1": ["Market intelligence", runMarket], "0 12 * * 2": ["Student acquisition", runGrowth], "0 12 * * 3": ["Content creation", runContent], "0 12 * * 4": ["B2B sales", runSales] };
-    const job = JOBS[event.cron] || ["Chief of Staff", runChief];
-    ctx.waitUntil(job[1](env).catch((error) => console.error(`${job[0]} run failed:`, error.message)));
+    const log = (name) => (error) => console.error(`${name} run failed:`, error.message);
+    if (event.cron === "0 12 * * *") {
+      const WEEKDAY = { 1: ["Market intelligence", runMarket], 2: ["Student acquisition", runGrowth], 3: ["Content creation", runContent], 4: ["B2B sales", runSales], 5: ["Insights analyst", runInsights] };
+      const job = WEEKDAY[new Date(event.scheduledTime).getUTCDay()];
+      if (job) ctx.waitUntil(job[1](env).catch(log(job[0])));
+      return;
+    }
+    ctx.waitUntil(collectInsights(env).catch(log("Insights collect")).then(() => runChief(env)).catch(log("Chief of Staff")));
   },
 };

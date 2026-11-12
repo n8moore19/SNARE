@@ -622,6 +622,8 @@ export async function runContent(env) {
     env.AGENTS ? env.AGENTS.get("latest:growth", "json") : null,
   ]);
   const ideas = market ? market.output.items.filter((i) => i.sendTo === "content").map((i) => ({ title: i.title, summary: i.summary, url: i.url })) : [];
+  const insights = env.AGENTS ? await env.AGENTS.get("latest:insights", "json") : null;
+  const panelStats = insights && insights.output.mode === "real" ? insights.output.contentStats : [];
   const events = growth ? growth.output.events : [];
 
   const r = await research(client, {
@@ -633,7 +635,7 @@ export async function runContent(env) {
 
   const f = await structure(client, {
     model, system: CONTENT_FORMAT_SYSTEM, schema: CONTENT_SCHEMA,
-    content: `Today is ${today()}.\n\nResearch notes:\n${r.notes.join("\n\n")}\n\nAllowed sources (JSON):\n${JSON.stringify([...r.sources.values()])}\n\nIdeas from Market intelligence (JSON): ${JSON.stringify(ideas)}\nCampus events from Student acquisition (JSON): ${JSON.stringify(events)}\n\nRecipes (JSON): ${JSON.stringify(recipes.map(({ id, name, minutes, serves, meal, usesUp }) => ({ id, name, minutes, serves, meal, usesUp })))}`,
+    content: `Today is ${today()}.\n\nResearch notes:\n${r.notes.join("\n\n")}\n\nAllowed sources (JSON):\n${JSON.stringify([...r.sources.values()])}\n\nIdeas from Market intelligence (JSON): ${JSON.stringify(ideas)}\nCampus events from Student acquisition (JSON): ${JSON.stringify(events)}\nReal stats from SNARE's own student panel (each covers at least 50 students; cite source "SNARE student panel" with url ""; may be empty): ${JSON.stringify(panelStats)}\n\nRecipes (JSON): ${JSON.stringify(recipes.map(({ id, name, minutes, serves, meal, usesUp }) => ({ id, name, minutes, serves, meal, usesUp })))}`,
   });
 
   // Drop any piece with a citation search didn't return or a recipe that doesn't exist.
@@ -641,7 +643,7 @@ export async function runContent(env) {
   const before = f.output.pieces.length;
   const weekKey = new Date().toISOString().slice(0, 10);
   const pieces = f.output.pieces
-    .filter((p) => p.facts.every((x) => r.sources.has(x.url)) && (!p.recipeId || ids.has(p.recipeId)))
+    .filter((p) => p.facts.every((x) => r.sources.has(x.url) || (x.url === "" && x.source === "SNARE student panel" && panelStats.length)) && (!p.recipeId || ids.has(p.recipeId)))
     .map((p, n) => {
       const link = `${env.JOIN_URL || JOIN_URL}?src=${p.format === "poster" ? "poster" : p.format === "blurb" ? "club-blurb" : p.format.split(" ")[0]}`;
       const fill = (t) => t.split("{{JOIN_LINK}}").join(link);
@@ -808,6 +810,195 @@ async function updateProspect(env, body) {
   return list;
 }
 
+// ---------- agent 6: Insights analyst ----------
+// Real panel: pilot students who switch on anonymous sharing send used and
+// tossed events from the app into D1. Every number needs at least 50 distinct
+// students (K). Until the real panel reaches 50, reports run on a clearly
+// labelled sample panel and switch to real data automatically. The weekly
+// brief and prospect reports run as a Message Batch at half price: submitted
+// on Fridays, collected on the next scheduled check.
+
+const K = 50;
+const DAY_MS = 864e5;
+const EVENT_TYPES = ["bought", "used", "tossed"];
+const REASONS = ["went off", "forgot", "too much", "didn't like", "unknown"];
+
+const SAMPLE_PANEL = {
+  students: 1240, period: "last 28 days",
+  products: [
+    ["Fresh spinach", "produce", 610, 0.41, 4.2], ["Whole wheat bread", "bakery", 702, 0.31, 5.1], ["Romaine lettuce", "produce", 388, 0.28, 4.8],
+    ["Mushrooms", "produce", 305, 0.24, 4.4], ["Plain yogurt", "dairy", 344, 0.19, 9.6], ["Milk 2%", "dairy", 881, 0.14, 8.2],
+    ["Flour tortillas", "bakery", 297, 0.11, 10.4], ["Eggs", "eggs", 812, 0.04, 16.0],
+  ].map(([product, category, students, wasteShare, avgDaysToToss]) => ({ product, category, students, wasteShare, avgDaysToToss })),
+  reasons: [["went off", 0.44], ["forgot", 0.27], ["too much", 0.18], ["didn't like", 0.11]].map(([reason, share]) => ({ reason, share })),
+  weekly: [3.1, 3.4, 3.8, 3.6, 5.6, 4.0, 4.2, 4.4, 4.9, 5.3, 7.0, 6.4].map((kgPer100, i) => ({ week: i + 1, kgPer100 })),
+  campus: [{ campus: "Western", students: 812, wasteShare: 0.19 }, { campus: "Fanshawe", students: 428, wasteShare: 0.17 }],
+  household: [{ household: "solo", students: 318, wasteShare: 0.24 }, { household: "shared", students: 922, wasteShare: 0.16 }],
+};
+
+async function ensurePanel(env) {
+  await env.PANEL.prepare(`CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, pid TEXT NOT NULL, t INTEGER NOT NULL, type TEXT NOT NULL, product TEXT NOT NULL, category TEXT, days REAL, reason TEXT, campus TEXT, household TEXT, source TEXT)`).run();
+  await env.PANEL.prepare("CREATE INDEX IF NOT EXISTS events_t ON events (t)").run();
+  await env.PANEL.prepare("CREATE INDEX IF NOT EXISTS events_pid ON events (pid)").run();
+}
+
+async function recordEvents(request, env, cors) {
+  if (!env.PANEL) return json({ error: "Panel storage is not set up" }, 503, cors);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+  const pid = String(body.pid || "");
+  if (!/^[a-z0-9]{12,40}$/.test(pid)) return json({ error: "Invalid id" }, 400, cors);
+  await ensurePanel(env);
+  if (body.forget) {
+    await env.PANEL.prepare("DELETE FROM events WHERE pid = ?").bind(pid).run();
+    return json({ forgotten: true }, 200, cors);
+  }
+  const list = Array.isArray(body.events) ? body.events.slice(0, 50) : [];
+  const now = Date.now();
+  const campus = ["Western", "Fanshawe", "Other"].includes(body.campus) ? body.campus : "Other";
+  const household = body.household === "shared" ? "shared" : "solo";
+  const str = (v, n) => String(v || "").replace(/[^a-z0-9 _%'-]/gi, "").slice(0, n);
+  const rows = [];
+  for (const e of list) {
+    const t = Number(e.t) || now;
+    if (!EVENT_TYPES.includes(e.type) || t < now - 30 * DAY_MS || t > now + 3600e3) continue;
+    const days = Number.isFinite(Number(e.days)) ? Math.max(-60, Math.min(400, Number(e.days))) : null;
+    rows.push(env.PANEL.prepare("INSERT INTO events (pid, t, type, product, category, days, reason, campus, household, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(pid, t, e.type, str(e.product, 40), str(e.category, 20), days, e.type === "tossed" && REASONS.includes(e.reason) ? e.reason : null, campus, household, str(e.source, 20)));
+  }
+  if (rows.length) await env.PANEL.batch(rows);
+  return json({ saved: rows.length }, 200, cors);
+}
+
+// Aggregates with the K rule applied to every cell.
+async function realPanel(env) {
+  if (!env.PANEL) return { students: 0 };
+  await ensurePanel(env);
+  const since = Date.now() - 28 * DAY_MS;
+  const q = (sql, ...args) => env.PANEL.prepare(sql).bind(...args).all().then((r) => r.results);
+  const [size] = await q("SELECT COUNT(DISTINCT pid) AS n FROM events WHERE t > ?", since);
+  const students = size ? size.n : 0;
+  if (students < K) return { students };
+  const share = "CAST(SUM(type = 'tossed') AS REAL) / NULLIF(SUM(type IN ('used', 'tossed')), 0)";
+  const products = await q(`SELECT product, category, COUNT(DISTINCT pid) AS students, ${share} AS wasteShare, AVG(CASE WHEN type = 'tossed' THEN days END) AS avgDaysToToss FROM events WHERE t > ? GROUP BY product HAVING students >= ? ORDER BY wasteShare DESC LIMIT 20`, since, K);
+  const reasonRows = await q("SELECT reason, COUNT(*) AS n, COUNT(DISTINCT pid) AS s FROM events WHERE t > ? AND type = 'tossed' AND reason IS NOT NULL AND reason != 'unknown' GROUP BY reason HAVING s >= ?", since, K);
+  const total = reasonRows.reduce((t, r) => t + r.n, 0) || 1;
+  const weekly = await q("SELECT CAST(t / 604800000 AS INTEGER) AS week, COUNT(DISTINCT pid) AS s, SUM(type = 'tossed') AS tossed FROM events WHERE t > ? GROUP BY week HAVING s >= ? ORDER BY week", Date.now() - 84 * DAY_MS, K);
+  const campus = await q(`SELECT campus, COUNT(DISTINCT pid) AS students, ${share} AS wasteShare FROM events WHERE t > ? GROUP BY campus HAVING students >= ?`, since, K);
+  const household = await q(`SELECT household, COUNT(DISTINCT pid) AS students, ${share} AS wasteShare FROM events WHERE t > ? GROUP BY household HAVING students >= ?`, since, K);
+  return {
+    students, period: "last 28 days",
+    products: products.map((r) => ({ ...r, wasteShare: Math.round((r.wasteShare || 0) * 100) / 100, avgDaysToToss: r.avgDaysToToss == null ? null : Math.round(r.avgDaysToToss * 10) / 10 })),
+    reasons: reasonRows.map((r) => ({ reason: r.reason, share: Math.round((r.n / total) * 100) / 100 })),
+    weekly: weekly.map((r, i) => ({ week: i + 1, itemsTossedPerStudent: Math.round((r.tossed / r.s) * 10) / 10 })),
+    campus: campus.map((r) => ({ ...r, wasteShare: Math.round((r.wasteShare || 0) * 100) / 100 })),
+    household: household.map((r) => ({ ...r, wasteShare: Math.round((r.wasteShare || 0) * 100) / 100 })),
+  };
+}
+
+export async function panelSnapshot(env) {
+  const real = await realPanel(env);
+  return real.students >= K
+    ? { mode: "real", k: K, realStudents: real.students, panel: real }
+    : { mode: "sample", k: K, realStudents: real.students, panel: SAMPLE_PANEL };
+}
+
+const BRIEF_SCHEMA_INSIGHTS = {
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    topWaste: { type: "array", items: { type: "object", properties: { item: { type: "string" }, figure: { type: "string" }, note: { type: "string" } }, required: ["item", "figure", "note"], additionalProperties: false } },
+    timing: { type: "string" },
+    reasons: { type: "string" },
+    forBuyers: { type: "array", items: { type: "string" } },
+    contentStats: { type: "array", items: { type: "object", properties: { stat: { type: "string" }, context: { type: "string" } }, required: ["stat", "context"], additionalProperties: false } },
+    nextSteps: { type: "array", items: { type: "string" } },
+  },
+  required: ["headline", "topWaste", "timing", "reasons", "forBuyers", "contentStats", "nextSteps"],
+  additionalProperties: false,
+};
+
+const REPORT_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    answer: { type: "string" },
+    findings: { type: "array", items: { type: "object", properties: { finding: { type: "string" }, figure: { type: "string" } }, required: ["finding", "figure"], additionalProperties: false } },
+    chartProducts: { type: "array", items: { type: "string" } },
+    recommendation: { type: "string" },
+    method: { type: "string" },
+  },
+  required: ["title", "answer", "findings", "chartProducts", "recommendation", "method"],
+  additionalProperties: false,
+};
+
+const INSIGHTS_SYSTEM = `You are SNARE's Insights analyst. SNARE runs an anonymous household food waste panel of students in London, Ontario who opted in to sharing. You get aggregate panel numbers in which every cell already covers at least 50 students.
+Rules:
+- Use only numbers in the panel data. Never invent, extrapolate or round into new claims. wasteShare is the share of used or tossed items that were tossed.
+- The input says whether the panel is "real" or "sample". If sample, every output is an illustration of the format: say so plainly and never present a sample number as a real finding. contentStats must be [] when the panel is sample.
+- Plain, short sentences. No em dashes or hyphens used as dashes.`;
+
+async function getPending(env) { return env.AGENTS ? env.AGENTS.get("insights:pending", "json") : null; }
+
+export async function runInsights(env) {
+  if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
+  if (!env.AGENTS) throw new Error("NO_STORE");
+  const pending = await getPending(env);
+  if (pending) return { pending };
+  const snap = await panelSnapshot(env);
+  const prospects = (await getProspects(env)).filter((p) => p.status !== "lost").slice(0, 8);
+  const model = env.INSIGHTS_MODEL || "claude-opus-5-5";
+  const data = JSON.stringify({ mode: snap.mode, panel: snap.panel });
+  const params = (schema, content) => ({
+    model, max_tokens: 16000,
+    output_config: { effort: "medium", format: { type: "json_schema", schema } },
+    system: INSIGHTS_SYSTEM,
+    messages: [{ role: "user", content }],
+  });
+  const requests = [{
+    custom_id: "brief",
+    params: params(BRIEF_SCHEMA_INSIGHTS, `Today is ${today()}. Write the weekly insights brief: what students wasted most, when, and why; what it means for buyers (food brands, grocers, cities); and, only if the panel is real, 2 to 4 shareable stats for social posts with context. Panel (JSON): ${data}`),
+  }, ...prospects.map((p) => ({
+    custom_id: `report-${p.id}`.slice(0, 64),
+    params: params(REPORT_SCHEMA, `Today is ${today()}. Write a short insight report for ${p.org} (${p.type}). Their question: "${p.question}". Answer it from the panel only; if the panel cannot answer it directly, say what it does show and what data would answer it. chartProducts: up to 6 product names from the panel to chart. method: one sentence on the panel and the 50 student rule. Panel (JSON): ${data}`),
+  }))];
+
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const batch = await client.messages.batches.create({ requests });
+  const record = { batchId: batch.id, submittedAt: new Date().toISOString(), mode: snap.mode, realStudents: snap.realStudents, panel: snap.panel, prospects: prospects.map((p) => ({ id: p.id, org: p.org })) };
+  await env.AGENTS.put("insights:pending", JSON.stringify(record));
+  return { pending: record };
+}
+
+// Collect a finished batch. Cheap when nothing is pending.
+export async function collectInsights(env) {
+  const pending = await getPending(env);
+  if (!pending || !env.ANTHROPIC_API_KEY) return null;
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const batch = await client.messages.batches.retrieve(pending.batchId);
+  if (batch.processing_status !== "ended") return null;
+  let brief = null; const reports = {}; let inTok = 0, outTok = 0, errors = 0;
+  for await (const r of await client.messages.batches.results(pending.batchId)) {
+    if (r.result.type !== "succeeded") { errors++; continue; }
+    const m = r.result.message;
+    inTok += m.usage.input_tokens; outTok += m.usage.output_tokens;
+    let out;
+    try { out = JSON.parse(textOf(m)); } catch { errors++; continue; }
+    if (r.custom_id === "brief") brief = out;
+    else reports[r.custom_id.replace(/^report-/, "")] = out;
+  }
+  if (brief && pending.mode !== "real") brief.contentStats = []; // never share sample numbers
+  await env.AGENTS.delete("insights:pending");
+  if (!brief && !Object.keys(reports).length) return null;
+  return save(env, "insights", {
+    agent: "insights",
+    generatedAt: new Date().toISOString(),
+    output: { mode: pending.mode, brief, reports, prospects: pending.prospects, panel: pending.panel, contentStats: brief ? brief.contentStats : [] },
+    sources: { mode: pending.mode, realStudents: pending.realStudents, reports: Object.keys(reports).length, errors, batch: true },
+    usage: { input: inTok, output: outTok },
+  });
+}
+
 async function getPostStatus(env) {
   return (env.AGENTS ? await env.AGENTS.get("postStatus", "json") : null) || {};
 }
@@ -844,6 +1035,18 @@ export async function handleAgents(request, env, cors) {
   if (request.method === "GET" && path === "/agents/waitlist") return json({ summary: await waitlistSummary(env) }, 200, cors);
   if (request.method === "GET" && path === "/agents/poststatus") return json({ status: await getPostStatus(env) }, 200, cors);
   if (request.method === "GET" && path === "/agents/prospects") return json({ prospects: await getProspects(env) }, 200, cors);
+  // Public: the app sends anonymous events here when a student opts in; also used to forget them.
+  if (request.method === "POST" && path === "/agents/events") {
+    if (tooManyRuns("events:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 120)) return json({ error: "Too many events" }, 429, cors);
+    return recordEvents(request, env, cors);
+  }
+  if (request.method === "GET" && path === "/agents/panel") return json(await panelSnapshot(env), 200, cors);
+  if (request.method === "GET" && path === "/agents/insights") {
+    let latest = null;
+    try { latest = await collectInsights(env); } catch { /* try again next time */ }
+    latest = latest || (env.AGENTS ? await env.AGENTS.get("latest:insights", "json") : null);
+    return json({ latest, pending: await getPending(env) }, 200, cors);
+  }
   // Public: the join page posts here. Same site check as everything else.
   if (request.method === "POST" && path === "/agents/waitlist/join") {
     if (tooManyRuns("join:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 10)) return json({ error: "Too many tries, wait a bit" }, 429, cors);
@@ -910,6 +1113,10 @@ export async function handleAgents(request, env, cors) {
     return json({ prospects: list }, 200, cors);
   }
 
+  if (request.method === "POST" && path === "/agents/insights/run") {
+    try { return json(await runInsights(env), 200, cors); } catch (error) { return agentError(error, cors); }
+  }
+
   const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales };
   const runMatch = path.match(/^\/agents\/(chief|market|growth|content|sales)\/run$/);
   if (request.method === "POST" && runMatch) {
@@ -928,6 +1135,7 @@ function agentError(error, cors) {
   if (error.message === "NO_KEY") return json({ error: "The worker has no Anthropic API key yet" }, 500, cors);
   if (error.message === "REFUSED") return json({ error: "Claude declined to write this brief" }, 502, cors);
   if (error.message === "TOO_LONG") return json({ error: "The brief was cut off. Try again." }, 502, cors);
+  if (error.message === "NO_STORE") return json({ error: "Storage is not set up on the worker" }, 500, cors);
   if (error.message === "NO_SOURCES") return json({ error: "Web search returned no sources. Try again later." }, 502, cors);
   if (error instanceof Anthropic.AuthenticationError) return json({ error: "The worker's API key is invalid" }, 500, cors);
   if (error instanceof Anthropic.RateLimitError) return json({ error: "Claude is busy, try again shortly" }, 429, cors);

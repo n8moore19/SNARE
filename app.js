@@ -315,6 +315,47 @@
     f.expHi = now + hi * DAY - 3600e3;
   }
 
+  // ---------- anonymous panel events ----------
+  // Only when the student turned on anonymous sharing and the live worker is
+  // connected. A random id counts distinct students for the 50 student rule;
+  // it is never linked to an email or a name.
+  let panelQueue = [], panelTimer = null;
+  function panelId() {
+    try {
+      let id = localStorage.getItem('snare.pid');
+      if (!id) { id = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 20); localStorage.setItem('snare.pid', id); }
+      return id;
+    } catch (e) { return null; }
+  }
+  const panelCampus = () => ({ campus: 'Western', fanshawe: 'Fanshawe' })[P().area] || 'Other';
+  function trackEvent(type, f, extra = {}) {
+    const url = (window.SNARE_AI_URL || '').trim();
+    if (!P().share || !url || !f || products[f.id].leftover) return;
+    panelQueue.push({ type, product: products[f.id].name, category: products[f.id].cat, days: Math.round((Date.now() - (f.added || Date.now())) / DAY * 10) / 10, source: f.src || '', t: Date.now(), ...extra });
+    clearTimeout(panelTimer);
+    panelTimer = setTimeout(flushPanel, 1500);
+  }
+  function flushPanel() {
+    const url = (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
+    const pid = panelId();
+    if (!panelQueue.length || !url || !pid) return;
+    const events = panelQueue.splice(0, 50);
+    fetch(url + '/agents/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid, campus: panelCampus(), household: P().house ? 'shared' : 'solo', events }) }).catch(() => { /* offline: drop quietly */ });
+    if (panelQueue.length) panelTimer = setTimeout(flushPanel, 500);
+  }
+  function forgetPanel() {
+    panelQueue = [];
+    const url = (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
+    const pid = panelId();
+    if (url && pid) fetch(url + '/agents/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid, forget: true }) }).catch(() => {});
+  }
+  // Used it: remove from the fridge and count it for the panel.
+  function useItem(f) {
+    if (!f) return;
+    state.fridge = state.fridge.filter(x => x !== f);
+    trackEvent('used', f);
+  }
+
   function addToFridge(id, opts = {}) {
     const p = products[id];
     const exact = !!opts.label;
@@ -333,6 +374,7 @@
     };
     setRange(item, days, exact);
     state.fridge.push(item);
+    if (['receipt', 'trip'].includes(item.src)) trackEvent('bought', item);
     return item;
   }
 
@@ -425,7 +467,8 @@
     f.checkedAt = Date.now();
   }
 
-  function tossItem(f) {
+  function tossItem(f, reason = 'unknown') {
+    trackEvent('tossed', f, { reason });
     // Thrown out before the early end of its window means it goes off sooner for this user.
     const early = daysLeft(f);
     if (!f.frozen && f.src !== 'label') learnFrom(f.id, early > 0 ? -early : -0.5);
@@ -547,6 +590,7 @@
     const value = a.expiring.reduce((t, h) => t + products[h.f.id].base * 0.5, 0);
     // Perishables get used up; long life items (cheese, eggs, rice) stay.
     const used = a.have.filter(h => products[h.f.id].life <= 10).map(h => h.f.uid);
+    a.have.filter(h => used.includes(h.f.uid)).forEach(h => trackEvent('used', h.f));
     state.fridge = state.fridge.filter(f => !used.includes(f.uid));
     state.cooked.push({ rid, date: Date.now(), rescued, value, kg: rescued * KG_PER_ITEM });
     if (a.r.serves >= 2) addToFridge('leftovers', { labelText: `Leftover ${a.r.name}`, days: 4, src: 'leftover', qty: `${a.r.serves - 1} servings` });
@@ -814,6 +858,7 @@
           <li>${ICONS.check}Totals only. A buyer never sees one student.</li>
           <li>${ICONS.check}Location off. Fridge photos are deleted after scanning.</li>
           <li>${ICONS.check}You earn points either way. Nothing is paid for throwing food out.</li>
+          <li>${ICONS.check}Turn sharing off any time and what you shared is deleted.</li>
           <li>${ICONS.check}For students 18 and over.</li>
         </ul>
         <div class="sticky">
@@ -1011,7 +1056,8 @@
             const f = a ? a.f : state.fridge.find(x => x.uid === uid);
             if (!f) return '';
             return `<li class="${a ? 'answered ' + a.v : ''}">
-              <div class="ci-name"><strong>${esc(itemName(f))}</strong><span>${a ? label[a.v] : rangeText(f)}</span></div>
+              <div class="ci-name"><strong>${esc(itemName(f))}</strong><span>${a ? label[a.v] + (a.reason ? ': ' + a.reason : '') : rangeText(f)}</span></div>
+              ${a && a.v === 'tossed' && !a.reason ? `<div class="ci-why"><span>Why?</span>${['went off', 'forgot', 'too much', "didn't like"].map(r => `<button data-action="cireason" data-id="${uid}" data-r="${r}">${r}</button>`).join('')}</div>` : ''}
               ${a ? `<button class="link" data-action="ciundo" data-id="${uid}">Undo</button>` : `<div class="ci-btns">
                 <button data-action="ci" data-id="${uid}" data-v="used">${ICONS.check}Used</button>
                 <button data-action="ci" data-id="${uid}" data-v="tossed">${ICONS.trash}Tossed</button>
@@ -1034,8 +1080,8 @@
     for (const [uid, a] of Object.entries(c.answers)) {
       const f = state.fridge.find(x => x.uid === uid);
       if (!f) continue;
-      if (a.v === 'used') { if (daysHi(f) >= 0) inTime++; state.fridge = state.fridge.filter(x => x !== f); }
-      if (a.v === 'tossed') tossItem(f);
+      if (a.v === 'used') { if (daysHi(f) >= 0) inTime++; useItem(f); }
+      if (a.v === 'tossed') tossItem(f, a.reason || 'unknown');
       if (a.v === 'have' && daysLeft(f) <= 0) stillGood(f);
     }
     earn(PTS.checkin, 'Weekly check in');
@@ -2579,7 +2625,7 @@
     else if (act === 'additem') { if (!state.items.some(it => it.id === arg)) state.items.push({ id: arg, qty: 1, why: 'Added by chat' }); done = `added ${lower(products[arg].name)} to your list`; }
     else if (act === 'removeitem') { state.items = state.items.filter(it => it.id !== arg); done = `took ${lower(products[arg].name)} off your list`; }
     else if (act === 'fridgeadd') { const f = addToFridge(arg); state.highlight = [f.uid]; persist(); done = `added ${lower(products[arg].name)} to your fridge`; }
-    else if (act === 'useditem') { const f = fridgeAll().find(x => x.id === arg); if (f) { state.fridge = state.fridge.filter(x => x !== f); persist(); done = `marked ${lower(itemName(f))} as used`; } }
+    else if (act === 'useditem') { const f = fridgeAll().find(x => x.id === arg); if (f) { useItem(f); persist(); done = `marked ${lower(itemName(f))} as used`; } }
     else if (act === 'freeze') { const f = fridgeAll().find(x => x.id === arg && !x.frozen); if (f) { freezeItem(f); persist(); done = `froze your ${lower(itemName(f))}`; } }
     else if (act === 'dislike') { if (!P().dislikes.includes(arg)) P().dislikes.push(arg); persist(); done = `will remember you don't eat ${lower(products[arg].name)}`; }
     else if (act === 'diet') { if (!P().diet.includes(arg)) P().diet.push(arg); persist(); done = `will only show ${lower(DIETS.find(d => d[0] === arg)[1])} meals`; }
@@ -2773,7 +2819,7 @@
       case 'budget': P().budget = Number(id); persist(); rerender(); break;
       case 'mode': P().mode = id; persist(); el.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === el)); break;
       case 'finishwelcome': state.afterConsent = id === 'scan' ? 'scan' : 'fridge'; if (P().consented) { P().done = true; persist(); go(state.afterConsent); } else go('consent'); break;
-      case 'consent': P()[id] = !P()[id]; persist(); rerender(); if (state.screen !== 'consent') toast(id === 'share' ? (P().share ? 'Anonymous sharing on. Brand bonuses unlocked.' : 'Anonymous sharing off. We stop using your data in totals.') : (P().track ? 'Food tracking on' : 'Food tracking off')); break;
+      case 'consent': P()[id] = !P()[id]; persist(); if (id === 'share' && !P().share) forgetPanel(); rerender(); if (state.screen !== 'consent') toast(id === 'share' ? (P().share ? 'Anonymous sharing on. Brand bonuses unlocked.' : 'Anonymous sharing off. Anything you shared is deleted from the totals.') : (P().track ? 'Food tracking on' : 'Food tracking off')); break;
       case 'consentdone': P().consented = true; P().done = true; persist(); go(state.afterConsent); break;
       case 'profile': go('profile'); break;
       case 'forget': P().dislikes = P().dislikes.filter(x => x !== id); persist(); rerender(); break;
@@ -2792,7 +2838,7 @@
       case 'ffilter': state.fridgeFilter = id; rerender(); break;
       case 'used': {
         const f = state.fridge.find(x => x.uid === id);
-        state.fridge = state.fridge.filter(x => x.uid !== id);
+        useItem(f);
         if (f.owner === 'You' && daysHi(f) >= 0) { earn(PTS.usedInTime, `Used ${lower(itemName(f))} in time`); toast(`${itemName(f)} used in time · +${PTS.usedInTime} points`); }
         else toast(`${itemName(f)} marked as used`);
         persist(); rerender(); break;
@@ -2818,6 +2864,7 @@
       case 'receiptconfirm': confirmReceipt(); break;
       case 'startcheckin': startCheckin(); break;
       case 'ci': state.checkin.answers[id] = { v: el.dataset.v, f: state.fridge.find(x => x.uid === id) }; rerender(); break;
+      case 'cireason': state.checkin.answers[id].reason = el.dataset.r; rerender(); break;
       case 'ciundo': delete state.checkin.answers[id]; rerender(); break;
       case 'cifinish': finishCheckin(); break;
       case 'cashout': state.cashPick = true; rerender(); break;
@@ -2976,7 +3023,7 @@
     if (!b) return;
     const f = state.fridge.find(x => x.uid === b.dataset.id);
     if (b.dataset.n === 'used' && f) {
-      state.fridge = state.fridge.filter(x => x !== f);
+      useItem(f);
       if (daysHi(f) >= 0) earn(PTS.usedInTime, `Used ${lower(itemName(f))} in time`);
       toast(`${itemName(f)} marked as finished${daysHi(f) >= 0 ? ` · +${PTS.usedInTime} points` : ''}`);
     }

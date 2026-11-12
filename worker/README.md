@@ -32,6 +32,7 @@ assistant automatically if the worker is ever unreachable.
 
    ```bash
    npx wrangler kv namespace create AGENTS   # paste the id it prints into wrangler.toml
+   npx wrangler d1 create snare-panel         # paste the database_id it prints into wrangler.toml
    npx wrangler secret put TEAM_KEY           # a passcode your team types to run agents and edit tasks
    npx wrangler deploy                        # deploy again so the agents and the 8:00 schedule go live
    ```
@@ -72,11 +73,23 @@ The same worker runs the launch agents shown on `org.html`.
   details), and writes an email and a one page pitch with real cited stats and a clearly
   illustrative example insight. Prospects go into the sales pipeline on the org page; the
   team sends, and any price or contract goes through Gate 1. Opus 5.5, about $1 to $1.50 a run.
+- **Insights analyst** (built): students who turn on anonymous sharing in the app send
+  bought, used and tossed events (with a reason from the weekly check in) to `POST /agents/events`,
+  stored in D1 under a random id that is never linked to a name or email. Turning sharing off
+  deletes them. Every number needs at least 50 distinct students. Until 50 real students share,
+  everything runs on a clearly labelled sample panel, and switches to real data automatically.
+  On Fridays it submits a Message Batch (half price) for a weekly brief and a report per
+  prospect; results are collected at the next 13:00 UTC run or when the org page loads. Real
+  stats (never sample) go to Content creation. `insights.html` reads `GET /agents/panel` live.
+  Opus 5.5, about 30 to 40 cents a week.
+- **Schedule**: two cron triggers. 12:00 UTC runs the weekday's agent (Mon market, Tue
+  acquisition, Wed content, Thu sales, Fri insights); 13:00 UTC collects insights, then the
+  Chief of Staff writes the daily brief.
 - **Waitlist**: `join.html` posts to `POST /agents/waitlist/join` (public, rate limited, same
   site only). Each email is one KV key with campus, source and date in its metadata. Students
   can remove their email on the same page. The org page only shows counts.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)
