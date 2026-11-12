@@ -1773,6 +1773,109 @@ async function markInvoiced(env, brand) {
   return sent;
 }
 
+// ---------- the hub: ask the Chief of Staff, and what's waiting ----------
+
+const RUN_IDS = ["chief", "market", "growth", "content", "sales", "insights", "router", "privacy", "rewards"];
+const ALL_IDS = [...RUN_IDS, "support"];
+
+// Everything that is waiting for a person, in one place.
+async function waitingForTeam(env) {
+  const [buyers, queue, tickets, book, content] = await Promise.all([
+    getBuyers(env), env.AGENTS ? env.AGENTS.get("privacy:queue", "json") : null, getTickets(env), rewardsBook(env).catch(() => null), env.AGENTS ? env.AGENTS.get("latest:content", "json") : null,
+  ]);
+  return {
+    gate1: buyers.filter((b) => !b.approved && !b.revoked).map((b) => ({ org: b.org })),
+    gate1held: buyers.filter((b) => b.heldReport && !b.revoked).map((b) => ({ org: b.org })),
+    gate2: book ? { used: book.cap.used, cap: book.cap.limit, over: book.cap.overCap, flags: book.flags.length } : null,
+    gate3: (queue || []).filter((x) => x.status === "held").map((x) => ({ kind: x.kind, title: x.title })),
+    support: tickets.filter((t) => t.status === "open").map((t) => ({ question: t.question, created: t.created })),
+    postsReady: content ? content.output.pieces.filter((p) => !p.privacy || ["passed", "fixed", "approved"].includes(p.privacy.status)).length : 0,
+  };
+}
+
+// A compact picture of the whole organization for the Chief to answer from.
+async function orgSnapshot(env) {
+  const get = (k) => (env.AGENTS ? env.AGENTS.get(k, "json") : null);
+  const [tasks, act, waiting, prospects, groups, waitlist, ...latest] = await Promise.all([
+    getTasks(env), readActivity(env), waitingForTeam(env), getProspects(env), getGroups(env), waitlistSummary(env).catch(() => null),
+    ...ALL_IDS.map((id) => get(`latest:${id}`)),
+  ]);
+  const L = Object.fromEntries(ALL_IDS.map((id, i) => [id, latest[i]]));
+  const at = (r) => (r ? r.generatedAt : "never run");
+  const o = (id) => (L[id] ? L[id].output : null);
+  const stageCounts = {};
+  prospects.forEach((p) => { stageCounts[p.status] = (stageCounts[p.status] || 0) + 1; });
+  return {
+    today: today(),
+    tasks: tasks.map(({ text, owner, due, done }) => ({ text, owner, due, done })),
+    waitingForTeam: waiting,
+    agents: {
+      chief: { lastRun: at(L.chief), brief: o("chief") && { headline: o("chief").headline, needsYou: o("chief").needsYou, risks: o("chief").risks } },
+      market: { lastRun: at(L.market), headline: o("market") && o("market").headline, findings: o("market") && o("market").items.slice(0, 8).map((i) => ({ category: i.category, title: i.title, sendTo: i.sendTo })) },
+      growth: { lastRun: at(L.growth), headline: o("growth") && o("growth").headline, newGroups: o("growth") && o("growth").newGroups, events: o("growth") && o("growth").events.slice(0, 5).map((e) => `${e.date} ${e.event}`), pipeline: groups.length, contacted: groups.filter((g) => g.status !== "new").length, waitlist },
+      content: { lastRun: at(L.content), headline: o("content") && o("content").headline, posts: o("content") && o("content").pieces.map((p) => ({ format: p.format, title: p.title, privacy: p.privacy ? p.privacy.status : "unchecked" })) },
+      sales: { lastRun: at(L.sales), headline: o("sales") && o("sales").headline, pipeline: stageCounts, prospects: prospects.slice(-10).map((p) => ({ org: p.org, type: p.type, stage: p.status })) },
+      insights: { lastRun: at(L.insights), panel: o("insights") && o("insights").mode, brief: o("insights") && o("insights").brief && { headline: o("insights").brief.headline, topWaste: o("insights").brief.topWaste } },
+      router: { lastRun: at(L.router), headline: o("router") && o("router").headline, offerIdeas: o("router") && o("router").offerIdeas.map((i) => i.offerText) },
+      privacy: { lastRun: at(L.privacy), last30: o("privacy") && o("privacy").last30, heldAtGate3: waiting.gate3.length },
+      support: { openQuestions: waiting.support.length },
+      rewards: { lastRun: at(L.rewards), headline: o("rewards") && o("rewards").headline, fraudFlags: o("rewards") && o("rewards").book ? o("rewards").book.flags.length : null },
+    },
+    recentActivity: act.events.slice(-20).map((e) => `${e.t} ${e.agent} ${e.type}: ${e.text || ""}`),
+  };
+}
+
+const CHIEF_ASK_SCHEMA = {
+  type: "object",
+  properties: {
+    reply: { type: "string" },
+    actions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { type: { type: "string", enum: ["run", "open", "addTask"] }, agent: { type: "string" }, task: { type: "string" }, label: { type: "string" } },
+        required: ["type", "agent", "task", "label"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["reply", "actions"],
+  additionalProperties: false,
+};
+
+const CHIEF_ASK_SYSTEM = `You are the Chief of Staff of Team SNARE's launch organization: ten AI agents and five students (Eason, Ava, Sally, Nate, Ruby). The team asks you questions about what is going on across the organization.
+Answer from the organization snapshot only: tasks, what is waiting for the team, each agent's latest work and when it last ran, and recent activity. Say plainly when something hasn't run yet or the data isn't there. Never invent numbers, buyers, groups or results. Remember SNARE is pre launch; app numbers on the student panel are sample data until 50 students share.
+Be brief and specific, like a sharp chief of staff: 2 to 6 sentences, or a short list. Plain text; "- " for list lines is fine. No em dashes or hyphens used as dashes.
+Actions are buttons the person can press:
+- "run" an agent (agent id from: ${RUN_IDS.join(", ")}) only when they ask you to run, refresh or redo something.
+- "open" an agent's page (any of: ${ALL_IDS.join(", ")}) when pointing them to details.
+- "addTask" with the task text when they ask you to add or remember a task.
+For actions that don't use a field, set it to "". Labels are 2 to 4 words. Use an empty list when no action fits.`;
+
+async function chiefAsk(request, env, cors) {
+  if (!env.ANTHROPIC_API_KEY) return json({ error: "The worker has no Anthropic API key yet" }, 500, cors);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+  const msgs = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+  if (!msgs.length || !msgs.every((m) => ["user", "assistant"].includes(m.role) && typeof m.content === "string" && m.content.length > 0 && m.content.length <= 2000) || msgs[0].role !== "user" || msgs[msgs.length - 1].role !== "user") return json({ error: "Invalid request" }, 400, cors);
+  const snapshot = await orgSnapshot(env);
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  try {
+    const r = await client.beta.messages.create({
+      model: env.AGENT_MODEL || "claude-opus-5-5", max_tokens: 8000, ...FALLBACK,
+      output_config: { effort: "low", format: { type: "json_schema", schema: CHIEF_ASK_SCHEMA } },
+      system: [{ type: "text", text: CHIEF_ASK_SYSTEM }, { type: "text", text: `Organization snapshot (JSON):\n${JSON.stringify(snapshot)}` }],
+      messages: msgs,
+    });
+    if (r.stop_reason === "refusal") return json({ reply: "I can't help with that one. Ask me about the organization.", actions: [] }, 200, cors);
+    const out = JSON.parse(textOf(r));
+    out.actions = out.actions.filter((a) => (a.type === "run" && RUN_IDS.includes(a.agent)) || (a.type === "open" && ALL_IDS.includes(a.agent)) || (a.type === "addTask" && a.task.trim() && a.task.length <= 200)).slice(0, 3);
+    return json(out, 200, cors);
+  } catch (error) {
+    return agentError(error, cors);
+  }
+}
+
 async function getPostStatus(env) {
   return (env.AGENTS ? await env.AGENTS.get("postStatus", "json") : null) || {};
 }
@@ -1966,6 +2069,11 @@ export async function handleAgents(request, env, cors) {
     return json({ offers }, 200, cors);
   }
 
+  if (request.method === "POST" && path === "/agents/chief/ask") {
+    if (tooManyRuns("ask:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 40)) return json({ error: "Too many questions this hour" }, 429, cors);
+    return chiefAsk(request, env, cors);
+  }
+  if (request.method === "GET" && path === "/agents/waiting") return json(await waitingForTeam(env), 200, cors);
   if (request.method === "GET" && path === "/agents/rewards") {
     const [latest, sent, settings] = await Promise.all(["latest:rewards", "billing:sent", "billing:settings"].map((k) => (env.AGENTS ? env.AGENTS.get(k, "json") : null)));
     return json({ latest, live: { book: await rewardsBook(env), billing: await invoiceDrafts(env) }, sent: (sent || []).slice(-20).reverse(), settings: settings || { fee: 0.5 } }, 200, cors);

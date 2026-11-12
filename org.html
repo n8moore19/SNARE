@@ -529,8 +529,118 @@
     .feed li.start time, .feed li.done time { color: var(--forest); font-weight: 700; }
     .feed .ev { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 6px; border-radius: 5px; margin-right: 4px; background: var(--soft); color: var(--forest); }
     .feed .ev.error, .feed .ev.handoff { background: var(--warn-bg); color: var(--warn); }
-    .feed .empty { color: var(--muted); font-size: 13px; padding: 8px 6px; }
+    .feed .empty { display: block; color: var(--muted); font-size: 13px; padding: 8px 6px; }
     @media (prefers-reduced-motion: reduce) { .edge-flow { animation: none; } .nd.working .nd-ring { animation: none; } }
+
+
+    /* ---------- hub: the organization as people ---------- */
+    .view[hidden] { display: none !important; }
+    .hub-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .hub-head h1 { font-size: clamp(28px, 3.6vw, 40px); font-weight: 800; letter-spacing: -0.03em; margin: 4px 0 4px; }
+    .hub-state { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+    .hub-state b, #hub-state { color: var(--ink); font-weight: 700; }
+    .live-dot { width: 9px; height: 9px; border-radius: 50%; background: #C9D4CE; }
+    .live-dot.on { background: #2DBE60; box-shadow: 0 0 0 0 rgba(45,190,96,0.5); animation: hubping 2s infinite; }
+    .live-dot.busy { background: var(--lime); animation: hubping 1s infinite; }
+    @keyframes hubping { 0% { box-shadow: 0 0 0 0 rgba(45,190,96,0.5); } 100% { box-shadow: 0 0 0 9px rgba(45,190,96,0); } }
+    .hub { container-type: inline-size; }
+    .hub-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 16px; align-items: stretch; }
+    @container (min-width: 1180px) { .hub-grid { grid-template-columns: minmax(0, 1fr) 360px; } .chief-chat { max-height: none; } }
+    .stage-card { background: #FFFFFF; border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); padding: 10px 10px 12px; min-width: 0; }
+    .stage-scroll { overflow-x: auto; }
+    .team-stage { position: relative; min-width: 700px; aspect-ratio: 1000 / 880; }
+    .col-label { position: absolute; top: 22.5%; transform: translateX(-50%); font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #9AA59E; }
+    .stage-note { font-size: 12px; color: var(--muted); margin: 6px 8px 0; }
+    .member { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 4px; width: 150px; text-align: center; z-index: 2; }
+    .member .av { position: relative; width: 74px; height: 74px; border: 0; padding: 0; background: none; border-radius: 50%; cursor: pointer; transition: transform 0.2s; }
+    .member.chief .av { width: 96px; height: 96px; }
+    .member .av:hover { transform: translateY(-2px) scale(1.04); }
+    .member .av .face { width: 100%; height: 100%; display: block; border-radius: 50%; box-shadow: 0 4px 14px rgba(0, 66, 48, 0.14); }
+    .member .av::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2.5px solid transparent; transition: border-color 0.3s; }
+    .member.working .av::after { border-color: var(--lime); animation: workring 1.2s ease-in-out infinite; }
+    @keyframes workring { 50% { transform: scale(1.06); border-color: var(--accent); } }
+    .member .who { font-size: 13px; font-weight: 700; line-height: 1.2; }
+    .member .st { font-size: 11px; color: var(--muted); }
+    .member.working .st { color: var(--forest); font-weight: 700; }
+    .member .run { position: absolute; top: -4px; right: -6px; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink); background: #fff; font-size: 10px; display: grid; place-items: center; padding: 0; opacity: 0; transition: opacity 0.2s; }
+    .member:hover .run, .member .run:focus-visible { opacity: 1; }
+    .member .run:disabled { opacity: 0 !important; }
+    .member.team .tm { display: flex; }
+    .member.team .tm span { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; background: var(--forest); color: var(--lime); border: 2px solid #fff; margin-left: -7px; }
+    .member.team .tm span:first-child { margin-left: 0; }
+    /* faces: blink, look down at work, talk */
+    .face .lid { transform: scaleY(0); transform-box: fill-box; transform-origin: top; animation: blink 6s infinite; animation-delay: var(--bd, 0s); }
+    @keyframes blink { 0%, 96%, 100% { transform: scaleY(0); } 97.5% { transform: scaleY(1); } }
+    .face .m-open { display: none; }
+    .talking .face .m-open { display: inline; animation: mouth 0.32s steps(2) infinite; }
+    .talking .face .m-closed { animation: mouth 0.32s steps(2) infinite reverse; }
+    @keyframes mouth { 50% { opacity: 0; } }
+    .working .face .iris { transform: translateY(1.8px); transition: transform 0.3s; }
+    .thinking { position: absolute; top: -14px; left: 58%; display: flex; gap: 3px; background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 5px 7px; box-shadow: var(--shadow); }
+    .thinking i { width: 5px; height: 5px; border-radius: 50%; background: var(--forest); animation: think 1s infinite; }
+    .thinking i:nth-child(2) { animation-delay: 0.15s; } .thinking i:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes think { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+    .listening .av { animation: nod 0.6s ease-in-out 2; }
+    @keyframes nod { 50% { transform: translateY(3px) rotate(-3deg); } }
+    /* speech: bubbles travel between people, with sound waves */
+    #talk-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+    .say { position: absolute; transform: translate(-50%, -100%); background: #fff; color: var(--ink); border: 1.5px solid var(--ink); border-radius: 14px; padding: 5px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 6px 16px rgba(0,0,0,0.12); animation: sayin 2.6s ease both; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+    .say::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; background: #fff; border-right: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); transform: translateX(-50%) rotate(45deg); }
+    @keyframes sayin { 0% { opacity: 0; transform: translate(-50%, -80%) scale(0.8); } 12%, 80% { opacity: 1; transform: translate(-50%, -100%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -110%); } }
+    .msgdot { position: absolute; width: 30px; height: 22px; margin: -11px 0 0 -15px; background: var(--lime); border-radius: 11px; display: flex; align-items: center; justify-content: center; gap: 3px; box-shadow: 0 4px 12px rgba(162,220,93,0.6); }
+    .msgdot::after { content: ''; position: absolute; left: 6px; bottom: -4px; width: 8px; height: 8px; background: var(--lime); transform: rotate(45deg); border-radius: 1px; }
+    .msgdot i { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); position: relative; z-index: 1; }
+    .waves { position: absolute; width: 56px; height: 56px; margin: -28px 0 0 -28px; }
+    .waves span { position: absolute; inset: 0; border-radius: 50%; border: 3px solid transparent; border-right-color: var(--lime); animation: wave 1.1s ease-out infinite; opacity: 0; }
+    .waves span:nth-child(2) { animation-delay: 0.25s; } .waves span:nth-child(3) { animation-delay: 0.5s; }
+    @keyframes wave { 0% { transform: scale(0.5); opacity: 0.9; } 100% { transform: scale(1.5); opacity: 0; } }
+    .replay-tag { position: absolute; left: 1%; top: 7%; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); background: var(--soft); border: 1px solid var(--lime); padding: 4px 10px; border-radius: 99px; z-index: 4; }
+    /* chief chat */
+    .chief-chat { background: #fff; border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 420px; max-height: 620px; min-width: 0; overflow: hidden; }
+    .cc-head { display: flex; gap: 10px; align-items: center; padding: 14px; border-bottom: 1px solid var(--line); }
+    .cc-face { width: 46px; height: 46px; flex: none; display: block; }
+    .cc-face .face { width: 100%; height: 100%; }
+    .cc-head strong { display: block; font-size: 15px; }
+    .cc-head span { font-size: 12px; color: var(--muted); }
+    .cc-msgs { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+    .cm { max-width: 92%; padding: 9px 12px; border-radius: 14px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
+    .cm.me { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 4px; }
+    .cm.chief { align-self: flex-start; background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+    .cm .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; white-space: normal; }
+    .cm.typing { display: flex; gap: 4px; }
+    .cm.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: think 1s infinite; }
+    .cm.typing i:nth-child(2) { animation-delay: 0.15s; } .cm.typing i:nth-child(3) { animation-delay: 0.3s; }
+    .cc-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 14px 0; }
+    .cc-chips button { flex: none; border: 1.5px solid var(--line); background: #fff; border-radius: 99px; padding: 5px 10px; font-size: 12px; font-weight: 600; }
+    .cc-chips button:hover { border-color: var(--ink); }
+    .cc-input { display: flex; gap: 6px; padding: 10px 14px 14px; }
+    .cc-input input { flex: 1; min-width: 0; font: inherit; font-size: 13.5px; padding: 9px 11px; border: 1.5px solid var(--line); border-radius: 11px; }
+    .hub-row { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 14px; margin-top: 14px; align-items: start; }
+    .hub-row .panel { min-height: 160px; }
+    .mini { display: flex; gap: 8px; align-items: flex-start; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+    .mini:first-of-type { border-top: 0; }
+    .mini .mf { width: 26px; height: 26px; flex: none; }
+    .mini .mf .face { width: 100%; height: 100%; }
+    .mini button.link2 { border: 0; background: none; padding: 0; color: var(--forest); font-weight: 700; text-decoration: underline; font-size: 12.5px; }
+    .feed li .mf { display: inline-block; width: 18px; height: 18px; vertical-align: -4px; margin-right: 4px; }
+    .feed li .mf .face { width: 100%; height: 100%; }
+    .how { margin-top: 44px; padding-top: 20px; border-top: 1.5px solid var(--line); }
+    .how-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 14px; }
+    /* agent pages */
+    .back-link { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--forest); }
+    .agent-head { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; margin: 12px 0 6px; background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 18px; box-shadow: var(--shadow); }
+    .agent-head .big { width: 110px; height: 110px; }
+    .agent-head .big .face { width: 100%; height: 100%; }
+    .agent-head h1 { font-size: clamp(24px, 3vw, 32px); font-weight: 800; letter-spacing: -0.02em; margin: 2px 0 4px; }
+    .agent-head .ah-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--muted); }
+    .agent-head .ah-does { margin: 8px 0 0; padding-left: 18px; font-size: 13px; display: grid; gap: 2px; }
+    .agent-head .ah-with { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .agent-head .ah-with button { width: 30px; height: 30px; border: 0; padding: 0; background: none; border-radius: 50%; }
+    .agent-head .ah-with .face { width: 100%; height: 100%; }
+    @container (max-width: 900px) { .hub-row { grid-template-columns: 1fr; } }
+    .chief-chat { max-height: 520px; }
+    @media (max-width: 600px) { .agent-head { grid-template-columns: 1fr; justify-items: start; } .agent-head .big { width: 84px; height: 84px; } }
+    @media (prefers-reduced-motion: reduce) { .face .lid, .member.working .av::after, .waves span, .thinking i { animation: none; } }
 
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
@@ -627,11 +737,57 @@
     </div>
 
     <div class="body">
+      <div id="pass-slot"></div>
+
+      <div class="view" data-view="home">
+        <section class="hub">
+          <div class="hub-head">
+            <div>
+              <span class="eyebrow">Launch organization</span>
+              <h1>Your team</h1>
+              <p class="hub-state"><span class="live-dot" id="hub-dot"></span><span id="hub-state">Connecting</span> <span class="hub-sub" id="hub-sub"></span></p>
+            </div>
+            <button class="btn outline small" id="mc-replay" type="button">Replay the week</button>
+          </div>
+          <div class="hub-grid">
+            <div class="stage-card">
+              <div class="stage-scroll">
+                <div class="team-stage" id="team-stage">
+                  <div class="col-label" style="left:16%">Grow students</div>
+                  <div class="col-label" style="left:50%">Sell data</div>
+                  <div class="col-label" style="left:84%">Run safely</div>
+                  <div id="members"></div>
+                  <div id="talk-layer"></div>
+                  <div class="replay-tag" id="mc-replaying" hidden>Replay · animation only, nothing is running</div>
+                </div>
+              </div>
+              <p class="stage-note">Click anyone to open their page. When agents pass work to each other, you'll see them talk.</p>
+            </div>
+            <aside class="chief-chat" id="chief-chat" aria-label="Ask the Chief of Staff">
+              <div class="cc-head"><span class="cc-face" id="cc-face"></span><div><strong>Chief of Staff</strong><span>Ask me anything about the organization</span></div></div>
+              <div class="cc-msgs" id="cc-msgs"></div>
+              <div class="cc-chips" id="cc-chips"></div>
+              <form class="cc-input" id="cc-form"><input id="cc-text" placeholder="Ask the Chief of Staff" autocomplete="off" maxlength="2000" aria-label="Question"><button class="btn small" aria-label="Send">Send</button></form>
+            </aside>
+          </div>
+          <div class="hub-row">
+            <div class="panel" id="hub-brief"></div>
+            <div class="panel" id="hub-waiting"></div>
+            <div class="panel">
+          <h3><span class="dot-live"></span>Live activity</h3>
+          <p class="sub" id="feed-sub">Real events from the agents, newest first.</p>
+          <ul class="feed" id="feed"></ul>
+        </div>
+          </div>
+        </section>
+
+        <section class="how">
+          <h2 class="how-title">How it works and what it costs</h2>
       <div class="hero">
         <div>
           <span class="eyebrow">Human plus AI organization</span>
           <h1>Ten agents run the launch. Humans hold three keys.</h1>
-          <p>Each agent has one job, a Claude model sized to it, and a clear limit on what it can do alone. Click any agent to expand it.</p>
+          <p>Each agent has one job, a Claude model sized to it, and a clear limit on what it can do alone.</p>
         </div>
       </div>
       <div class="kpis">
@@ -641,24 +797,80 @@
         <div class="kpi"><b id="k-hire">$0</b><span>same work with hires (est.)</span></div>
       </div>
 
-      <section class="section" id="brief-section">
-        <div class="live-head">
-          <h2>Live agents</h2>
-          <div class="ltabs" role="tablist" aria-label="Live agents">
-            <button role="tab" data-ltab="chief" aria-selected="true">Chief of Staff</button>
-            <button role="tab" data-ltab="market" aria-selected="false">Market intelligence</button>
-            <button role="tab" data-ltab="growth" aria-selected="false">Student acquisition</button>
-            <button role="tab" data-ltab="content" aria-selected="false">Content creation</button>
-            <button role="tab" data-ltab="sales" aria-selected="false">B2B sales</button>
-            <button role="tab" data-ltab="insights" aria-selected="false">Insights analyst</button>
-            <button role="tab" data-ltab="router" aria-selected="false">Data and offers router</button>
-            <button role="tab" data-ltab="privacy" aria-selected="false">Privacy guard</button>
-            <button role="tab" data-ltab="support" aria-selected="false">Student support</button>
-            <button role="tab" data-ltab="rewards" aria-selected="false">Rewards ops</button>
+      <section class="section">
+        <div class="panel">
+          <h3>The three human gates</h3>
+          <p class="sub">Everything else runs on its own.</p>
+          <ul class="gates">
+            <li><span class="n">1</span><div><strong>New data buyers</strong><span>The first delivery to any new buyer, and any new contract or price, needs a person to approve it.</span></div></li>
+            <li><span class="n">2</span><div><strong>Money out above the cap</strong><span>Rewards and gift cards pay out automatically up to $500 a week. Anything above waits for approval.</span></div></li>
+            <li><span class="n">3</span><div><strong>Privacy flags</strong><span>When the Privacy guard blocks something and can't fix it alone, a person decides.</span></div></li>
+          </ul>
+          <p class="everything"><b>Runs alone:</b> research, outreach drafts, posts, student support, reports to existing buyers, offer matching, payouts under the cap. <b>Sent by the team:</b> outreach to student groups and social posts.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Where the data goes</h2>
+        <p class="sub">The Data and offers router knows which buyer gets what, and when. Targeting happens inside SNARE: buyers choose a group of students, SNARE shows the offer, and buyers only get counts back.</p>
+        <div class="flow">
+          <div class="step"><span class="k">1 · Collect</span><strong>Students who opted in</strong><p>Receipts, weekly check ins, used and tossed items. No names leave the app.</p></div>
+          <div class="step"><span class="k">2 · Analyse</span><strong>Insights analyst</strong><p>Turns events into totals: what gets wasted, when, and why.</p></div>
+          <div class="step guard"><span class="k">3 · Check</span><strong>Privacy guard</strong><p>Every number covers 50+ students. Consent checked. Blocks or merges anything smaller.</p></div>
+          <div class="step hot"><span class="k">4 · Route</span><strong>Data and offers router</strong><p>Matches each insight to the buyers who pay for it, and each offer to a student group.</p></div>
+          <div class="step"><span class="k">5 · Deliver</span><strong>Reports and in app offers</strong><p>Reports go to brands, grocers and the city. Offers show inside SNARE.</p></div>
+        </div>
+        <div class="outs">
+          <div class="panel">
+            <h3>Buyer routing</h3>
+            <p class="sub">Who gets what. Illustrative: no agreements exist yet.</p>
+            <div class="scroll"><table>
+              <thead><tr><th>Buyer</th><th>Gets</th><th>How often</th><th class="num">Price</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td><b>Valley Greens</b><br><small>Produce brand</small></td><td>Pack fit report: spinach and salad</td><td>Each quarter</td><td class="num">$5K a report</td><td><span class="status">Scheduled</span></td></tr>
+                <tr><td><b>Golden Crust</b><br><small>Bakery brand</small></td><td>Bread waste report plus a sponsored bonus</td><td>Monthly</td><td class="num">$5K + offer fees</td><td><span class="status">Offer live</span></td></tr>
+                <tr><td><b>Discount grocer</b><br><small>Target: No Frills, FreshCo</small></td><td>Home spoilage by category for campus area stores</td><td>Monthly</td><td class="num">$10K a year</td><td><span class="status wait">Gate 1</span></td></tr>
+                <tr><td><b>City of London</b><br><small>Waste services</small></td><td>Household waste baseline and term timing</td><td>Each term</td><td class="num">$20K to $50K</td><td><span class="status idle">Proposal</span></td></tr>
+              </tbody>
+            </table></div>
+            <p class="note">Brand names are made up for the prototype. Grocers and the city are targets, not partners.</p>
+          </div>
+          <div class="panel">
+            <h3>How an offer is matched</h3>
+            <p class="sub">Golden Crust wants to reach students who throw out bread.</p>
+            <div class="match">
+              <div><span class="k">SNARE keeps inside</span><b>184</b>students tossed bread twice this month</div>
+              <div><span class="k">Brand chooses</span><b>+100</b>points and a freezer tip, shown to that group</div>
+              <div><span class="k">Brand gets back</span><b>41</b>redeemed, and bread waste in the group fell 22% the next month</div>
+            </div>
+            <p class="note">The brand never gets a list of students. Only students who turned on anonymous sharing are matched. Offers are always labelled Sponsored and never change meal ranking or the cheapest trip.</p>
           </div>
         </div>
-        <div id="pass-slot"></div>
+      </section>
 
+      <section class="section">
+        <h2>What it costs</h2>
+        <p class="sub" id="cost-sub"></p>
+        <div class="panel">
+          <div class="scroll"><table class="costs">
+            <thead><tr><th>Agent</th><th>Model</th><th>How we estimated it (launch month)</th><th class="num">Per month</th></tr></thead>
+            <tbody id="cost-rows"></tbody>
+            <tfoot id="cost-foot"></tfoot>
+          </table></div>
+          <div class="compare">
+            <div><span>Agents plus tools, per month</span><b id="c-ai">$0</b><span id="c-ai-sub"></span></div>
+            <div><span>Hiring people for the same work, per month (estimate)</span><b id="c-hire">$0</b><span id="c-hire-sub"></span></div>
+          </div>
+          <p class="note">Claude API prices: Opus 5.5 $4 in and $20 out, Sonnet 5.5 $2 and $10, Haiku 5.5 $0.10 and $0.50 per million tokens. Batch jobs are half price. Web search about $10 per 1,000 searches. Usage per agent is our estimate; hiring costs assume junior roles at about $4,300 a month each in London, ON.</p>
+        </div>
+      </section>
+        </section>
+      </div>
+
+      <div class="view" data-view="agent" hidden>
+        <button class="back-link" data-home type="button">← Organization</button>
+        <div class="agent-head" id="agent-head"></div>
+      <section class="section" id="brief-section">
         <div data-pane="chief">
         <div class="brief-head">
           <h3 class="pane-title">Today's brief</h3>
@@ -849,115 +1061,7 @@
         </div>
       </section>
 
-      <section class="section">
-        <h2>The organization</h2>
-        <p class="sub">The live network. A glowing ring means an agent is working right now. Bright pulses along a line are real work moving between agents: what an agent reads when it starts, and where its results go when it finishes. Press ▶ on any agent to run it.</p>
-        <div class="mc" id="mc">
-          <div class="mc-bar">
-            <span class="mc-live" id="mc-live"><i></i><b id="mc-state">Connecting</b></span>
-            <span class="mc-sub" id="mc-sub"></span>
-            <button class="mc-btn" id="mc-replay" type="button">Replay the week</button>
-          </div>
-          <div class="mc-scroll">
-            <div class="mc-stage" id="mc-stage">
-              <svg class="mc-svg" id="mc-svg" viewBox="0 0 1000 720" aria-hidden="true">
-                <defs>
-                  <pattern id="mc-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(162,220,93,0.06)" stroke-width="1"/></pattern>
-                  <radialGradient id="mc-glow"><stop offset="0" stop-color="#E9FFC9"/><stop offset="0.35" stop-color="#A2DC5D"/><stop offset="1" stop-color="#A2DC5D" stop-opacity="0"/></radialGradient>
-                  <filter id="mc-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
-                </defs>
-                <rect width="1000" height="720" fill="url(#mc-grid)"/>
-                <g id="mc-edges"></g>
-                <g id="mc-packets"></g>
-              </svg>
-              <div class="mc-col" style="left:16%">Grow students</div>
-              <div class="mc-col" style="left:50%">Sell data</div>
-              <div class="mc-col" style="left:84%">Run safely</div>
-              <div id="mc-nodes"></div>
-              <div class="mc-replaying" id="mc-replaying" hidden>Replay · animation only, nothing is running</div>
-            </div>
-          </div>
-          <div class="mc-legend">
-            <span><i class="lg-work"></i>Working</span>
-            <span><i class="lg-pulse"></i>Work moving between agents</span>
-            <span><i class="lg-idle"></i>Idle</span>
-            <span><i class="lg-gate"></i>Human gate</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="section two">
-        <div class="panel">
-          <h3><span class="dot-live"></span>Live activity</h3>
-          <p class="sub" id="feed-sub">Real events from the agents, newest first.</p>
-          <ul class="feed" id="feed"></ul>
-        </div>
-        <div class="panel">
-          <h3>The three human gates</h3>
-          <p class="sub">Everything else runs on its own.</p>
-          <ul class="gates">
-            <li><span class="n">1</span><div><strong>New data buyers</strong><span>The first delivery to any new buyer, and any new contract or price, needs a person to approve it.</span></div></li>
-            <li><span class="n">2</span><div><strong>Money out above the cap</strong><span>Rewards and gift cards pay out automatically up to $500 a week. Anything above waits for approval.</span></div></li>
-            <li><span class="n">3</span><div><strong>Privacy flags</strong><span>When the Privacy guard blocks something and can't fix it alone, a person decides.</span></div></li>
-          </ul>
-          <p class="everything"><b>Runs alone:</b> research, outreach drafts, posts, student support, reports to existing buyers, offer matching, payouts under the cap. <b>Sent by the team:</b> outreach to student groups and social posts.</p>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>Where the data goes</h2>
-        <p class="sub">The Data and offers router knows which buyer gets what, and when. Targeting happens inside SNARE: buyers choose a group of students, SNARE shows the offer, and buyers only get counts back.</p>
-        <div class="flow">
-          <div class="step"><span class="k">1 · Collect</span><strong>Students who opted in</strong><p>Receipts, weekly check ins, used and tossed items. No names leave the app.</p></div>
-          <div class="step"><span class="k">2 · Analyse</span><strong>Insights analyst</strong><p>Turns events into totals: what gets wasted, when, and why.</p></div>
-          <div class="step guard"><span class="k">3 · Check</span><strong>Privacy guard</strong><p>Every number covers 50+ students. Consent checked. Blocks or merges anything smaller.</p></div>
-          <div class="step hot"><span class="k">4 · Route</span><strong>Data and offers router</strong><p>Matches each insight to the buyers who pay for it, and each offer to a student group.</p></div>
-          <div class="step"><span class="k">5 · Deliver</span><strong>Reports and in app offers</strong><p>Reports go to brands, grocers and the city. Offers show inside SNARE.</p></div>
-        </div>
-        <div class="outs">
-          <div class="panel">
-            <h3>Buyer routing</h3>
-            <p class="sub">Who gets what. Illustrative: no agreements exist yet.</p>
-            <div class="scroll"><table>
-              <thead><tr><th>Buyer</th><th>Gets</th><th>How often</th><th class="num">Price</th><th>Status</th></tr></thead>
-              <tbody>
-                <tr><td><b>Valley Greens</b><br><small>Produce brand</small></td><td>Pack fit report: spinach and salad</td><td>Each quarter</td><td class="num">$5K a report</td><td><span class="status">Scheduled</span></td></tr>
-                <tr><td><b>Golden Crust</b><br><small>Bakery brand</small></td><td>Bread waste report plus a sponsored bonus</td><td>Monthly</td><td class="num">$5K + offer fees</td><td><span class="status">Offer live</span></td></tr>
-                <tr><td><b>Discount grocer</b><br><small>Target: No Frills, FreshCo</small></td><td>Home spoilage by category for campus area stores</td><td>Monthly</td><td class="num">$10K a year</td><td><span class="status wait">Gate 1</span></td></tr>
-                <tr><td><b>City of London</b><br><small>Waste services</small></td><td>Household waste baseline and term timing</td><td>Each term</td><td class="num">$20K to $50K</td><td><span class="status idle">Proposal</span></td></tr>
-              </tbody>
-            </table></div>
-            <p class="note">Brand names are made up for the prototype. Grocers and the city are targets, not partners.</p>
-          </div>
-          <div class="panel">
-            <h3>How an offer is matched</h3>
-            <p class="sub">Golden Crust wants to reach students who throw out bread.</p>
-            <div class="match">
-              <div><span class="k">SNARE keeps inside</span><b>184</b>students tossed bread twice this month</div>
-              <div><span class="k">Brand chooses</span><b>+100</b>points and a freezer tip, shown to that group</div>
-              <div><span class="k">Brand gets back</span><b>41</b>redeemed, and bread waste in the group fell 22% the next month</div>
-            </div>
-            <p class="note">The brand never gets a list of students. Only students who turned on anonymous sharing are matched. Offers are always labelled Sponsored and never change meal ranking or the cheapest trip.</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>What it costs</h2>
-        <p class="sub" id="cost-sub"></p>
-        <div class="panel">
-          <div class="scroll"><table class="costs">
-            <thead><tr><th>Agent</th><th>Model</th><th>How we estimated it (launch month)</th><th class="num">Per month</th></tr></thead>
-            <tbody id="cost-rows"></tbody>
-            <tfoot id="cost-foot"></tfoot>
-          </table></div>
-          <div class="compare">
-            <div><span>Agents plus tools, per month</span><b id="c-ai">$0</b><span id="c-ai-sub"></span></div>
-            <div><span>Hiring people for the same work, per month (estimate)</span><b id="c-hire">$0</b><span id="c-hire-sub"></span></div>
-          </div>
-          <p class="note">Claude API prices: Opus 5.5 $4 in and $20 out, Sonnet 5.5 $2 and $10, Haiku 5.5 $0.10 and $0.50 per million tokens. Batch jobs are half price. Web search about $10 per 1,000 searches. Usage per agent is our estimate; hiring costs assume junior roles at about $4,300 a month each in London, ON.</p>
-        </div>
-      </section>
+      </div>
     </div>
   </div>
 
@@ -1189,7 +1293,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     function closeAgent() { detail.hidden = true; if (lastFocus) lastFocus.focus(); }
     document.addEventListener('click', e => {
       const ag = e.target.closest('[data-agent]');
-      if (ag) { openAgent(ag.dataset.agent); return; }
+      if (ag) { showTab(ag.dataset.agent); return; }
       if (e.target.closest('[data-close]') || e.target === detail) closeAgent();
       const sc = e.target.closest('[data-scale]');
       if (sc) { scale = Number(sc.dataset.scale); render(); }
@@ -1480,18 +1584,10 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     }
 
     // Tabs for live agents; the last one opened is remembered in this browser.
-    function showTab(id) {
-      document.querySelectorAll('[data-ltab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.ltab === id)));
-      document.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== id; });
-      try { localStorage.setItem('snare.org.tab', id); } catch (e) { /* ignore */ }
-    }
-    let tab0 = 'chief';
-    try { tab0 = localStorage.getItem('snare.org.tab') || 'chief'; } catch (e) { /* ignore */ }
-    showTab(document.querySelector(`[data-ltab="${tab0}"]`) ? tab0 : 'chief');
+    // Each agent has its own page at #agent-<id>; the hub is the home page.
+    function showTab(id) { location.hash = 'agent-' + id; }
 
     document.addEventListener('click', e => {
-      const t = e.target.closest('[data-ltab]');
-      if (t) showTab(t.dataset.ltab);
       if (e.target.closest('#run-market')) needPass(runMarketNow);
       const wd = e.target.closest('[data-wdel]');
       if (wd) needPass(() => saveWatch(live.watch.filter(w => w.id !== wd.dataset.wdel)));
@@ -2733,22 +2829,103 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     });
 
 
-    // ---------- live network (mission control) ----------
-    // Real status from GET /agents/activity every few seconds: who is working,
-    // and events with "from" (what an agent read) and "to" (where its results
-    // went). New events become pulses travelling along those lines.
-    const POS = {
-      chief: [500, 92], market: [160, 236], growth: [160, 396], content: [160, 556],
-      sales: [500, 286], insights: [500, 436], router: [500, 586],
-      privacy: [840, 236], support: [840, 396], rewards: [840, 556], team: [500, 680],
+    // ----- anime style faces, drawn in SVG -----
+    // Each agent's face comes from a fixed seed, so it is the same every time.
+    // Classes on the wrapper animate it: .talking moves the mouth, .working
+    // looks down at work, and every face blinks now and then.
+    const FACE = {
+      chief: { seed: 'chief-7', hair: 'side', hairC: '#2B2A33', skin: '#F2C9A8', eye: '#3B5BA8', shirt: '#004230', bg: '#E4F4D2', acc: 'tie' },
+      market: { seed: 'market-3', hair: 'bob', hairC: '#7A4A2E', skin: '#F7D7BE', eye: '#2F7D5B', shirt: '#2F7D5B', bg: '#E2F1EA', acc: 'glasses' },
+      growth: { seed: 'growth-9', hair: 'spiky', hairC: '#E0A43A', skin: '#E9B994', eye: '#C2552B', shirt: '#A2DC5D', bg: '#F1F8E4', acc: '' },
+      content: { seed: 'content-2', hair: 'long', hairC: '#E58FB4', skin: '#F5D1B8', eye: '#8A4FB8', shirt: '#F26B4F', bg: '#FCE6E8', acc: 'clip' },
+      sales: { seed: 'sales-5', hair: 'swoop', hairC: '#1F1E1E', skin: '#B9805C', eye: '#4A3020', shirt: '#1F1E1E', bg: '#ECECEA', acc: 'tie' },
+      insights: { seed: 'insights-4', hair: 'buns', hairC: '#3A3F8F', skin: '#F0C4A0', eye: '#2A6FB8', shirt: '#3A6FB0', bg: '#E4ECF7', acc: 'glasses' },
+      router: { seed: 'router-8', hair: 'pony', hairC: '#9C3A2E', skin: '#D9A07A', eye: '#2F7D5B', shirt: '#BBD004', bg: '#F4F7DC', acc: '' },
+      privacy: { seed: 'privacy-6', hair: 'short', hairC: '#C9CED6', skin: '#8D5B3E', eye: '#6A4A2A', shirt: '#B4541A', bg: '#FBEBDD', acc: 'shield' },
+      support: { seed: 'support-1', hair: 'bob', hairC: '#3E8E7E', skin: '#F2C9A8', eye: '#C27A2B', shirt: '#7BC26B', bg: '#E7F5E8', acc: 'headset' },
+      rewards: { seed: 'rewards-0', hair: 'spiky', hairC: '#5B3A8F', skin: '#C88E68', eye: '#B8862A', shirt: '#F2C14E', bg: '#FFF4D6', acc: 'star' },
     };
-    const EDGES = [
-      ['market', 'chief'], ['growth', 'chief'], ['content', 'chief'], ['sales', 'chief'], ['insights', 'chief'], ['router', 'chief'], ['privacy', 'chief'], ['support', 'chief'], ['rewards', 'chief'],
-      ['market', 'growth'], ['market', 'content'], ['market', 'sales'], ['growth', 'content'], ['insights', 'content'],
-      ['sales', 'insights'], ['insights', 'router'], ['sales', 'router'],
-      ['content', 'privacy'], ['growth', 'privacy'], ['sales', 'privacy'], ['router', 'privacy'], ['router', 'rewards'],
-      ['chief', 'team', 'gate'], ['privacy', 'team', 'gate'], ['router', 'team', 'gate'], ['rewards', 'team', 'gate'], ['support', 'team', 'gate'],
-    ];
+
+    function hairBack(f) {
+      if (f.hair === 'long') return `<path d="M24 44 Q20 82 30 96 L70 96 Q80 82 76 44 Q74 18 50 16 Q26 18 24 44Z" fill="${f.hairC}"/>`;
+      if (f.hair === 'pony') return `<path d="M70 34 Q92 40 86 70 Q84 80 76 84 Q82 64 72 50Z" fill="${f.hairC}"/>`;
+      if (f.hair === 'buns') return `<circle cx="30" cy="20" r="10" fill="${f.hairC}"/><circle cx="70" cy="20" r="10" fill="${f.hairC}"/>`;
+      if (f.hair === 'bob') return `<path d="M24 46 Q22 70 30 72 L70 72 Q78 70 76 46 Q74 18 50 17 Q26 18 24 46Z" fill="${f.hairC}"/>`;
+      return '';
+    }
+    function hairFront(f) {
+      const c = f.hairC;
+      switch (f.hair) {
+        case 'spiky': return `<path d="M26 40 L24 26 L32 30 L32 16 L41 25 L46 12 L52 24 L60 13 L62 26 L71 18 L69 31 L77 28 L74 42 Q70 30 60 30 Q50 34 40 30 Q30 30 26 40Z" fill="${c}"/>`;
+        case 'bob': return `<path d="M26 44 Q26 20 50 19 Q74 20 74 44 Q70 32 60 30 L56 38 L52 30 Q44 33 38 31 L34 38 Q30 34 26 44Z" fill="${c}"/>`;
+        case 'long': return `<path d="M27 44 Q26 19 50 18 Q74 19 73 44 Q68 30 58 28 Q52 36 46 30 Q40 34 33 31 Q29 36 27 44Z" fill="${c}"/>`;
+        case 'swoop': return `<path d="M26 42 Q24 18 52 17 Q76 18 75 40 Q62 24 40 34 Q33 37 26 42Z" fill="${c}"/>`;
+        case 'buns': return `<path d="M27 42 Q26 20 50 19 Q74 20 73 42 Q66 31 50 32 Q36 31 27 42Z" fill="${c}"/>`;
+        case 'pony': return `<path d="M27 42 Q26 19 50 18 Q75 19 74 40 Q64 26 52 31 Q44 27 38 33 Q32 34 27 42Z" fill="${c}"/>`;
+        case 'short': return `<path d="M27 40 Q27 19 50 18 Q73 19 73 40 Q68 27 50 27 Q32 27 27 40Z" fill="${c}"/>`;
+        default: return `<path d="M26 42 Q25 18 50 17 Q75 18 74 42 Q68 26 48 28 Q36 28 30 34 Q28 37 26 42Z" fill="${c}"/>`;
+      }
+    }
+    function accessory(f) {
+      switch (f.acc) {
+        case 'glasses': return `<g fill="none" stroke="#1F1E1E" stroke-width="1.6"><circle cx="40" cy="49" r="7"/><circle cx="60" cy="49" r="7"/><path d="M47 49h6"/></g>`;
+        case 'headset': return `<path d="M24 46 Q24 16 50 16 Q76 16 76 46" fill="none" stroke="#1F1E1E" stroke-width="3"/><rect x="20" y="44" width="7" height="12" rx="3" fill="#1F1E1E"/><rect x="73" y="44" width="7" height="12" rx="3" fill="#1F1E1E"/><path d="M76 54 Q76 66 62 67" fill="none" stroke="#1F1E1E" stroke-width="2"/><circle cx="61" cy="67" r="2.4" fill="#1F1E1E"/>`;
+        case 'clip': return `<path d="M66 28 l6 -4 l2 3 l-6 4z" fill="#A2DC5D" stroke="#1F1E1E" stroke-width="1"/>`;
+        case 'tie': return `<path d="M50 84 l-4 5 l4 11 l4 -11z" fill="#A2DC5D"/>`;
+        case 'shield': return `<path d="M62 88 l5 -2 l5 2 v4 q0 4 -5 6 q-5 -2 -5 -6z" fill="#F4FFE6" stroke="#1F1E1E" stroke-width="1"/>`;
+        case 'star': return `<path d="M64 89 l1.6 3.4 3.7 .5 -2.7 2.6 .7 3.7 -3.3 -1.8 -3.3 1.8 .7 -3.7 -2.7 -2.6 3.7 -.5z" fill="#FFF4D6" stroke="#1F1E1E" stroke-width=".8"/>`;
+        default: return '';
+      }
+    }
+    function eye(cx, f) {
+      return `<g class="eye">
+        <ellipse cx="${cx}" cy="50" rx="6" ry="7.6" fill="#FFFFFF"/>
+        <ellipse class="iris" cx="${cx}" cy="51" rx="5" ry="6.6" fill="${f.eye}"/>
+        <ellipse class="iris" cx="${cx}" cy="52.4" rx="2.6" ry="3.5" fill="#14131A"/>
+        <circle class="iris" cx="${cx - 1.8}" cy="48.2" r="2" fill="#FFFFFF"/>
+        <circle class="iris" cx="${cx + 1.5}" cy="54" r="0.8" fill="#FFFFFF"/>
+        <path d="M${cx - 7} 45 Q${cx} 40.6 ${cx + 7} 44.8" fill="none" stroke="#14131A" stroke-width="2.1" stroke-linecap="round"/>
+        <rect class="lid" x="${cx - 7.5}" y="41.5" width="15" height="17.5" fill="${f.skin}"/>
+      </g>`;
+    }
+    function faceSVG(id) {
+      const f = FACE[id];
+      const uid = 'f' + id;
+      return `<svg class="face" viewBox="0 0 100 100" aria-hidden="true">
+        <defs><clipPath id="${uid}"><circle cx="50" cy="50" r="49"/></clipPath></defs>
+        <circle cx="50" cy="50" r="49" fill="${f.bg}"/>
+        <g clip-path="url(#${uid})"><g transform="translate(50 54) scale(1.18) translate(-50 -50)">
+          ${hairBack(f)}
+          <path d="M42 70 h16 v12 h-16z" fill="${f.skin}"/>
+          <path d="M42 76 Q50 82 58 76 v4 h-16z" fill="rgba(0,0,0,0.08)"/>
+          <path d="M14 104 Q16 82 40 78 Q50 84 60 78 Q84 82 86 104Z" fill="${f.shirt}"/>
+          <path d="M40 78 L50 90 L60 78" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+          <ellipse cx="26.5" cy="52" rx="3.5" ry="5" fill="${f.skin}"/><ellipse cx="73.5" cy="52" rx="3.5" ry="5" fill="${f.skin}"/>
+          <path d="M27 42 Q27 20 50 20 Q73 20 73 42 Q73 62 62 70 Q56 75 50 75 Q44 75 38 70 Q27 62 27 42Z" fill="${f.skin}"/>
+          <ellipse cx="36" cy="60" rx="4.5" ry="2.4" fill="#F58A8A" opacity="0.35"/><ellipse cx="64" cy="60" rx="4.5" ry="2.4" fill="#F58A8A" opacity="0.35"/>
+          ${eye(40, f)}${eye(60, f)}
+          <path d="M33 40 Q39 37 45 39" fill="none" stroke="${f.hairC === '#C9CED6' ? '#8A8F98' : f.hairC}" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M55 39 Q61 37 67 40" fill="none" stroke="${f.hairC === '#C9CED6' ? '#8A8F98' : f.hairC}" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M50 57 l-1 3 h2" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1" stroke-linecap="round"/>
+          <path class="m-closed" d="M45 65 Q50 68.5 55 65" fill="none" stroke="#7A2E2E" stroke-width="1.8" stroke-linecap="round"/>
+          <ellipse class="m-open" cx="50" cy="66" rx="3.6" ry="2.8" fill="#7A2E2E"/>
+          <ellipse class="m-open" cx="50" cy="67.4" rx="2.2" ry="1.1" fill="#F2848C"/>
+          ${hairFront(f)}
+          ${accessory(f)}
+        </g></g>
+      </svg>`;
+    }
+
+    // ---------- the hub: the organization as people ----------
+    // Real status from GET /agents/activity every few seconds. When work moves
+    // from one agent to another, the speaker talks and a message travels to
+    // the listener with sound waves; working agents look down at their work.
+    const POS = {
+      chief: [500, 105], market: [165, 300], growth: [165, 480], content: [165, 660],
+      sales: [500, 300], insights: [500, 480], router: [500, 660],
+      privacy: [835, 300], support: [835, 480], rewards: [835, 660], team: [500, 805],
+    };
+    const H = 880; // stage height in the same units as POS
     const READS_UI = {
       chief: ['market', 'growth', 'content', 'sales', 'insights', 'router', 'privacy', 'support', 'rewards'], market: [], growth: ['market'], content: ['market', 'growth', 'insights'],
       sales: ['market'], insights: ['sales'], router: ['insights', 'sales'], privacy: ['content', 'growth', 'sales', 'router'], support: [], rewards: ['router'],
@@ -2757,113 +2934,93 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       chief: ['team'], market: ['sales', 'content', 'growth', 'chief'], growth: ['content', 'privacy', 'chief'], content: ['privacy', 'chief'], sales: ['insights', 'router', 'privacy', 'chief'],
       insights: ['sales', 'router', 'content', 'chief'], router: ['privacy', 'rewards', 'chief'], privacy: ['content', 'growth', 'sales', 'router', 'chief'], support: ['chief'], rewards: ['chief'],
     };
+    const SAY = {
+      chief: "Here's today's brief", market: 'New leads and news', growth: 'Groups and events', content: 'Posts ready to check', sales: 'New prospects',
+      insights: 'Reports are ready', router: 'Deliveries and offers', privacy: 'Checked and cleared', support: 'Student questions', rewards: "This week's numbers", team: '',
+    };
     const RUNNABLE = { chief: () => runChief(), market: () => runMarketNow(), growth: () => runGrowthNow(), content: () => runContentNow(), sales: () => runSalesNow(), insights: () => runInsightsNow(), router: () => runRouterNow(), privacy: () => runPrivacyNow(), rewards: () => runRewardsNow() };
     const NAME = id => id === 'team' ? 'Team SNARE' : byId[id].name;
-    const mc = { running: {}, events: [], seen: new Set(), localRun: {}, lastRun: {}, flashT: {}, errors: {}, replay: false, first: true };
-    const edgeKey = (a, b) => [a, b].sort().join('|');
-    const pathEls = {};
+    const mc = { running: {}, events: [], seen: new Set(), localRun: {}, lastRun: {}, errors: {}, replay: false, first: true };
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    function edgePath(a, b) {
-      const [x1, y1] = POS[a], [x2, y2] = POS[b];
-      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
-      const bend = Math.min(60, len * 0.14) * ((x1 + y1) % 2 ? 1 : -1);
-      return `M${x1} ${y1} Q${mx - dy / len * bend} ${my + dx / len * bend} ${x2} ${y2}`;
-    }
-
-    function buildNetwork() {
-      const g = document.getElementById('mc-edges');
-      g.innerHTML = EDGES.map(([a, b, kind]) => {
-        const d = edgePath(a, b);
-        return `<path class="edge ${kind === 'gate' ? 'gate' : ''}" data-e="${edgeKey(a, b)}" d="${d}"/>${kind === 'gate' ? '' : `<path class="edge-flow" data-f="${edgeKey(a, b)}" data-from="${a}" d="${d}"/>`}`;
-      }).join('');
-      g.querySelectorAll('.edge').forEach(el => { pathEls[el.dataset.e] = el; });
-      document.getElementById('mc-nodes').innerHTML = Object.keys(POS).map(id => {
-        const [x, y] = POS[id];
-        if (id === 'team') return `<div class="nd team" style="left:${x / 10}%;top:${y / 7.2}%"><div class="nd-ring"></div><div class="nd-core"><strong>Team SNARE · 5 people</strong><span class="nd-meta">Gate 1 buyers · Gate 2 payouts · Gate 3 privacy</span></div></div>`;
-        const a = byId[id];
-        return `<div class="nd ${id === 'chief' ? 'chief' : ''}" data-node="${id}" style="left:${x / 10}%;top:${y / 7.2}%">
-          <div class="nd-ring"></div>
-          <button class="nd-core" data-agent="${id}">${a.built ? '<span class="nd-built">BUILT</span>' : ''}<strong>${esc(a.name)}</strong><span class="nd-meta">${PRICE[a.model][2].replace('Claude ', '')} · ${money(cost(a))}/mo</span><span class="nd-state"><i></i><span data-state="${id}">Idle</span></span></button>
-          ${RUNNABLE[id] ? `<button class="nd-run" data-mcrun="${id}" aria-label="Run ${esc(a.name)}" title="Run now">▶</button>` : `<button class="nd-run" data-ltabgo="support" aria-label="Open Student support" title="Answers students instantly; open its tab">?</button>`}
-        </div>`;
-      }).join('');
-    }
-
     const ago = iso => { const s2 = Math.max(0, (Date.now() - Date.parse(iso)) / 1000); return s2 < 60 ? 'just now' : s2 < 3600 ? Math.round(s2 / 60) + ' min ago' : s2 < 86400 ? Math.round(s2 / 3600) + ' h ago' : Math.round(s2 / 86400) + ' d ago'; };
     const clock = ms => { const s2 = Math.floor(ms / 1000); return `${Math.floor(s2 / 60)}:${String(s2 % 60).padStart(2, '0')}`; };
+    // Faces share clip-path ids; give each copy its own so every copy renders.
+    function face(id, tag) { const k = 'c' + tag + Math.random().toString(36).slice(2, 7); return faceSVG(id).replace(`id="f${id}"`, `id="${k}"`).replace(`url(#f${id})`, `url(#${k})`); }
+
+    function buildTeam() {
+      document.getElementById('members').innerHTML = Object.keys(POS).map((id, n) => {
+        const [x, y] = POS[id];
+        if (id === 'team') return `<div class="member team" data-m="team" style="left:${x / 10}%;top:${y / H * 100}%"><div class="tm"><span>E</span><span>A</span><span>S</span><span>N</span><span>R</span></div><span class="who">Team SNARE</span><span class="st">Gates 1, 2 and 3</span></div>`;
+        return `<div class="member ${id === 'chief' ? 'chief' : ''}" data-m="${id}" style="left:${x / 10}%;top:${y / H * 100}%;--bd:${(n * 0.7) % 5}s">
+          <button class="av" data-agent="${id}" aria-label="Open ${esc(byId[id].name)}">${face(id, 'm')}</button>
+          ${RUNNABLE[id] ? `<button class="run" data-mcrun="${id}" aria-label="Run ${esc(byId[id].name)}" title="Run now">▶</button>` : ''}
+          <span class="who">${esc(byId[id].name)}</span><span class="st" data-state="${id}">Idle</span>
+        </div>`;
+      }).join('');
+      document.getElementById('cc-face').innerHTML = face('chief', 'cc');
+    }
 
     function paintNodes() {
       const connected = API && live.status && live.status.hasKey;
       for (const id of Object.keys(POS)) {
         if (id === 'team') continue;
-        const el = document.querySelector(`.nd[data-node="${id}"]`); if (!el) continue;
+        const el = document.querySelector(`.member[data-m="${id}"]`); if (!el) continue;
         const since = mc.running[id] || mc.localRun[id];
         el.classList.toggle('working', !!since);
-        el.classList.toggle('error', !!mc.errors[id] && !since);
-        const st = el.querySelector(`[data-state="${id}"]`);
-        st.textContent = since ? `Working ${clock(Date.now() - Date.parse(since))}` : mc.errors[id] ? 'Last run stopped' : mc.lastRun[id] ? `Idle · ran ${ago(mc.lastRun[id])}` : id === 'support' ? 'Answers on demand' : 'Idle';
+        let th = el.querySelector('.thinking');
+        if (since && !th) el.querySelector('.av').insertAdjacentHTML('beforeend', '<span class="thinking"><i></i><i></i><i></i></span>');
+        if (!since && th) th.remove();
+        el.querySelector(`[data-state="${id}"]`).textContent = since ? `Working ${clock(Date.now() - Date.parse(since))}` : mc.errors[id] ? 'Last run stopped' : mc.lastRun[id] ? `Ran ${ago(mc.lastRun[id])}` : id === 'support' ? 'Answers on demand' : 'Idle';
         const run = el.querySelector('[data-mcrun]');
         if (run) run.disabled = !connected || !!since;
       }
-      const busy = Object.keys(mc.running).length + Object.keys(mc.localRun).length;
-      const lv = document.getElementById('mc-live');
-      lv.className = 'mc-live' + (busy ? ' busy' : connected ? ' on' : '');
-      document.getElementById('mc-state').textContent = !API ? 'Not connected' : !live.status ? 'Worker unreachable' : busy ? `${busy} agent${busy === 1 ? '' : 's'} working` : 'Live · idle';
-      document.getElementById('mc-sub').textContent = !API ? 'Connect the worker to see agents work.' : busy ? [...new Set([...Object.keys(mc.running), ...Object.keys(mc.localRun)])].map(NAME).join(', ') : `Next scheduled runs at 12:00 and 13:00 UTC`;
+      const busy = [...new Set([...Object.keys(mc.running), ...Object.keys(mc.localRun)])];
+      document.getElementById('hub-dot').className = 'live-dot' + (busy.length ? ' busy' : connected ? ' on' : '');
+      document.getElementById('hub-state').textContent = !API ? 'Not connected' : !live.status ? 'Worker unreachable' : busy.length ? `${busy.length} working` : 'Live';
+      document.getElementById('hub-sub').textContent = busy.length ? busy.map(NAME).join(', ') : connected ? '· next scheduled runs at 12:00 and 13:00 UTC' : '';
     }
 
-    // A glowing packet with a short tail travelling along a line.
-    function pulse(from, to, delay = 0) {
-      const key = edgeKey(from, to), el = pathEls[key];
-      if (!el || reduceMotion) { hot(key, from, 1200); return; }
-      const total = el.getTotalLength(), forward = el.getAttribute('d').startsWith(`M${POS[from][0]} ${POS[from][1]}`);
-      const g = document.getElementById('mc-packets');
+    // One agent tells another something: talk, sound waves, a message travelling over.
+    function speak(from, to, text, delay = 0) {
+      const layer = document.getElementById('talk-layer');
+      const A = POS[from], B = POS[to];
+      if (!A || !B) return;
       setTimeout(() => {
-        hot(key, from, 1500);
-        const dots = [13, 6, 4.5, 3.5, 2.5].map((r, i) => { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('r', r); c.setAttribute('fill', i ? '#A2DC5D' : 'url(#mc-glow)'); c.setAttribute('opacity', i ? 0.95 - i * 0.18 : 0.9); if (!i) c.setAttribute('filter', 'url(#mc-blur)'); g.appendChild(c); return c; });
-        const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); core.setAttribute('r', 3.4); core.setAttribute('fill', '#F4FFE6'); g.appendChild(core);
-        const dur = 1100 + total * 0.9, t0 = performance.now();
-        (function step(now) {
-          const k = Math.min(1, (now - t0) / dur);
-          dots.concat(core).forEach((c, i) => {
-            const kk = Math.max(0, k - (c === core ? 0 : i * 0.035));
-            const e = kk < 0.5 ? 2 * kk * kk : 1 - Math.pow(-2 * kk + 2, 2) / 2;
-            const pt = el.getPointAtLength((forward ? e : 1 - e) * total);
-            c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y);
-          });
-          if (k < 1) requestAnimationFrame(step); else { dots.concat(core).forEach(c => c.remove()); flash(to); }
-        })(t0);
+        const sp = document.querySelector(`.member[data-m="${from}"]`), li = document.querySelector(`.member[data-m="${to}"]`);
+        if (sp) { sp.classList.add('talking'); setTimeout(() => sp.classList.remove('talking'), 1700); }
+        const pct = (p, yOff = 0) => ({ left: p[0] / 10 + '%', top: (p[1] + yOff) / H * 100 + '%' });
+        if (text) { const b = document.createElement('div'); b.className = 'say'; b.textContent = text; Object.assign(b.style, pct(A, from === 'chief' ? -62 : -50)); layer.appendChild(b); setTimeout(() => b.remove(), 2700); }
+        const w = document.createElement('div'); w.className = 'waves'; w.innerHTML = '<span></span><span></span><span></span>';
+        Object.assign(w.style, pct(A)); w.style.transform = `rotate(${Math.atan2(B[1] - A[1], B[0] - A[0])}rad)`;
+        layer.appendChild(w); setTimeout(() => w.remove(), 1400);
+        if (reduceMotion) { if (li) { li.classList.add('listening'); setTimeout(() => li.classList.remove('listening'), 1300); } return; }
+        const m = document.createElement('div'); m.className = 'msgdot'; m.innerHTML = '<i></i><i></i><i></i>';
+        layer.appendChild(m);
+        const dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy) || 1;
+        const cx = (A[0] + B[0]) / 2 - dy / len * 50, cy = (A[1] + B[1]) / 2 + dx / len * 50 - 30;
+        const frames = Array.from({ length: 16 }, (_, i) => {
+          const t = i / 15, x = (1 - t) * (1 - t) * A[0] + 2 * (1 - t) * t * cx + t * t * B[0], y = (1 - t) * (1 - t) * A[1] + 2 * (1 - t) * t * cy + t * t * B[1];
+          return { left: x / 10 + '%', top: y / H * 100 + '%', opacity: t < 0.08 ? 0 : t > 0.92 ? 0 : 1, transform: `scale(${0.7 + Math.sin(t * Math.PI) * 0.4})` };
+        });
+        m.animate(frames, { duration: 900 + len * 1.1, easing: 'ease-in-out' }).onfinish = () => {
+          m.remove();
+          if (li) { li.classList.add('listening'); setTimeout(() => li.classList.remove('listening'), 1300); }
+        };
       }, delay);
     }
-    function hot(key, from, ms) {
-      const e = pathEls[key], f = document.querySelector(`[data-f="${key}"]`);
-      if (e) e.classList.add('hot');
-      if (f) { f.classList.add('hot'); f.classList.toggle('rev', f.dataset.from !== from); }
-      clearTimeout(mc.flashT[key]);
-      mc.flashT[key] = setTimeout(() => { if (e) e.classList.remove('hot'); if (f) f.classList.remove('hot', 'rev'); }, ms);
-    }
-    function flash(id) {
-      const el = document.querySelector(id === 'team' ? '.nd.team' : `.nd[data-node="${id}"]`);
-      if (!el) return;
-      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
-    }
     function animateEvent(ev) {
-      (ev.from || []).forEach((f, i) => pulse(f, ev.agent, i * 140));
-      const outDelay = (ev.from || []).length ? 1400 : 0;
-      (ev.to || []).forEach((t, i) => pulse(ev.agent, t, outDelay + i * 160));
-      if (!(ev.from || []).length && !(ev.to || []).length) flash(ev.agent);
+      (ev.from || []).forEach((f, i) => speak(f, ev.agent, i ? '' : SAY[f], i * 220));
+      const outDelay = (ev.from || []).length ? 1500 : 0;
+      (ev.to || []).forEach((t, i) => speak(ev.agent, t, i ? '' : (ev.type === 'done' ? SAY[ev.agent] : (ev.text || '').slice(0, 42)), outDelay + i * 240));
     }
 
-    // Real feed: the same events, as text.
     const EVLABEL = { start: 'started', done: 'finished', error: 'stopped', review: 'checked', deliver: 'delivered', chat: 'answered', handoff: 'to team' };
     function renderFeed() {
       const feed = document.getElementById('feed');
-      const evs = mc.events.slice(-12).reverse();
+      const evs = mc.events.slice(-10).reverse();
       document.getElementById('feed-sub').textContent = API ? 'Real events from the agents, newest first.' : 'Real events appear here once the worker is connected.';
-      feed.innerHTML = evs.length ? evs.map(e => `<li class="${e.type}"><time>${new Date(e.t).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}</time><div><span class="ev ${e.type}">${esc(EVLABEL[e.type] || e.type)}</span><b>${esc(NAME(e.agent))}:</b> ${esc(e.text || '')}${(e.to || []).length ? `<br><span class="note" style="margin:0">To ${esc(e.to.map(NAME).join(', '))}</span>` : ''}</div></li>`).join('')
-        : '<li class="empty">Nothing yet. Press ▶ on an agent, or wait for the next scheduled run.</li>';
+      feed.innerHTML = evs.length ? evs.map(e => `<li class="${e.type}"><time>${new Date(e.t).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}</time><div>${byId[e.agent] ? `<span class="mf">${face(e.agent, 'fd')}</span>` : ''}<b>${esc(NAME(e.agent))}</b> <span class="ev ${e.type}">${esc(EVLABEL[e.type] || e.type)}</span><br>${esc(e.text || '')}${(e.to || []).length ? `<br><span class="note" style="margin:0">Told ${esc(e.to.map(NAME).join(', '))}</span>` : ''}</div></li>`).join('')
+        : '<li class="empty">Nothing yet. Hover over an agent and press ▶, or ask the Chief of Staff.</li>';
     }
 
     async function pollActivity() {
@@ -2877,7 +3034,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
         mc.seen.add(key);
         if (ev.type === 'done') { mc.lastRun[ev.agent] = ev.t; delete mc.errors[ev.agent]; }
         if (ev.type === 'error') mc.errors[ev.agent] = ev.t;
-        if (!mc.first && !mc.replay) animateEvent(ev);
+        if (!mc.first && !mc.replay && homeVisible()) animateEvent(ev);
       }
       mc.events = d.events || [];
       mc.first = false;
@@ -2891,42 +3048,158 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       setTimeout(pollActivity, 1500);
       try { await RUNNABLE[id](); } finally { delete mc.localRun[id]; }
       await pollActivity();
-      paintNodes();
+      paintNodes(); renderHubBrief();
     }
 
-    // Replay: the weekly order, animation only.
     async function replayWeek() {
       if (mc.replay) return;
       mc.replay = true;
       const btn = document.getElementById('mc-replay'); btn.disabled = true;
       document.getElementById('mc-replaying').hidden = false;
-      const order = ['market', 'growth', 'content', 'sales', 'insights', 'router', 'privacy', 'rewards', 'chief'];
       const wait = ms => new Promise(r => setTimeout(r, ms));
-      for (const id of order) {
+      for (const id of ['market', 'growth', 'content', 'sales', 'insights', 'router', 'privacy', 'rewards', 'chief']) {
         mc.localRun[id] = new Date().toISOString(); paintNodes();
-        animateEvent({ agent: id, from: READS_UI[id], to: [] });
-        await wait(id === 'chief' ? 2600 : 2000);
+        animateEvent({ agent: id, from: READS_UI[id].slice(0, id === 'chief' ? 9 : 3), to: [] });
+        await wait(id === 'chief' ? 2800 : 2100);
         delete mc.localRun[id]; paintNodes();
-        animateEvent({ agent: id, from: [], to: SENDS_UI[id] });
-        await wait(1500);
+        animateEvent({ agent: id, type: 'done', from: [], to: SENDS_UI[id] });
+        await wait(1900);
       }
       document.getElementById('mc-replaying').hidden = true;
       btn.disabled = false; mc.replay = false;
     }
 
-    buildNetwork(); paintNodes(); renderFeed();
+    // ----- Chief of Staff chat -----
+    const cc = { msgs: [], busy: false };
+    const CC_CHIPS = ['What happened today?', 'What needs me right now?', 'How is the waitlist going?', 'Which agent should I run next?'];
+    function renderChat() {
+      const box = document.getElementById('cc-msgs');
+      const intro = !API || !(live.status && live.status.hasKey)
+        ? 'Hi, I coordinate the ten agents. Once the worker is connected, ask me anything about the organization.'
+        : "Hi, I'm your Chief of Staff. I can see every agent's latest work, your tasks and what's waiting for you. What do you want to know?";
+      box.innerHTML = `<div class="cm chief">${esc(intro)}</div>` + cc.msgs.map((m, i) => `<div class="cm ${m.role === 'user' ? 'me' : 'chief'}">${esc(m.content)}${m.actions && m.actions.length ? `<div class="acts">${m.actions.map((a, k) => `<button class="btn small ${a.type === 'run' ? '' : 'outline'}" data-cca="${i}:${k}" ${a.done ? 'disabled' : ''}>${esc(a.done ? 'Done' : a.label)}</button>`).join('')}</div>` : ''}</div>`).join('')
+        + (cc.busy ? '<div class="cm chief typing"><i></i><i></i><i></i></div>' : '');
+      box.scrollTop = box.scrollHeight;
+      document.getElementById('cc-chips').innerHTML = CC_CHIPS.map(c => `<button data-ccq="${esc(c)}">${esc(c)}</button>`).join('');
+    }
+    async function askChief(q) {
+      q = String(q || '').trim();
+      if (!q || cc.busy) return;
+      if (!API || !(live.status && live.status.hasKey)) { cc.msgs.push({ role: 'user', content: q }, { role: 'assistant', content: 'I can answer once the worker is connected.' }); renderChat(); return; }
+      cc.msgs.push({ role: 'user', content: q });
+      cc.busy = true; renderChat();
+      const chief = document.querySelector('.member[data-m="chief"]');
+      if (chief) chief.classList.add('working');
+      try {
+        const d = await call('/agents/chief/ask', { method: 'POST', body: JSON.stringify({ messages: cc.msgs.slice(-12).map(({ role, content }) => ({ role, content })) }) });
+        cc.msgs.push({ role: 'assistant', content: d.reply, actions: d.actions });
+        if (chief) { chief.classList.add('talking'); setTimeout(() => chief.classList.remove('talking'), Math.min(4000, 600 + d.reply.length * 12)); }
+        const ccf = document.getElementById('cc-face');
+        ccf.classList.add('talking'); setTimeout(() => ccf.classList.remove('talking'), Math.min(4000, 600 + d.reply.length * 12));
+      } catch (e) {
+        if (e.message === 'PASS') { cc.msgs.pop(); cc.retry = q; }
+        else cc.msgs.push({ role: 'assistant', content: `Sorry, I couldn't answer that: ${e.message}.` });
+      }
+      cc.busy = false;
+      if (chief) chief.classList.remove('working');
+      renderChat();
+      if (cc.retry && teamKey) { const r = cc.retry; cc.retry = null; askChief(r); }
+    }
+    async function chiefAction(i, k) {
+      const a = cc.msgs[i] && cc.msgs[i].actions[k];
+      if (!a || a.done) return;
+      if (a.type === 'open') { showTab(a.agent); return; }
+      if (a.type === 'run') { a.done = true; renderChat(); needPass(() => runFromMap(a.agent)); return; }
+      if (a.type === 'addTask') { needPass(async () => { await saveTasks([...live.tasks, { id: 't' + Date.now().toString(36), text: a.task, owner: 'Team', due: '', done: false }]); a.done = true; renderChat(); }); }
+    }
+
+    // ----- hub cards: today's brief, waiting for you -----
+    function renderHubBrief() {
+      const latest = live.latest, b = latest ? latest.output : PREVIEW;
+      document.getElementById('hub-brief').innerHTML = `<h3>Today's brief</h3><p class="sub">${latest ? `From the Chief of Staff, ${fmtTime(latest.generatedAt)}` : 'Sample until the first run'}</p>
+        <p style="font-weight:700;font-size:14.5px;margin:0 0 6px">${esc(b.headline)}</p>
+        ${b.needsYou.slice(0, 3).map(n => `<div class="mini"><span class="pill gate" style="flex:none"><i></i>${esc(n.when)}</span><span>${esc(n.title)}</span></div>`).join('')}
+        <button class="btn small outline" data-agent="chief" style="margin-top:10px">Open the full brief</button>`;
+    }
+    let waiting = null;
+    function renderWaiting() {
+      const box = document.getElementById('hub-waiting');
+      const head = '<h3>Waiting for you</h3><p class="sub">Gates and open student questions.</p>';
+      if (!API || !live.status) { box.innerHTML = head + '<p class="note" style="margin:0">Shows up once the worker is connected.</p>'; return; }
+      if (!waiting) { box.innerHTML = head + '<p class="note" style="margin:0 0 8px">Loads with the team passcode.</p><button class="btn small" data-loadwait>Show what\'s waiting</button>'; return; }
+      const rows = [
+        ...waiting.gate1.map(x => ['router', `Gate 1: approve the first delivery to ${x.org}`]),
+        ...waiting.gate1held.map(x => ['privacy', `A report for ${x.org} is held for a privacy check`]),
+        ...(waiting.gate2 && waiting.gate2.over ? [['rewards', `Gate 2: payouts are over the $${waiting.gate2.cap} weekly cap`]] : []),
+        ...waiting.gate3.map(x => ['privacy', `Gate 3: ${x.title}`]),
+        ...waiting.support.map(x => ['support', `Student asked: ${x.question}`]),
+        ...(waiting.gate2 && waiting.gate2.flags ? [['rewards', `${waiting.gate2.flags} fraud flag${waiting.gate2.flags === 1 ? '' : 's'} to look at`]] : []),
+      ];
+      box.innerHTML = head + (rows.length ? rows.slice(0, 7).map(([id, t]) => `<div class="mini"><span class="mf">${face(id, 'w')}</span><span style="flex:1">${esc(t)}</span><button class="link2" data-agent="${id}">Open</button></div>`).join('') + (rows.length > 7 ? `<p class="note">${rows.length - 7} more</p>` : '')
+        : '<p style="margin:0;font-size:13.5px">Nothing is waiting. The agents have it.</p>');
+    }
+    async function loadWaiting() {
+      try { waiting = await call('/agents/waiting'); } catch (e) { /* passcode prompt or offline */ }
+      renderWaiting();
+    }
+
+    // ----- agent pages -----
+    function renderAgentHead(id) {
+      const a = byId[id];
+      const since = mc.running[id] || mc.localRun[id];
+      document.getElementById('agent-head').innerHTML = `
+        <div class="big ${since ? 'working' : ''}">${face(id, 'h')}</div>
+        <div>
+          <span class="eyebrow">${a.group === 'chief' ? 'Coordinator' : GROUPS.find(g => g[0] === a.group)[1]}</span>
+          <h1>${esc(a.name)}</h1>
+          <div class="ah-meta"><span>${esc(PRICE[a.model][2])}</span><span>·</span><span>${money(cost(a))} a month</span><span>·</span><span>${esc(a.cadence)}</span>${autoPill(a)}</div>
+          <ul class="ah-does">${a.does.slice(0, 4).map(d => `<li>${esc(d)}</li>`).join('')}</ul>
+          <div class="ah-with">Works with ${a.talks.map(t => `<button data-agent="${t}" title="${esc(byId[t].name)}" aria-label="Open ${esc(byId[t].name)}">${face(t, 'w')}</button>`).join('')}<span style="margin-left:6px">${esc(a.gate)}</span></div>
+        </div>`;
+    }
+    const homeVisible = () => !document.querySelector('[data-view="home"]').hidden;
+    function route() {
+      const m = location.hash.match(/^#agent-([a-z]+)$/);
+      const id = m && byId[m[1]] ? m[1] : null;
+      document.querySelector('[data-view="home"]').hidden = !!id;
+      document.querySelector('[data-view="agent"]').hidden = !id;
+      if (id) {
+        document.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== id; });
+        renderAgentHead(id);
+      }
+      const w = document.getElementById('window');
+      if (w) w.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
+    window.addEventListener('hashchange', route);
+
+    buildTeam(); paintNodes(); renderFeed(); renderChat(); renderHubBrief(); renderWaiting(); route();
     setInterval(() => { if (Object.keys(mc.running).length || Object.keys(mc.localRun).length) paintNodes(); }, 1000);
     setInterval(pollActivity, 5000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) pollActivity(); });
     document.addEventListener('click', e => {
       const r = e.target.closest('[data-mcrun]');
-      if (r) { e.stopPropagation(); if (!detail.hidden) closeAgent(); needPass(() => runFromMap(r.dataset.mcrun)); }
+      if (r) { e.stopPropagation(); needPass(() => runFromMap(r.dataset.mcrun)); }
       if (e.target.closest('#mc-replay')) replayWeek();
-      const go = e.target.closest('[data-ltabgo]');
-      if (go) { showTab(go.dataset.ltabgo); document.getElementById('brief-section').scrollIntoView({ behavior: 'smooth' }); }
+      if (e.target.closest('[data-home]')) { location.hash = ''; }
+      const q = e.target.closest('[data-ccq]');
+      if (q) askChief(q.dataset.ccq);
+      const ca = e.target.closest('[data-cca]');
+      if (ca) { const [i, k] = ca.dataset.cca.split(':').map(Number); chiefAction(i, k); }
+      if (e.target.closest('[data-loadwait]')) needPass(loadWaiting);
+    });
+    document.addEventListener('submit', e => {
+      if (e.target.id !== 'cc-form') return;
+      e.preventDefault();
+      const i = document.getElementById('cc-text');
+      const q = i.value; i.value = '';
+      needPass(() => askChief(q));
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy(), loadSupport(), loadRewardsTab()])).then(() => { paintNodes(); pollActivity(); });
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy(), loadSupport(), loadRewardsTab()])).then(() => {
+      paintNodes(); pollActivity(); renderChat(); renderHubBrief();
+      if (API && live.status && teamKey) loadWaiting(); else renderWaiting();
+    });
     render();
   })();
   </script>
