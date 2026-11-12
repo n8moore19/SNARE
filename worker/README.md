@@ -66,11 +66,17 @@ The same worker runs the launch agents shown on `org.html`.
   recipes). Any piece citing a link search didn't return is dropped. The org page draws a
   branded PNG for each piece (posters get a waitlist QR code); the team posts them.
   Sonnet 5.5, about 50 to 65 cents a run.
+- **B2B sales** (built): every Thursday at 12:00 UTC it searches for Canadian food brands,
+  grocers and governments with a timely reason to care, plus buyer leads from Market
+  intelligence. For each it names the role to reach and a public route in (never personal
+  details), and writes an email and a one page pitch with real cited stats and a clearly
+  illustrative example insight. Prospects go into the sales pipeline on the org page; the
+  team sends, and any price or contract goes through Gate 1. Opus 5.5, about $1 to $1.50 a run.
 - **Waitlist**: `join.html` posts to `POST /agents/waitlist/join` (public, rate limited, same
   site only). Each email is one KV key with campus, source and date in its metadata. Students
   can remove their email on the same page. The org page only shows counts.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)

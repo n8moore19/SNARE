@@ -295,6 +295,53 @@
     .mix { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
     @media (max-width: 900px) { .pieces { grid-template-columns: 1fr; } }
 
+
+    /* ---------- agent 5: B2B sales ---------- */
+    .stage-row { display: grid; grid-template-columns: 78px 1fr 22px; gap: 8px; align-items: center; font-size: 12.5px; margin: 5px 0; }
+    .stage-row .trk { height: 10px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+    .stage-row .trk i { display: block; height: 100%; background: var(--forest); border-radius: 99px; }
+    .stage-row.gate1 .trk i { background: var(--warn); }
+    .stage-row b { text-align: right; font-variant-numeric: tabular-nums; }
+    .pipe-val { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12.5px; }
+    .pipe-val b { font-size: 16px; font-variant-numeric: tabular-nums; }
+    .ptype { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: var(--soft); color: var(--forest); }
+    .ptype.grocer { background: #FFF6D6; color: #7A5A00; }
+    .ptype.government { background: #E6EEF8; color: #1F4E8C; }
+    .why2 { font-size: 12.5px; color: var(--ink); margin-top: 6px; }
+    .why2 a { color: var(--forest); font-size: 11.5px; margin-left: 4px; }
+    .gate-note { font-size: 11.5px; color: var(--warn); font-weight: 600; margin-top: 6px; }
+    /* one page pitch */
+    .op-wrap { background: var(--bg); width: min(860px, 100%); max-height: 100%; overflow: auto; border-radius: 18px; box-shadow: 0 30px 80px rgba(0,0,0,0.4); }
+    .op-bar { position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; justify-content: flex-end; padding: 12px 16px; background: var(--ink); }
+    .op-bar .btn { background: #fff; color: var(--ink); border-color: #fff; }
+    .op-bar .btn.outline { background: transparent; color: #fff; }
+    .op { background: #fff; margin: 18px; padding: 44px 48px; border-radius: 6px; box-shadow: var(--shadow); color: var(--ink); }
+    .op-top { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 3px solid var(--lime); padding-bottom: 14px; }
+    .op-top .brand { font-size: 28px; }
+    .op-top > span:not(.brand) { font-size: 12px; color: var(--muted); text-align: right; }
+    .op-top .brand { color: var(--ink); }
+    .op h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.12; margin: 22px 0 10px; text-wrap: balance; }
+    .op .lead { font-size: 15px; color: var(--muted); }
+    .op h2 { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--forest); margin: 22px 0 8px; }
+    .op ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+    .op .ex { background: var(--soft); border-radius: 12px; padding: 14px 16px; font-size: 15px; font-weight: 600; color: var(--forest); }
+    .op .ex small { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn); margin-bottom: 4px; }
+    .op .stats li a { color: var(--forest); font-size: 12px; }
+    .op .offer { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+    .op .offer div { border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; }
+    .op .offer b { display: block; font-size: 15px; }
+    .op-foot { margin-top: 26px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    @media (max-width: 700px) { .op { padding: 24px 20px; margin: 10px; } .op .offer { grid-template-columns: 1fr; } }
+    @media print {
+      body { background: #fff !important; display: block !important; padding: 0 !important; overflow: visible !important; }
+      body * { visibility: hidden; }
+      #op-modal, #op-modal .op, #op-modal .op * { visibility: visible; }
+      #op-modal { position: absolute; inset: 0; background: #fff; padding: 0; display: block; }
+      .op-wrap { box-shadow: none; max-height: none; overflow: visible; width: 100%; background: #fff; }
+      .op-bar { display: none; }
+      .op { box-shadow: none; margin: 0; padding: 0.4in 0.5in; }
+    }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -412,6 +459,7 @@
             <button role="tab" data-ltab="market" aria-selected="false">Market intelligence</button>
             <button role="tab" data-ltab="growth" aria-selected="false">Student acquisition</button>
             <button role="tab" data-ltab="content" aria-selected="false">Content creation</button>
+            <button role="tab" data-ltab="sales" aria-selected="false">B2B sales</button>
           </div>
         </div>
         <div id="pass-slot"></div>
@@ -481,6 +529,25 @@
         <p class="sub">Every Wednesday it writes 6 pieces for Instagram, LinkedIn and campus boards from real cited facts, the other agents' ideas and SNARE's recipes. Every number links to its source. Download the image, copy the caption, post it, then mark it posted.</p>
         <div class="panel" id="content-head"></div>
         <div class="pieces" id="pieces"></div>
+        </div>
+
+        <div data-pane="sales" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">This week's prospects</h3>
+          <span id="s-status" class="pill gate"><i></i>Checking</span>
+          <span id="s-time" class="note" style="margin:0"></span>
+          <button class="btn" id="run-sales" type="button" disabled>Run now</button>
+        </div>
+        <p class="sub">Every Thursday it finds food brands, grocers and governments in Canada with a reason to care right now, names the role to reach and a public way in, and writes an email and a one page pitch for each. The team sends. Any price or contract goes through Gate 1.</p>
+        <div class="brief-grid">
+          <div class="panel brief" id="sales"></div>
+          <div class="side"><div class="panel"><h3>Pipeline</h3><p class="sub">Every prospect the agent has found.</p><div id="funnel"></div></div></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="pipe-head"><h3>Prospects</h3><div class="chips" id="pros-filter"></div></div>
+          <p class="sub" id="pros-sub"></p>
+          <div id="prospects"></div>
+        </div>
         </div>
       </section>
 
@@ -579,6 +646,7 @@
   </div>
 
   <div class="detail" id="detail" role="dialog" aria-modal="true" aria-label="Agent details" hidden></div>
+  <div class="detail" id="op-modal" role="dialog" aria-modal="true" aria-label="One page pitch" hidden></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="config.js"></script>
@@ -648,18 +716,18 @@ Slide 2: Cook what expires first: Leftover Egg Fried Rice, 15 minutes.
 Caption: Snap your receipt, see what expires first, earn grocery money. Join the waitlist: {link}
 Fact: cited to its source page.` },
 
-      { id: 'sales', name: 'B2B sales', group: 'sell', model: 'opus', auto: 'gate', runs: 100, inTok: 40000, outTok: 6000, f: [1.5, 3],
-        job: 'Finds and works data buyers: brands, grocers and cities.',
-        cadence: 'About 25 prospects a week',
-        does: ['Researches each prospect and what question our data answers for them', 'Writes outreach and follow ups', 'Builds a sample report for each prospect', 'Hands signed buyers to the router'],
-        tools: ['Web search', 'CRM', 'Email', 'Sample report builder'],
-        gate: 'Gate 1: a person approves new contracts and prices. Follow ups run alone.',
+      { id: 'sales', name: 'B2B sales', group: 'sell', model: 'opus', auto: 'gate', built: true, runs: 4, inTok: 180000, outTok: 18000, extra: 0.5, extraNote: '48 web searches', f: [1.5, 3],
+        job: 'Finds data buyers and writes the pitch for each.',
+        cadence: 'Weekly, Thursdays, plus Run now',
+        does: ['Finds Canadian food brands, grocers and governments with a reason to care now', 'Names the role to reach and a public way in, never personal details', 'Writes a tailored email for each prospect', 'Builds a printable one page pitch with real cited stats', 'Uses buyer leads from Market intelligence'],
+        tools: ['Claude web search', 'Sales pipeline', 'One page pitch builder'],
+        gate: 'The team sends every email. Gate 1: a person approves any price or contract.',
         talks: ['market', 'insights', 'router'],
-        sample: `To: Insights manager, bakery brand
-Subject: How much of your bread do students throw out?
-
-Students in London throw out 31% of the bread they buy, mostly from full size loaves, mostly around day 5. We track this every week across 1,240 students who opted in.
-Can I send you a free two page sample for your brand?` },
+        sample: `Prospect: a Canadian bakery brand (food brand)
+Why now: launched half loaves this fall.
+Reach: Director of Consumer Insights, via the partnerships page.
+Question we answer: how much of a full loaf do students throw out, and when?
+Email and one page pitch ready to send.` },
 
       { id: 'insights', name: 'Insights analyst', group: 'sell', model: 'opus', auto: 'auto', runs: 8, inTok: 1500000, outTok: 40000, batch: true, f: [3, 10],
         job: 'Turns the panel into reports buyers pay for.',
@@ -1697,7 +1765,164 @@ Duplicate receipts blocked: 6` },
       if (sel) needPass(() => setPostStatus(sel.dataset.pstat, sel.value));
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent()]));
+    // ---------- agent 5: B2B sales ----------
+    const STAGES = ['new', 'contacted', 'replied', 'meeting', 'proposal', 'won', 'lost'];
+    const OFFER_VALUE = { 'single report': 5000, 'annual subscription': 10000, 'custom study': 35000 };
+    const SALES_PREVIEW = { headline: 'Sample: real prospects, emails and one page pitches appear after the first run.', newProspects: [], nextSteps: ['Connect the worker, then press Run now.'] };
+    const SAMPLE_PROSPECTS = [{
+      id: 'sample-p', org: 'Example: a Canadian bakery brand', type: 'food brand', whyNow: 'Sample. A real run names the news that makes them timely, with its link.', roleToReach: 'Director of Consumer Insights',
+      route: 'Partnerships form on their website', routeUrl: '', question: 'How much of a full loaf do students throw out, and when?', offer: 'single report', offerText: 'A single insight report, about $5K', sources: [],
+      email: { subject: 'Sample subject', body: 'Sample email. A real run writes one per prospect, specific to their news.' },
+      onePager: { headline: 'What students throw away, before it costs you', problem: 'Sample problem statement for this prospect.', whatWeTrack: ['What students buy', 'What they use', 'What they throw out, and why'], exampleInsight: 'Example: students who live alone throw out more of a full loaf than a half loaf.', stats: [], ask: 'A 20 minute call to shape the first report.' },
+      status: 'new', added: '' }];
+    live.sales = null; live.pros = []; live.sbusy = false; live.serror = ''; live.prosFilter = 'all'; live.openEmail = null;
+
+    function renderSales() {
+      const latest = live.sales;
+      const [cls, label, banner] = statusOf(latest);
+      const st = document.getElementById('s-status');
+      st.className = 'pill ' + cls; st.innerHTML = '<i></i>' + label;
+      const btn = document.getElementById('run-sales');
+      btn.disabled = !API || !live.status || !live.status.hasKey || live.sbusy;
+      btn.textContent = live.sbusy ? 'Finding buyers' : 'Run now';
+      document.getElementById('s-time').textContent = latest ? `Written ${fmtTime(latest.generatedAt)}` : '';
+      const o = latest ? latest.output : SALES_PREVIEW;
+      document.getElementById('sales').innerHTML = `
+        ${banner ? `<div class="preview"><div><b>${latest ? '' : 'Preview'}</b>${esc(banner)}</div></div>` : ''}
+        <p class="headline">${esc(o.headline)}</p>
+        ${o.newProspects.length ? `<div class="bsec"><b>New this week</b><ul class="blist">${o.newProspects.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        ${o.nextSteps.length ? `<div class="bsec"><b>Next steps</b><ul class="blist">${o.nextSteps.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+        ${live.serror ? `<p class="err">${esc(live.serror)}</p>` : ''}
+        <div class="srcs">${latest
+          ? `<span class="src real">${latest.sources.searches} web searches</span><span class="src real">${latest.sources.added} new prospects</span><span class="src real">${latest.sources.leads} leads from Market intelligence</span>`
+          : '<span class="src samp">Sample</span>'}</div>`;
+      renderFunnel();
+    }
+
+    function renderFunnel() {
+      const list = live.pros;
+      const n = st => list.filter(p => p.status === st).length;
+      const max = Math.max(1, ...STAGES.map(n));
+      const open = list.filter(p => ['contacted', 'replied', 'meeting', 'proposal'].includes(p.status)).reduce((t, p) => t + (OFFER_VALUE[p.offer] || 0), 0);
+      const won = list.filter(p => p.status === 'won').reduce((t, p) => t + (OFFER_VALUE[p.offer] || 0), 0);
+      document.getElementById('funnel').innerHTML = list.length ? `
+        ${STAGES.map(st => `<div class="stage-row ${st === 'proposal' ? 'gate1' : ''}"><span>${st}</span><span class="trk"><i style="width:${n(st) / max * 100}%"></i></span><b>${n(st)}</b></div>`).join('')}
+        <div class="pipe-val"><span>Open pipeline (est.)</span><b>${money(open)}</b></div>
+        <div class="pipe-val" style="border:0;padding-top:0;margin-top:4px"><span>Won (est.)</span><b>${money(won)}</b></div>
+        <p class="note">Values use the price anchors: $5K report, $10K a year, about $35K study.</p>`
+        : '<p class="note" style="margin:0">No prospects yet. They appear after the first run.</p>';
+    }
+
+    function renderProspects() {
+      const edit = canEdit();
+      const sample = !live.pros.length;
+      const list = sample ? SAMPLE_PROSPECTS : live.pros;
+      const counts = {}; list.forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1; });
+      document.getElementById('pros-filter').innerHTML = ['all', ...STAGES].map(st => `<button class="${live.prosFilter === st ? 'on' : ''}" data-prf="${st}">${st}${st === 'all' ? ` ${list.length}` : counts[st] ? ` ${counts[st]}` : ''}</button>`).join('');
+      document.getElementById('pros-sub').textContent = sample
+        ? 'Sample row. Open the email or the one page pitch to see the format.'
+        : `Open the email, copy it, send it from your own address with the one pager attached, then update the stage.${edit ? '' : ' Stage editing turns on once the worker is connected.'}`;
+      const shown = list.filter(p => live.prosFilter === 'all' || p.status === live.prosFilter);
+      document.getElementById('prospects').innerHTML = shown.length ? shown.map(p => `<div class="prow">
+        <div class="prow-top">
+          <div><strong>${esc(p.org)}</strong> <span class="ptype ${p.type === 'grocer' ? 'grocer' : p.type === 'government' ? 'government' : ''}">${esc(p.type)}</span>
+            <span class="pm">Reach: ${esc(p.roleToReach)} · ${p.routeUrl ? `<a href="${esc(p.routeUrl)}" target="_blank" rel="noopener">${esc(p.route)}</a>` : esc(p.route)}</span></div>
+          <span class="signups">${esc(p.offerText || p.offer)}</span>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+            <select data-prstat="${esc(p.id)}" ${edit && !sample ? '' : 'disabled'} aria-label="Stage">${STAGES.map(st => `<option ${p.status === st ? 'selected' : ''}>${st}</option>`).join('')}</select>
+            <button class="btn small outline" data-email="${esc(p.id)}">${live.openEmail === p.id ? 'Hide' : 'Email'}</button>
+            <button class="btn small" data-op="${esc(p.id)}">One pager</button>
+          </div>
+        </div>
+        <p class="why2">${esc(p.whyNow)}${p.sources.map((u, k) => `<a href="${esc(u)}" target="_blank" rel="noopener">source ${k + 1}</a>`).join('')}</p>
+        ${p.status === 'proposal' ? '<p class="gate-note">Gate 1: a person approves the price and terms before anything is sent.</p>' : ''}
+        ${live.openEmail === p.id ? `<div class="draft">
+          <div class="dmeta">To: ${esc(p.roleToReach)} at ${esc(p.org)}, via ${esc(p.route)}</div>
+          <p><b>Subject:</b> ${esc(p.email.subject)}</p>
+          <pre>${esc(p.email.body)}</pre>
+          <div class="row2"><button class="btn small" data-copy="${esc('Subject: ' + p.email.subject + '\n\n' + p.email.body)}">Copy email</button>${p.routeUrl ? `<a class="btn small outline" href="${esc(p.routeUrl)}" target="_blank" rel="noopener">Open their contact page</a>` : ''}</div>
+        </div>` : ''}
+      </div>`).join('') : '<p class="note">No prospects at this stage.</p>';
+    }
+
+    function openOnePager(id) {
+      const p = (live.pros.length ? live.pros : SAMPLE_PROSPECTS).find(x => x.id === id);
+      if (!p) return;
+      const o = p.onePager;
+      const m = document.getElementById('op-modal');
+      m.innerHTML = `<div class="op-wrap">
+        <div class="op-bar"><button class="btn small" data-print>Print or save PDF</button><button class="btn small outline" data-opclose>Close</button></div>
+        <article class="op">
+          <div class="op-top"><span class="brand">snare<i></i></span><span>Prepared for ${esc(p.org)}<br>${new Date().toLocaleDateString('en-CA', { month: 'long', year: 'numeric' })}</span></div>
+          <h1>${esc(o.headline)}</h1>
+          <p class="lead">${esc(o.problem)}</p>
+          <h2>The question we answer for you</h2>
+          <p style="font-size:16px;font-weight:600">${esc(p.question)}</p>
+          <h2>What SNARE tracks</h2>
+          <ul>${o.whatWeTrack.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+          <h2>The kind of insight you get</h2>
+          <div class="ex"><small>Illustrative example, not real data yet</small>${esc(o.exampleInsight)}</div>
+          ${o.stats.length ? `<h2>Why it matters</h2><ul class="stats">${o.stats.map(x => `<li>${esc(x.claim)} <a href="${esc(x.url)}">${esc(x.source)}</a></li>`).join('')}</ul>` : ''}
+          <h2>How it works</h2>
+          <div class="offer">
+            <div><b>Students opt in</b>A free app for Western and Fanshawe students logs what they buy, use and throw out. Only students who choose to share are counted.</div>
+            <div><b>You get totals, never people</b>Every number covers at least 50 students. No names, addresses or locations.</div>
+          </div>
+          <h2>The offer</h2>
+          <p style="font-size:14.5px">${esc(p.offerText || p.offer)}. ${esc(o.ask)}</p>
+          <div class="op-foot"><span>Team SNARE · Ivey Business School student venture · London, Ontario</span><span>Pre launch: student pilot under way</span></div>
+        </article>
+      </div>`;
+      m.hidden = false;
+      m.querySelector('[data-opclose]').focus();
+    }
+
+    async function setProspect(id, status) {
+      const prev = live.pros;
+      live.pros = live.pros.map(p => p.id === id ? { ...p, status } : p); renderProspects(); renderFunnel();
+      try { live.pros = (await call('/agents/prospects', { method: 'PUT', body: JSON.stringify({ id, status }) })).prospects; }
+      catch (e) { if (e.message !== 'PASS') { live.pros = prev; live.serror = e.message; renderSales(); } }
+      renderProspects(); renderFunnel();
+    }
+
+    async function runSalesNow() {
+      live.sbusy = true; live.serror = ''; renderSales();
+      try {
+        live.sales = (await call('/agents/sales/run', { method: 'POST' })).latest;
+        live.pros = (await call('/agents/prospects')).prospects;
+      } catch (e) { if (e.message !== 'PASS') live.serror = e.message; }
+      live.sbusy = false; renderSales(); renderProspects();
+    }
+
+    async function loadSales() {
+      renderSales(); renderProspects();
+      if (!API || !live.status) return;
+      try {
+        const [sl, pr] = await Promise.all([call('/agents/sales'), call('/agents/prospects')]);
+        live.sales = sl.latest; live.pros = pr.prospects;
+      } catch (e) { /* keep preview */ }
+      renderSales(); renderProspects();
+    }
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('#run-sales')) needPass(runSalesNow);
+      const f = e.target.closest('[data-prf]');
+      if (f) { live.prosFilter = f.dataset.prf; renderProspects(); }
+      const em = e.target.closest('[data-email]');
+      if (em) { live.openEmail = live.openEmail === em.dataset.email ? null : em.dataset.email; renderProspects(); }
+      const op = e.target.closest('[data-op]');
+      if (op) openOnePager(op.dataset.op);
+      if (e.target.closest('[data-print]')) window.print();
+      const m = document.getElementById('op-modal');
+      if (e.target.closest('[data-opclose]') || e.target === m) m.hidden = true;
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('op-modal').hidden = true; });
+    document.addEventListener('change', e => {
+      const sel = e.target.closest('[data-prstat]');
+      if (sel) needPass(() => setProspect(sel.dataset.prstat, sel.value));
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales()]));
     render();
   })();
   </script>

@@ -663,6 +663,151 @@ export async function runContent(env) {
   });
 }
 
+// ---------- agent 5: B2B sales ----------
+// Finds food brands, grocers and governments that could buy SNARE's food
+// waste insights. Organisation and role only, never personal details. Writes
+// an email and a one page pitch per prospect; the team sends. Stats must cite
+// links the search returned; the example insight is always marked illustrative.
+
+const DEAL_STAGES = ["new", "contacted", "replied", "meeting", "proposal", "won", "lost"];
+
+const SALES_SCHEMA = {
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    prospects: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          org: { type: "string" },
+          type: { type: "string", enum: ["food brand", "grocer", "government"] },
+          whyNow: { type: "string" },
+          roleToReach: { type: "string" },
+          route: { type: "string" },
+          routeUrl: { type: "string" },
+          question: { type: "string" },
+          offer: { type: "string", enum: ["single report", "annual subscription", "custom study"] },
+          sources: { type: "array", items: { type: "string" } },
+          email: {
+            type: "object",
+            properties: { subject: { type: "string" }, body: { type: "string" } },
+            required: ["subject", "body"], additionalProperties: false,
+          },
+          onePager: {
+            type: "object",
+            properties: {
+              headline: { type: "string" },
+              problem: { type: "string" },
+              whatWeTrack: { type: "array", items: { type: "string" } },
+              exampleInsight: { type: "string" },
+              stats: {
+                type: "array",
+                items: { type: "object", properties: { claim: { type: "string" }, url: { type: "string" }, source: { type: "string" } }, required: ["claim", "url", "source"], additionalProperties: false },
+              },
+              ask: { type: "string" },
+            },
+            required: ["headline", "problem", "whatWeTrack", "exampleInsight", "stats", "ask"], additionalProperties: false,
+          },
+        },
+        required: ["org", "type", "whyNow", "roleToReach", "route", "routeUrl", "question", "offer", "sources", "email", "onePager"],
+        additionalProperties: false,
+      },
+    },
+    nextSteps: { type: "array", items: { type: "string" } },
+  },
+  required: ["headline", "prospects", "nextSteps"],
+  additionalProperties: false,
+};
+
+const OFFERS = {
+  "single report": "A single insight report, about $5K",
+  "annual subscription": "An annual subscription, about $10K a year",
+  "custom study": "A custom study, about $20K to $50K",
+};
+
+const SALES_RESEARCH_SYSTEM = `You are the B2B sales agent for SNARE, a student startup from the Ivey Business School in London, Ontario.
+SNARE is a free digital fridge app for students. Students who opt in feed an anonymous household food waste panel: what gets bought, used and thrown out, when, and why. SNARE sells aggregate insights (never individual data) to food brands (pack size, packaging, shelf life), grocers (home spoilage, campus stocking, store brands) and governments (Canada has no national household food waste baseline). It is pre launch: a waitlist and a 20 student pilot, no real panel data yet.
+
+Use web search to find new, specific prospects in Canada, preferring those with recent news that makes SNARE timely (a pack size change, a food waste commitment, a sustainability report, a city waste study, a green bin program). For each prospect find: why now (with the source page), the role that would buy (like Director of Consumer Insights or Manager of Waste Diversion), a public route in (partnerships page, general contact, media or sustainability inbox) with its page, and one or two real public stats relevant to them. Organisations and roles only: never collect a private person's name, email or phone.`;
+
+const SALES_FORMAT_SYSTEM = `You turn research into SNARE's weekly B2B sales prospects.
+Rules:
+- Up to 5 new prospects from the notes, best fit first, mixing types when possible, none already in the pipeline.
+- sources: URLs from the allowed list that support whyNow. routeUrl and every stat url must be copied exactly from the allowed list, or routeUrl "" if none.
+- route: how to reach them in words, like "Partnerships form on their sustainability page". Never a person's name or personal email.
+- question: the one question SNARE's data answers for this prospect.
+- offer: "single report" for most brands, "annual subscription" for grocers, "custom study" for governments, unless the notes suggest otherwise.
+- email: from "Team SNARE, Ivey Business School students". Under 150 words. Honest that SNARE is pre launch and building a student panel. Specific to their news. Ask for a 20 minute conversation or feedback on a sample report. Do not state prices in the email.
+- onePager: headline (under 12 words), problem (2 sentences, with their context), whatWeTrack (3 to 5 short items), exampleInsight (one sentence showing the kind of finding they'd get; it is illustrative and must not present a number as real), stats (1 to 3 real stats from the notes with urls), ask (one sentence).
+- headline: one sentence on this week's prospecting. nextSteps: up to 4.
+- Plain, short sentences. No em dashes or hyphens used as dashes.`;
+
+async function getProspects(env) {
+  return (env.AGENTS ? await env.AGENTS.get("prospects", "json") : null) || [];
+}
+
+export async function runSales(env) {
+  if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
+  const model = env.SALES_MODEL || "claude-opus-5-5";
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const [prospects, market] = await Promise.all([getProspects(env), env.AGENTS ? env.AGENTS.get("latest:market", "json") : null]);
+  const known = prospects.map((x) => x.org);
+  const leads = market ? market.output.items.filter((i) => i.sendTo === "sales" || i.category === "buyer lead").map((i) => ({ title: i.title, summary: i.summary, url: i.url })) : [];
+
+  const r = await research(client, {
+    model, system: SALES_RESEARCH_SYSTEM, maxUses: 12,
+    prompt: `Today is ${today()}.\nAlready in the pipeline, skip these: ${known.join("; ") || "none yet"}.\nLeads from Market intelligence (JSON): ${JSON.stringify(leads)}\nFind new prospects across food brands, grocers and government.`,
+  });
+  for (const l of leads) if (l.url) r.sources.set(l.url, { url: l.url, title: l.title, age: "" });
+
+  const f = await structure(client, {
+    model, system: SALES_FORMAT_SYSTEM, schema: SALES_SCHEMA,
+    content: `Today is ${today()}.\nAlready in the pipeline: ${known.join("; ") || "none"}\n\nResearch notes:\n${r.notes.join("\n\n")}\n\nAllowed sources (JSON):\n${JSON.stringify([...r.sources.values()])}`,
+  });
+
+  // Keep prospects backed by real links; strip any stat or route that isn't.
+  const seen = new Set(known.map((x) => x.toLowerCase()));
+  const added = [];
+  for (const p of f.output.prospects) {
+    const sources = p.sources.filter((u) => r.sources.has(u));
+    if (!sources.length || seen.has(p.org.toLowerCase())) continue;
+    seen.add(p.org.toLowerCase());
+    added.push({
+      ...p, sources,
+      id: crypto.randomUUID(),
+      routeUrl: r.sources.has(p.routeUrl) ? p.routeUrl : "",
+      onePager: { ...p.onePager, stats: p.onePager.stats.filter((x) => r.sources.has(x.url)) },
+      offerText: OFFERS[p.offer],
+      status: "new", notes: "", added: new Date().toISOString().slice(0, 10),
+    });
+  }
+  if (env.AGENTS && added.length) await env.AGENTS.put("prospects", JSON.stringify([...prospects, ...added]));
+
+  return save(env, "sales", {
+    agent: "sales",
+    generatedAt: new Date().toISOString(),
+    output: { headline: f.output.headline, newProspects: added.map((x) => `${x.org} (${x.type})`), nextSteps: f.output.nextSteps },
+    sources: { searches: r.searches, links: r.sources.size, found: f.output.prospects.length, added: added.length, leads: leads.length },
+    usage: { input: r.inTok + f.inTok, output: r.outTok + f.outTok },
+  });
+}
+
+// Status and notes only; the agent owns the rest of each prospect.
+async function updateProspect(env, body) {
+  const list = await getProspects(env);
+  const p = list.find((x) => x.id === body.id);
+  if (!p) return null;
+  if (body.status !== undefined) {
+    if (!DEAL_STAGES.includes(body.status)) return null;
+    p.status = body.status;
+  }
+  if (body.notes !== undefined) p.notes = String(body.notes).slice(0, 1000);
+  if (body.remove) list.splice(list.indexOf(p), 1);
+  await env.AGENTS.put("prospects", JSON.stringify(list));
+  return list;
+}
+
 async function getPostStatus(env) {
   return (env.AGENTS ? await env.AGENTS.get("postStatus", "json") : null) || {};
 }
@@ -698,12 +843,13 @@ export async function handleAgents(request, env, cors) {
   if (request.method === "GET" && path === "/agents/groups") return json({ groups: await getGroups(env) }, 200, cors);
   if (request.method === "GET" && path === "/agents/waitlist") return json({ summary: await waitlistSummary(env) }, 200, cors);
   if (request.method === "GET" && path === "/agents/poststatus") return json({ status: await getPostStatus(env) }, 200, cors);
+  if (request.method === "GET" && path === "/agents/prospects") return json({ prospects: await getProspects(env) }, 200, cors);
   // Public: the join page posts here. Same site check as everything else.
   if (request.method === "POST" && path === "/agents/waitlist/join") {
     if (tooManyRuns("join:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 10)) return json({ error: "Too many tries, wait a bit" }, 429, cors);
     return joinWaitlist(request, env, cors);
   }
-  const latestMatch = path.match(/^\/agents\/(chief|market|growth|content)$/);
+  const latestMatch = path.match(/^\/agents\/(chief|market|growth|content|sales)$/);
   if (request.method === "GET" && latestMatch) {
     const latest = env.AGENTS ? await env.AGENTS.get(`latest:${latestMatch[1]}`, "json") : null;
     return json({ latest }, 200, cors);
@@ -755,8 +901,17 @@ export async function handleAgents(request, env, cors) {
     return json({ status }, 200, cors);
   }
 
-  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent };
-  const runMatch = path.match(/^\/agents\/(chief|market|growth|content)\/run$/);
+  if (request.method === "PUT" && path === "/agents/prospects") {
+    if (!env.AGENTS) return json({ error: "Storage is not set up on the worker" }, 500, cors);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+    const list = typeof body.id === "string" ? await updateProspect(env, body) : null;
+    if (!list) return json({ error: "Invalid update" }, 400, cors);
+    return json({ prospects: list }, 200, cors);
+  }
+
+  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales };
+  const runMatch = path.match(/^\/agents\/(chief|market|growth|content|sales)\/run$/);
   if (request.method === "POST" && runMatch) {
     if (tooManyRuns(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many runs this hour" }, 429, cors);
     try {
