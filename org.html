@@ -563,7 +563,7 @@
     .live-dot.busy { background: var(--lime); animation: hubping 1s infinite; }
     @keyframes hubping { 0% { box-shadow: 0 0 0 0 rgba(45,190,96,0.5); } 100% { box-shadow: 0 0 0 9px rgba(45,190,96,0); } }
     .hub { container-type: inline-size; }
-    .hub-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 16px; align-items: stretch; }
+    .hub-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 16px; align-items: stretch; }
     @container (min-width: 1180px) { .hub-grid { grid-template-columns: minmax(0, 1fr) 360px; } .chief-chat { max-height: none; } }
     .stage-card { background: radial-gradient(120% 90% at 50% 0%, #FBFEF8 0%, #F2F9EC 55%, #E9F4E1 100%); border: 1px solid #DCEBD1; border-radius: 22px; box-shadow: var(--shadow); padding: 10px 10px 12px; min-width: 0; }
     .link-layer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: visible; }
@@ -574,7 +574,16 @@
     .lk-bead-glow { fill: #7BD34A; opacity: 0.85; filter: url(#lk-bead); }
     .lk-bead { fill: url(#lk-beadfill); stroke: #FFFFFF; stroke-width: 1.5; }
     .stage-scroll { overflow-x: auto; }
-    .team-stage { position: relative; min-width: 700px; aspect-ratio: 1000 / 880; }
+    .team-stage { position: relative; min-width: 300px; aspect-ratio: 1000 / 880; }
+    .team-stage.compact .member { width: 100px; gap: 3px; }
+    .team-stage.compact .member .st { white-space: normal; line-height: 1.2; }
+    .team-stage.compact .member .av { width: 62px; height: 62px; }
+    .team-stage.compact .member.chief .av { width: 80px; height: 80px; }
+    .team-stage.compact .member .who { font-size: 12px; }
+    .team-stage.compact .member .st { font-size: 10.5px; }
+    .team-stage.compact .member .run { width: 22px; height: 22px; font-size: 9px; opacity: 1; }
+    .team-stage.compact .member.team .tm span { width: 26px; height: 26px; font-size: 10px; }
+    .team-stage.compact .col-label { font-size: 9.5px; letter-spacing: 0.08em; white-space: nowrap; }
     .col-label { position: absolute; top: 22.5%; transform: translateX(-50%); font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #9AA59E; }
     .stage-note { font-size: 12px; color: var(--muted); margin: 6px 8px 0; }
     .member { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 4px; width: 150px; text-align: center; z-index: 2; }
@@ -2921,7 +2930,50 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       sales: [500, 300], insights: [500, 480], router: [500, 660],
       privacy: [835, 300], support: [835, 480], rewards: [835, 660], team: [500, 805],
     };
-    const H = 880; // stage height in the same units as POS
+    let H = 880; // stage height in the same units as POS
+    // When the stage is narrow (phones), stretch it taller so names never sit
+    // under the next row of faces. Everything reads POS and H, so lines,
+    // bubbles and beads follow automatically.
+    const WIDE_Y = Object.fromEntries(Object.entries(POS).map(([k, v]) => [k, v[1]]));
+    const WIDE_X = Object.fromEntries(Object.entries(POS).map(([k, v]) => [k, v[0]]));
+    // Narrow stages (phones, small windows) are laid out in pixels: each row
+    // gets room for the face, a two line name and the status, plus a gap.
+    function layoutStage() {
+      const stage = document.getElementById('team-stage');
+      const w = stage.clientWidth;
+      if (!w) return;
+      const tall = w < 820, compact = w < 560;
+      const key = tall ? `${compact}:${Math.round(w)}` : 'wide';
+      if (stage.dataset.laid === key) return;
+      stage.dataset.laid = key;
+      stage.classList.toggle('compact', compact);
+      for (const k in POS) POS[k][0] = compact && WIDE_X[k] !== 500 ? (WIDE_X[k] < 500 ? 180 : 820) : WIDE_X[k];
+      let labelTop = '';
+      if (!tall) {
+        H = 880;
+        for (const k in POS) POS[k][1] = WIDE_Y[k];
+      } else {
+        const f = compact ? 62 : 88, cf = compact ? 80 : 112, txt = compact ? 62 : 50;
+        const row = f + txt, chiefH = cf + txt;
+        const px = {};
+        px.chief = chiefH / 2 + 10;
+        const label = chiefH + 22;
+        const r1 = label + 22 + row / 2, gap = row + 18;
+        ['market', 'sales', 'privacy'].forEach(k => { px[k] = r1; });
+        ['growth', 'insights', 'support'].forEach(k => { px[k] = r1 + gap; });
+        ['content', 'router', 'rewards'].forEach(k => { px[k] = r1 + gap * 2; });
+        px.team = r1 + gap * 2 + row / 2 + 58;
+        const total = px.team + 50, u = 1000 / w;
+        H = Math.round(total * u);
+        for (const k in POS) POS[k][1] = Math.round(px[k] * u);
+        labelTop = label / total * 100 + '%';
+      }
+      stage.style.aspectRatio = `1000 / ${H}`;
+      document.getElementById('link-layer').setAttribute('viewBox', `0 0 1000 ${H}`);
+      stage.querySelectorAll('.col-label').forEach(el => { el.style.top = labelTop; });
+      stage.querySelectorAll('.member').forEach(el => { const q = POS[el.dataset.m]; el.style.left = q[0] / 10 + '%'; el.style.top = q[1] / H * 100 + '%'; });
+      stage.querySelectorAll('.col-label').forEach((el, i) => { el.style.left = (compact ? ['18%', '50%', '82%'] : ['16%', '50%', '84%'])[i]; });
+    }
     const READS_UI = {
       chief: ['market', 'growth', 'content', 'sales', 'insights', 'router', 'privacy', 'support', 'rewards'], market: [], growth: ['market'], content: ['market', 'growth', 'insights'],
       sales: ['market'], insights: ['sales'], router: ['insights', 'sales'], privacy: ['content', 'growth', 'sales', 'router'], support: [], rewards: ['router'],
@@ -3255,7 +3307,8 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     }
     window.addEventListener('hashchange', route);
 
-    buildTeam(); paintNodes(); renderFeed(); renderChat(); renderHubBrief(); renderWaiting(); route(); greet();
+    buildTeam(); layoutStage(); paintNodes(); renderFeed(); renderChat(); renderHubBrief(); renderWaiting(); route(); greet();
+    new ResizeObserver(layoutStage).observe(document.getElementById('team-stage'));
     setInterval(() => { if (!document.hidden && homeVisible()) loadScore(); }, 60000);
     setInterval(() => { if (Object.keys(mc.running).length || Object.keys(mc.localRun).length) paintNodes(); }, 1000);
     setInterval(pollActivity, 5000);
