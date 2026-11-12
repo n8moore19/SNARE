@@ -3,7 +3,7 @@
 // of app actions. The website never sees the API key.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales, runInsights, collectInsights, runRouter, deliverAll } from "./agents.js";
+import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales, runInsights, collectInsights, runRouter, deliverAll, runRetention } from "./agents.js";
 
 const ACTION_TYPES = [
   "open_recipe",      // target: recipe id
@@ -157,6 +157,7 @@ export default {
       return;
     }
     ctx.waitUntil(collectInsights(env).catch(log("Insights collect"))
+      .then(() => runRetention(env)).catch(log("Retention"))
       .then(() => deliverAll(env)).catch(log("Deliveries"))
       .then(() => runChief(env)).catch(log("Chief of Staff")));
   },

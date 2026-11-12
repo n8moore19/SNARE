@@ -18,6 +18,7 @@ CONTENT_MODEL = "claude-sonnet-5-5"  # Content creation
 SALES_MODEL = "claude-opus-5-5"      # B2B sales (judgement on fit and tone matters most here)
 INSIGHTS_MODEL = "claude-opus-5-5"   # Insights analyst (runs as a half price batch)
 ROUTER_MODEL = "claude-sonnet-5-5"   # Data and offers router (offer ideas; deliveries need no model)
+PRIVACY_MODEL = "claude-sonnet-5-5"  # Privacy guard (reviews posts, outreach, offers and deliveries)
 
 # Storage for the agents: team tasks and each agent's latest output.
 # Create it once with: npx wrangler kv namespace create AGENTS

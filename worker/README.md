@@ -90,14 +90,23 @@ The same worker runs the launch agents shown on `org.html`.
   bought a product N times) on the student's own phone. Only anonymous shown and redeemed
   events come back, counted as distinct students; brands see counts of 50 or more only.
   Saturdays it suggests new offers to pitch (Sonnet 5.5, a few cents).
+- **Privacy guard** (built): every buyer delivery, social post, student and B2B outreach
+  message, and sponsored offer passes through `guard()` before it goes out. Code rules
+  remove personal emails and phone numbers and enforce the 50 student rule; then a Claude
+  review (Sonnet 5.5) checks for small groups, misleading claims, sample data shown as real
+  and broken consent promises. It fixes small problems; anything it can't fix (or anything it
+  couldn't review) is held at Gate 3 on the org page, where a person approves or rejects it.
+  Every decision goes to an audit log. Panel events older than 12 months are deleted daily.
+  A few cents a week.
 - **Schedule**: two cron triggers. 12:00 UTC runs the weekday's agent (Mon market, Tue
   acquisition, Wed content, Thu sales, Fri insights, Sat router); 13:00 UTC collects insights,
-  delivers new reports to buyers, then the Chief of Staff writes the daily brief.
+  deletes panel events older than 12 months, delivers new reports to buyers, then the
+  Chief of Staff writes the daily brief.
 - **Waitlist**: `join.html` posts to `POST /agents/waitlist/join` (public, rate limited, same
   site only). Each email is one KV key with campus, source and date in its metadata. Students
   can remove their email on the same page. The org page only shows counts.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`, `GET /agents/offers`, `POST /agents/offers/event`, `GET /agents/buyer`, and with the passcode `GET /agents/buyers`, `PUT /agents/buyers`, `GET /agents/offers/all`, `PUT /agents/offers`, `GET /agents/router`, `POST /agents/router/run`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`, `GET /agents/sales`, `POST /agents/sales/run`, `GET /agents/prospects`, `PUT /agents/prospects`, `POST /agents/events`, `GET /agents/panel`, `GET /agents/insights`, `POST /agents/insights/run`, `GET /agents/offers`, `POST /agents/offers/event`, `GET /agents/buyer`, and with the passcode `GET /agents/buyers`, `PUT /agents/buyers`, `GET /agents/offers/all`, `PUT /agents/offers`, `GET /agents/router`, `POST /agents/router/run`, `GET /agents/privacy`, `PUT /agents/privacy`, `POST /agents/privacy/run`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)

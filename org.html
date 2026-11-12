@@ -394,6 +394,29 @@
     .idea span { font-size: 12px; color: var(--muted); }
     @media (max-width: 900px) { .oform { grid-template-columns: 1fr 1fr; } .oform .btn, .oform .wide { grid-column: span 2; } .orow { grid-template-columns: 1fr auto; } .orow .ostat { grid-column: 1 / -1; text-align: left; } }
 
+
+    /* ---------- agent 8: Privacy guard ---------- */
+    .pv { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; white-space: nowrap; }
+    .pv.passed, .pv.approved { background: var(--soft); color: var(--forest); }
+    .pv.fixed { background: #E6EEF8; color: #1F4E8C; }
+    .pv.held, .pv.rejected { background: var(--warn-bg); color: var(--warn); }
+    .pv-note { font-size: 11.5px; color: var(--warn); font-weight: 600; }
+    .ptiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 10px; }
+    .ptiles div { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+    .ptiles b { display: block; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .ptiles span { font-size: 11.5px; color: var(--muted); }
+    .hitem { border-top: 1px solid var(--line); padding: 10px 0; }
+    .hitem:first-child { border-top: 0; }
+    .hitem strong { display: block; font-size: 13.5px; }
+    .hitem ul { margin: 4px 0 6px; padding-left: 16px; font-size: 12px; color: var(--warn); }
+    .hitem details { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .hitem pre { white-space: pre-wrap; font: inherit; margin: 4px 0 0; background: var(--bg); border-radius: 8px; padding: 8px; }
+    .plog { width: 100%; font-size: 12.5px; }
+    .plog td { padding: 7px 6px; vertical-align: top; }
+    .plog td:first-child { white-space: nowrap; color: var(--muted); }
+    .plog .iss { color: var(--muted); font-size: 11.5px; }
+    @media (max-width: 900px) { .ptiles { grid-template-columns: repeat(2, 1fr); } }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -514,6 +537,7 @@
             <button role="tab" data-ltab="sales" aria-selected="false">B2B sales</button>
             <button role="tab" data-ltab="insights" aria-selected="false">Insights analyst</button>
             <button role="tab" data-ltab="router" aria-selected="false">Data and offers router</button>
+            <button role="tab" data-ltab="privacy" aria-selected="false">Privacy guard</button>
           </div>
         </div>
         <div id="pass-slot"></div>
@@ -645,6 +669,25 @@
           <p class="sub" id="offers-sub">Shown in the app's Rewards tab to students who match the rule and have anonymous sharing on.</p>
           <div id="offers"></div>
           <div id="offer-form"></div>
+        </div>
+        </div>
+
+        <div data-pane="privacy" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">Privacy checks</h3>
+          <span id="p-status" class="pill gate"><i></i>Checking</span>
+          <span id="p-time" class="note" style="margin:0"></span>
+          <button class="btn" id="run-privacy" type="button" disabled>Run now</button>
+        </div>
+        <p class="sub">Every buyer report, social post, outreach message and sponsored offer passes through here before it goes out. Code rules catch personal contact details and the 50 student rule; a Claude review catches anything subtler. Small problems are fixed. Anything it can't fix waits at Gate 3 for a person. Panel events older than 12 months are deleted every day.</p>
+        <div class="brief-grid">
+          <div class="panel brief" id="privacy"></div>
+          <div class="side"><div class="panel"><h3>Gate 3</h3><p class="sub">Held items waiting for a person.</p><div id="gate3"></div></div></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <h3>Audit log</h3>
+          <p class="sub">Every decision, newest first.</p>
+          <div id="plog"></div>
         </div>
         </div>
       </section>
@@ -853,17 +896,17 @@ Offer: Valley Greens small spinach bag, shown to students who threw out spinach.
 Brand sees: reached 184, redeemed 41. No names, no list.
 Idea to pitch: a freezer tip bonus for bread, for students who tossed bread twice.` },
 
-      { id: 'privacy', name: 'Privacy guard', group: 'safe', model: 'sonnet', auto: 'gate', runs: 250, inTok: 15000, outTok: 1000, f: [2.5, 8],
+      { id: 'privacy', name: 'Privacy guard', group: 'safe', model: 'sonnet', auto: 'gate', built: true, runs: 40, inTok: 8000, outTok: 1200, f: [2.5, 8],
         job: 'Checks everything that uses student data before it leaves.',
-        cadence: 'Before every report, post and offer',
-        does: ['Blocks any number built from fewer than 50 students', 'Checks that only opted in students are counted', 'Removes anything that could point to one person or address', 'Logs every decision for an audit'],
-        tools: ['Consent records', 'Report and post queue', 'Audit log'],
-        gate: 'Gate 3: if it cannot fix a problem by merging groups, a person decides.',
+        cadence: 'Before anything goes out, plus a daily cleanup',
+        does: ['Checks buyer reports, social posts, outreach and sponsored offers', 'Removes personal emails and phone numbers automatically', 'Enforces the 50 student rule on every delivery', 'Uses a Claude review for small groups, misleading claims and consent promises', 'Fixes small problems; holds the rest at Gate 3', 'Deletes panel events older than 12 months'],
+        tools: ['Privacy rules in code', 'Claude review', 'Audit log', 'Gate 3 queue'],
+        gate: 'Gate 3: anything it can\'t fix waits for a person to approve or reject.',
         talks: ['insights', 'router', 'content'],
         sample: `Checked 7 items this morning
-Passed: 6
-Fixed: "Bread waste, Byron, vegan" had 14 students. Merged into "West London", now 212 students.
-Escalated: none.` },
+Passed: 5. Fixed: 1 (removed a club member's phone number from a draft message).
+Held at Gate 3: 1 (a post described a group of students on one residence floor).
+Deleted 0 panel events older than 12 months.` },
 
       { id: 'support', name: 'Student support', group: 'safe', model: 'haiku', auto: 'auto', runs: 2000, inTok: 4000, outTok: 400, f: [10, 100],
         job: 'Answers students in the app, any time.',
@@ -1399,7 +1442,7 @@ Duplicate receipts blocked: 6` },
         const n = bySrc[src] || 0;
         return `<div class="prow">
           <div class="prow-top">
-            <div><strong>${g.url ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : esc(g.name)}</strong><span class="pm">${esc(g.campus)} · ${esc(g.type)}${g.contact ? ' · ' + esc(g.contact) : ''}</span></div>
+            <div><strong>${g.url ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.name)}</a>` : esc(g.name)}</strong> ${pvBadge(g.privacy)}<span class="pm">${esc(g.campus)} · ${esc(g.type)}${g.contact ? ' · ' + esc(g.contact) : ''}</span></div>
             <span class="signups">${n} sign up${n === 1 ? '' : 's'}</span>
             <div style="display:flex;gap:6px;align-items:center">
               <select data-gstatus="${esc(g.id)}" ${edit && !sample ? '' : 'disabled'} aria-label="Status">${STATUSES.map(st => `<option ${g.status === st ? 'selected' : ''}>${st}</option>`).join('')}</select>
@@ -1410,7 +1453,7 @@ Duplicate receipts blocked: 6` },
             <div class="dmeta">${esc(g.why)}<br>Send by ${esc(g.channel)}${g.contact ? ' to ' + esc(g.contact) : ''}</div>
             ${g.subject ? `<p><b>Subject:</b> ${esc(g.subject)}</p>` : ''}
             <pre>${esc(g.message)}</pre>
-            <div class="row2"><button class="btn small" data-copy="${esc((g.subject ? 'Subject: ' + g.subject + '\n\n' : '') + g.message)}">Copy message</button>${g.url ? `<a class="btn small outline" href="${esc(g.url)}" target="_blank" rel="noopener">Open their page</a>` : ''}</div>
+            <div class="row2">${pvBlocked(g.privacy) ? '<span class="pv-note">Held by the Privacy guard. Decide at Gate 3 before sending.</span>' : `<button class="btn small" data-copy="${esc((g.subject ? 'Subject: ' + g.subject + '\n\n' : '') + g.message)}">Copy message</button>`}${g.url ? `<a class="btn small outline" href="${esc(g.url)}" target="_blank" rel="noopener">Open their page</a>` : ''}</div>
           </div>` : ''}
         </div>`;
       }).join('') : '<p class="note">No groups with this status.</p>';
@@ -1467,6 +1510,10 @@ Duplicate receipts blocked: 6` },
       const sel = e.target.closest('[data-gstatus]');
       if (sel) needPass(() => saveGroups(live.groups.map(g => g.id === sel.dataset.gstatus ? { ...g, status: sel.value } : g)));
     });
+
+    // Privacy guard results shown on items in every tab.
+    const pvBadge = pv => pv ? `<span class="pv ${esc(pv.status)}" title="${esc((pv.issues || []).join(' '))}">Privacy: ${esc(pv.status)}</span>` : '';
+    const pvBlocked = pv => !!pv && ['held', 'rejected'].includes(pv.status);
 
     // ---------- agent 4: Content creation ----------
     const PSTAT = ['draft', 'ready', 'posted', 'skip'];
@@ -1798,17 +1845,17 @@ Duplicate receipts blocked: 6` },
         const imgs = images(p);
         return `<article class="piece ${status === 'skip' ? 'dim' : ''}">
           ${imgs.length ? `<div class="thumbs ${p.format === 'linkedin' ? 'wide' : ''}">${imgs.map((cv, i) => `<img src="${cv.toDataURL('image/png')}" alt="${esc(p.altText)}${imgs.length > 1 ? `, slide ${i + 1}` : ''}">`).join('')}</div>` : ''}
-          <div class="ptop"><span class="fmt ${fcls}">${fname}</span><span class="when">Post ${esc(p.postWhen || 'this week')}</span>
-            <select data-pstat="${esc(p.id)}" ${edit ? '' : 'disabled'} aria-label="Status">${PSTAT.map(x => `<option ${x === status ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+          <div class="ptop"><span class="fmt ${fcls}">${fname}</span>${pvBadge(p.privacy)}<span class="when">Post ${esc(p.postWhen || 'this week')}</span>
+            <select data-pstat="${esc(p.id)}" ${edit && !pvBlocked(p.privacy) ? '' : 'disabled'} aria-label="Status">${PSTAT.map(x => `<option ${x === status ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
           <h4>${esc(p.title)}</h4>
           ${p.format === 'blurb' ? `<pre class="cap">${esc(p.slides.map(x => x.heading + '\n\n' + x.body).join('\n\n'))}</pre>` : ''}
           <pre class="cap">${esc(p.caption)}</pre>
           ${p.hashtags.length ? `<div class="tags">${p.hashtags.map(t => '#' + esc(t.replace(/^#/, ''))).join(' ')}</div>` : ''}
           ${p.facts.length ? `<ul class="facts">${p.facts.map(f => `<li>${esc(f.claim)} <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.source)}</a></li>`).join('')}</ul>` : ''}
-          <div class="pbtns">
+          ${pvBlocked(p.privacy) ? `<p class="pv-note">${p.privacy.status === 'held' ? 'Held at Gate 3 by the Privacy guard. Decide in the Privacy guard tab before posting.' : 'Rejected at Gate 3. Do not post.'}</p>` : `<div class="pbtns">
             <button class="btn small" data-copy="${esc(p.format === 'blurb' ? p.slides.map(x => x.heading + '\n\n' + x.body).join('\n\n') : p.caption + (p.hashtags.length ? '\n\n' + p.hashtags.map(t => '#' + t.replace(/^#/, '')).join(' ') : ''))}">Copy ${p.format === 'blurb' ? 'blurb' : 'caption'}</button>
             ${imgs.length ? `<button class="btn small outline" data-dl="${esc(p.id)}">Download ${imgs.length > 1 ? imgs.length + ' images' : 'image'}</button>` : ''}
-          </div>
+          </div>`}
         </article>`;
       }).join('');
     }
@@ -1921,7 +1968,7 @@ Duplicate receipts blocked: 6` },
       const shown = list.filter(p => live.prosFilter === 'all' || p.status === live.prosFilter);
       document.getElementById('prospects').innerHTML = shown.length ? shown.map(p => `<div class="prow">
         <div class="prow-top">
-          <div><strong>${esc(p.org)}</strong> <span class="ptype ${p.type === 'grocer' ? 'grocer' : p.type === 'government' ? 'government' : ''}">${esc(p.type)}</span>
+          <div><strong>${esc(p.org)}</strong> <span class="ptype ${p.type === 'grocer' ? 'grocer' : p.type === 'government' ? 'government' : ''}">${esc(p.type)}</span> ${pvBadge(p.privacy)}
             <span class="pm">Reach: ${esc(p.roleToReach)} · ${p.routeUrl ? `<a href="${esc(p.routeUrl)}" target="_blank" rel="noopener">${esc(p.route)}</a>` : esc(p.route)}</span></div>
           <span class="signups">${esc(p.offerText || p.offer)}</span>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
@@ -1936,7 +1983,7 @@ Duplicate receipts blocked: 6` },
           <div class="dmeta">To: ${esc(p.roleToReach)} at ${esc(p.org)}, via ${esc(p.route)}</div>
           <p><b>Subject:</b> ${esc(p.email.subject)}</p>
           <pre>${esc(p.email.body)}</pre>
-          <div class="row2"><button class="btn small" data-copy="${esc('Subject: ' + p.email.subject + '\n\n' + p.email.body)}">Copy email</button>${p.routeUrl ? `<a class="btn small outline" href="${esc(p.routeUrl)}" target="_blank" rel="noopener">Open their contact page</a>` : ''}</div>
+          <div class="row2">${pvBlocked(p.privacy) ? '<span class="pv-note">Held by the Privacy guard. Decide at Gate 3 before sending.</span>' : `<button class="btn small" data-copy="${esc('Subject: ' + p.email.subject + '\n\n' + p.email.body)}">Copy email</button>`}${p.routeUrl ? `<a class="btn small outline" href="${esc(p.routeUrl)}" target="_blank" rel="noopener">Open their contact page</a>` : ''}</div>
         </div>` : ''}
       </div>`).join('') : '<p class="note">No prospects at this stage.</p>';
     }
@@ -2158,7 +2205,7 @@ Duplicate receipts blocked: 6` },
       document.getElementById('buyers-sub').textContent = 'Prospects marked won in B2B sales become buyers here. Send each one their private link once.';
       box.innerHTML = live.buyers.length ? live.buyers.map(b => {
         const last = b.deliveries[b.deliveries.length - 1];
-        const state = b.revoked ? ['off', 'Link revoked'] : !b.approved ? ['wait', 'Waiting for Gate 1'] : ['on', 'Active'];
+        const state = b.revoked ? ['off', 'Link revoked'] : !b.approved ? ['wait', 'Waiting for Gate 1'] : b.heldReport ? ['wait', 'Report held at Gate 3'] : ['on', 'Active'];
         return `<div class="brow"><div><strong>${esc(b.org)}</strong><span class="pm">${esc(b.type)} · ${esc(b.offer || '')} · ${last ? `last delivery ${fmtTime(last.deliveredAt)}: ${esc(last.title)}${last.mode !== 'real' ? ' (sample)' : ''}` : 'no deliveries yet'}</span></div>
           <div class="acts"><span class="bst ${state[0]}">${state[1]}</span>
             ${!b.approved && !b.revoked ? `<button class="btn small" data-bact="approve" data-bid="${esc(b.id)}">Approve first delivery</button>` : ''}
@@ -2175,9 +2222,9 @@ Duplicate receipts blocked: 6` },
         : API && live.status ? 'Offers and their counts load with the team passcode.' : 'These are the app\'s demo offers. Once the worker is connected, the team\'s offers replace them.';
       document.getElementById('offers').innerHTML = (list.length ? list.map(o => {
         const st = live.ostats[o.id] || { shown: 0, redeemed: 0 };
-        return `<div class="orow"><div><strong>${esc(o.brand)}: ${esc(o.text)}</strong><span class="pm">${esc(PROD[o.product] || o.product)} · +${o.points || o.pts} points · ${esc(ruleDesc(o.rule))}${o.active === false ? ' · paused' : ''}</span></div>
+        return `<div class="orow"><div><strong>${esc(o.brand)}: ${esc(o.text)}</strong> ${pvBadge(o.privacy)}<span class="pm">${esc(PROD[o.product] || o.product)} · +${o.points || o.pts} points · ${esc(ruleDesc(o.rule))}${o.active === false ? ' · paused' : ''}</span></div>
           <div class="ostat">${live.offersAll ? `Reached <b>${kfmt(st.shown)}</b><br>Redeemed <b>${kfmt(st.redeemed)}</b>` : ''}</div>
-          <div class="acts" style="display:flex;gap:6px">${edit ? `<button class="btn small outline" data-otoggle="${esc(o.id)}">${o.active === false ? 'Resume' : 'Pause'}</button><button class="x" data-odel="${esc(o.id)}" aria-label="Delete offer">&times;</button>` : ''}</div></div>`;
+          <div class="acts" style="display:flex;gap:6px">${edit ? `${pvBlocked(o.privacy) ? '' : `<button class="btn small outline" data-otoggle="${esc(o.id)}">${o.active === false ? 'Resume' : 'Pause'}</button>`}<button class="x" data-odel="${esc(o.id)}" aria-label="Delete offer">&times;</button>` : ''}</div></div>`;
       }).join('') : '<p class="note" style="margin:0">No offers yet.</p>') + (API && live.status && !live.offersAll ? '<button class="btn small" data-loadbuyers style="margin-top:8px">Show offers and counts</button>' : '');
       const prodOpts = Object.entries(PROD).map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('');
       document.getElementById('offer-form').innerHTML = edit ? `<form class="oform" id="addoffer">
@@ -2258,7 +2305,93 @@ Duplicate receipts blocked: 6` },
       needPass(() => saveOffers([...(live.offersAll || []), offer]));
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter()]));
+    // ---------- agent 8: Privacy guard ----------
+    live.priv = null; live.pbusy = false; live.perror = '';
+    const KIND = { delivery: 'Buyer report', post: 'Social post', outreach: 'Student outreach', sales: 'B2B pitch', offer: 'Sponsored offer' };
+
+    function renderPrivacy() {
+      const d = live.priv;
+      const latest = d ? d.latest : null;
+      let [cls, label, banner] = statusOf(latest || (d ? { generatedAt: new Date().toISOString() } : null));
+      if (API && live.status && !d) { cls = 'guard'; label = 'Connected'; banner = 'The audit log and Gate 3 load with the team passcode.'; }
+      const st = document.getElementById('p-status');
+      st.className = 'pill ' + cls; st.innerHTML = '<i></i>' + label;
+      const btn = document.getElementById('run-privacy');
+      btn.disabled = !API || !live.status || live.pbusy;
+      btn.textContent = live.pbusy ? 'Checking' : 'Run now';
+      document.getElementById('p-time').textContent = latest ? `Summary ${fmtTime(latest.generatedAt)}` : '';
+      const log = d ? d.log : [
+        { t: new Date().toISOString(), kind: 'post', title: 'Example: instagram post', status: 'passed', issues: [] },
+        { t: new Date().toISOString(), kind: 'outreach', title: 'Example: message to a club', status: 'fixed', issues: ['Removed a phone number from message'] },
+        { t: new Date().toISOString(), kind: 'post', title: 'Example: post about one residence floor', status: 'held', issues: ['Describes a group small enough to point to a few students'] }];
+      const since = Date.now() - 30 * 864e5;
+      const recent = log.filter(x => Date.parse(x.t) > since);
+      const n = st2 => recent.filter(x => x.status === st2).length;
+      const ret = d && d.retention;
+      document.getElementById('privacy').innerHTML = `
+        ${banner && !d ? `<div class="preview"><div><b>Preview</b>${esc(banner)}</div></div>` : ''}
+        ${!d && !(API && live.status) ? '' : !d ? `<button class="btn small" data-loadpriv>Show privacy log</button>` : ''}
+        <p class="headline">${d ? (d.queue.length ? `${d.queue.length} item${d.queue.length === 1 ? '' : 's'} waiting at Gate 3.` : 'Nothing waiting at Gate 3.') : 'Sample: real checks appear as the agents run.'}</p>
+        <div class="bsec"><b>Last 30 days</b><div class="ptiles">
+          <div><b>${n('passed')}</b><span>passed</span></div><div><b>${n('fixed')}</b><span>fixed</span></div><div><b>${n('held')}</b><span>held</span></div>
+          <div><b>${n('approved at Gate 3')}</b><span>approved by a person</span></div><div><b>${n('rejected at Gate 3')}</b><span>rejected</span></div></div></div>
+        <div class="bsec"><b>Retention</b><p style="font-size:13.5px">${ret ? `Last cleanup ${fmtTime(ret.at)}: ${ret.deleted} event${ret.deleted === 1 ? '' : 's'} older than 12 months deleted.` : 'Panel events older than 12 months are deleted every day at 13:00 UTC.'}</p></div>
+        <div class="bsec"><b>The rules</b><ul class="blist">
+          <li>No private person's name, email, phone, address or exact location</li>
+          <li>Every panel number covers at least 50 students, and no group so narrow it points to a few people</li>
+          <li>Sample numbers never presented as real, and no claims of customers or results SNARE doesn't have</li>
+          <li>Consent promises kept: totals only, location off, sharing can be switched off and deleted</li>
+          <li>Offers honest, never targeting sensitive traits or pushing students to overbuy</li></ul></div>
+        ${live.perror ? `<p class="err">${esc(live.perror)}</p>` : ''}
+        <div class="srcs">${d ? `<span class="src real">${d.log.length} decisions logged</span>` : '<span class="src samp">Sample</span>'}</div>`;
+
+      const q = d ? d.queue : [];
+      document.getElementById('gate3').innerHTML = !d ? '<p class="note" style="margin:0">Loads with the team passcode once connected.</p>'
+        : q.length ? q.map(h => `<div class="hitem"><strong>${esc(KIND[h.kind] || h.kind)}: ${esc(h.title)}</strong>
+            <ul>${h.issues.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+            <details><summary>See the text</summary><pre>${esc(Object.entries(h.fields || {}).map(([k, v]) => k + ': ' + v).join('\n\n'))}</pre></details>
+            <div style="display:flex;gap:6px"><button class="btn small" data-pdec="approve" data-qid="${esc(h.qid)}">Approve</button><button class="btn small outline" data-pdec="reject" data-qid="${esc(h.qid)}">Reject</button></div></div>`).join('')
+        : '<p class="note" style="margin:0">Nothing waiting.</p>';
+
+      document.getElementById('plog').innerHTML = log.length ? `<div class="scroll"><table class="plog"><tbody>${log.slice(0, 40).map(x => `<tr><td>${fmtTime(x.t)}</td><td>${esc(KIND[x.kind] || x.kind)}</td><td>${esc(x.title)}${x.issues.length ? `<div class="iss">${x.issues.map(esc).join(' · ')}</div>` : ''}</td><td><span class="pv ${esc(x.status.split(' ')[0])}">${esc(x.status)}</span></td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="note" style="margin:0">No decisions yet.</p>';
+    }
+
+    async function loadPriv() {
+      try { live.priv = await call('/agents/privacy'); live.perror = ''; } catch (e) { if (e.message !== 'PASS') live.perror = e.message; }
+      renderPrivacy();
+    }
+
+    async function decide(qid, decision) {
+      try {
+        await call('/agents/privacy', { method: 'PUT', body: JSON.stringify({ qid, decision }) });
+        await loadPriv();
+        // Refresh the tabs whose items may have changed.
+        await Promise.all([loadContent(), loadGrowth(), loadSales()]);
+        if (live.buyers) await loadPrivate();
+      } catch (e) { if (e.message !== 'PASS') { live.perror = e.message; renderPrivacy(); } }
+    }
+
+    async function runPrivacyNow() {
+      live.pbusy = true; live.perror = ''; renderPrivacy();
+      try { await call('/agents/privacy/run', { method: 'POST' }); await loadPriv(); }
+      catch (e) { if (e.message !== 'PASS') live.perror = e.message; }
+      live.pbusy = false; renderPrivacy();
+    }
+
+    async function loadPrivacy() {
+      renderPrivacy();
+      if (API && live.status && teamKey) await loadPriv();
+    }
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('#run-privacy')) needPass(runPrivacyNow);
+      if (e.target.closest('[data-loadpriv]')) needPass(loadPriv);
+      const pd = e.target.closest('[data-pdec]');
+      if (pd) needPass(() => decide(pd.dataset.qid, pd.dataset.pdec));
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy()]));
     render();
   })();
   </script>

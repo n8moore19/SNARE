@@ -509,6 +509,11 @@ export async function runGrowth(env) {
     added.push({ ...g, id: crypto.randomUUID(), message: g.message.split("{{JOIN_LINK}}").join(link), link, status: "new", notes: "", added: new Date().toISOString().slice(0, 10) });
   }
   out.events = out.events.filter((e) => !e.url || r.sources.has(e.url));
+  const gg = await guard(env, added.map((x) => ({
+    id: x.id, kind: "outreach", title: `Message to ${x.name}`, ref: { groupId: x.id }, fields: { subject: x.subject, message: x.message },
+    context: "A message the team sends to a student club or residence council from their own account.",
+  })));
+  for (const x of added) { const r = gg[x.id]; x.subject = r.fields.subject; x.message = r.fields.message; x.privacy = { status: r.status, issues: r.issues }; }
   if (env.AGENTS && added.length) await env.AGENTS.put("groups", JSON.stringify([...groups, ...added]));
 
   return save(env, "growth", {
@@ -656,6 +661,23 @@ export async function runContent(env) {
       return { ...p, id: `${weekKey}-${n + 1}`, link, caption: fill(p.caption), slides: p.slides.map((x) => ({ heading: fill(x.heading), body: fill(x.body) })), recipe: recipe ? { name: recipe.name, minutes: recipe.minutes, serves: recipe.serves } : null };
     });
 
+  // Privacy guard: fix what it can, hold the rest at Gate 3.
+  const g = await guard(env, pieces.map((p) => {
+    const fields = { caption: p.caption };
+    p.slides.forEach((x, n) => { fields[`slide${n}_heading`] = x.heading; fields[`slide${n}_body`] = x.body; });
+    return {
+      id: p.id, kind: "post", title: `${p.format}: ${p.title}`, ref: { pieceId: p.id }, fields,
+      context: "A public social post or campus poster. Facts cite public sources; SNARE panel stats are only allowed from the real panel.",
+      holdIf: [{ when: p.facts.some((x) => x.source === "SNARE student panel") && !panelStats.length, issue: "Uses SNARE panel numbers that are not from the real panel" }],
+    };
+  }));
+  for (const p of pieces) {
+    const r = g[p.id];
+    p.caption = r.fields.caption;
+    p.slides = p.slides.map((x, n) => ({ heading: r.fields[`slide${n}_heading`], body: r.fields[`slide${n}_body`] }));
+    p.privacy = { status: r.status, issues: r.issues };
+  }
+
   return save(env, "content", {
     agent: "content",
     generatedAt: new Date().toISOString(),
@@ -783,6 +805,17 @@ export async function runSales(env) {
       offerText: OFFERS[p.offer],
       status: "new", notes: "", added: new Date().toISOString().slice(0, 10),
     });
+  }
+  const sg = await guard(env, added.map((x) => ({
+    id: x.id, kind: "sales", title: `Pitch to ${x.org}`, ref: { prospectId: x.id },
+    fields: { emailSubject: x.email.subject, emailBody: x.email.body, headline: x.onePager.headline, problem: x.onePager.problem, exampleInsight: x.onePager.exampleInsight, ask: x.onePager.ask },
+    context: "A B2B email and one page pitch to an organisation. SNARE is pre launch with no real panel data; the example insight must read as illustrative.",
+  })));
+  for (const x of added) {
+    const r = sg[x.id].fields;
+    x.email = { subject: r.emailSubject, body: r.emailBody };
+    x.onePager = { ...x.onePager, headline: r.headline, problem: r.problem, exampleInsight: r.exampleInsight, ask: r.ask };
+    x.privacy = { status: sg[x.id].status, issues: sg[x.id].issues };
   }
   if (env.AGENTS && added.length) await env.AGENTS.put("prospects", JSON.stringify([...prospects, ...added]));
 
@@ -1076,26 +1109,178 @@ async function syncBuyers(env) {
   return buyers;
 }
 
-// Placeholder for agent 8. Today it checks the rules already enforced in code.
-function privacyCheck(delivery) {
-  const checks = ["Every panel number covers at least 50 students (enforced by the Insights analyst)", "No names, emails or locations in the report"];
-  if (delivery.mode !== "real") checks.push("Marked as a sample report");
-  return { ok: true, checks };
+// ---------- agent 8: Privacy guard ----------
+// Checks everything that uses student data or speaks for SNARE before it goes
+// out: buyer deliveries, social posts, outreach, sponsored offers. Hard rules
+// in code first (personal contact details, the 50 student rule, sample data
+// labelled), then a Claude review for anything subtler. Small problems are
+// fixed; anything it can't fix is held at Gate 3 for a person. Every decision
+// is logged. Panel events older than 12 months are deleted.
+
+const RETENTION_DAYS = 365;
+const EMAIL_IN_TEXT = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const PHONE_IN_TEXT = /(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g;
+
+const PRIVACY_POLICY = `SNARE privacy and honesty rules:
+1. Never identify or single out a student or household. No private person's name, email, phone, address, residence room or exact location. Organisations, job roles and a club's official public contact are fine.
+2. Panel numbers must cover at least 50 students. Never describe a group so narrow it could point to a few people (one residence floor, one small club, a rare diet on one street).
+3. SNARE has no real panel data until 50 students share. Sample numbers must never be presented as real findings, and nothing may claim SNARE already has customers, partners or results it doesn't.
+4. Keep the consent promises: totals only, never individual data; location off; nothing sold about one person; students can turn sharing off and their data is deleted.
+5. Sponsored offers must be honest, not target sensitive traits (health, religion, ethnicity, sexuality, money trouble), never push students to buy more than they need, and never promote alcohol, tobacco or cannabis.
+6. Outreach must be honest that SNARE is a pre launch student venture.`;
+
+const GUARD_SCHEMA = {
+  type: "object",
+  properties: {
+    reviews: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          verdict: { type: "string", enum: ["pass", "fix", "hold"] },
+          issues: { type: "array", items: { type: "string" } },
+          fixes: { type: "array", items: { type: "object", properties: { field: { type: "string" }, text: { type: "string" } }, required: ["field", "text"], additionalProperties: false } },
+        },
+        required: ["id", "verdict", "issues", "fixes"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["reviews"],
+  additionalProperties: false,
+};
+
+const GUARD_SYSTEM = `You are SNARE's Privacy guard. Review each item against these rules before it leaves SNARE.
+${PRIVACY_POLICY}
+For each item return a verdict:
+- "pass" when nothing breaks a rule.
+- "fix" when a small rewrite of one or more fields solves it. Give the full corrected text for each field you change, changing as little as possible and keeping the tone. Only use field names given.
+- "hold" when it can't be fixed safely by rewriting, or when you are unsure. A person will decide.
+issues: short plain sentences naming the rule and the problem. Empty for a pass. No em dashes or hyphens used as dashes.`;
+
+// Code rules run first and can only make text safer.
+function hardRules(item) {
+  const issues = [];
+  const fields = { ...item.fields };
+  for (const [k, v] of Object.entries(fields)) {
+    if (typeof v !== "string") continue;
+    let t = v;
+    const emails = (t.match(EMAIL_IN_TEXT) || []).filter((e) => !(item.allowEmails || []).includes(e.toLowerCase()));
+    if (emails.length) { emails.forEach((e) => { t = t.split(e).join("[removed]"); }); issues.push(`Removed an email address from ${k}`); }
+    if (PHONE_IN_TEXT.test(t)) { t = t.replace(PHONE_IN_TEXT, "[removed]"); issues.push(`Removed a phone number from ${k}`); }
+    PHONE_IN_TEXT.lastIndex = 0;
+    fields[k] = t;
+  }
+  for (const h of item.holdIf || []) if (h.when) issues.push(h.issue);
+  return { fields, issues, hold: (item.holdIf || []).some((h) => h.when) };
 }
 
-async function deliverOne(env, buyer, insights, stats, offers) {
-  const report = insights && insights.output.reports ? insights.output.reports[buyer.id] : null;
-  if (!report) return null;
+async function privacyLog(env, entries) {
+  if (!env.AGENTS || !entries.length) return;
+  const log = (await env.AGENTS.get("privacy:log", "json")) || [];
+  log.push(...entries);
+  await env.AGENTS.put("privacy:log", JSON.stringify(log.slice(-300)));
+}
+
+async function privacyQueue(env, held) {
+  if (!env.AGENTS || !held.length) return;
+  const q = (await env.AGENTS.get("privacy:queue", "json")) || [];
+  for (const h of held) if (!q.some((x) => x.qid === h.qid && x.status === "held")) q.push(h);
+  await env.AGENTS.put("privacy:queue", JSON.stringify(q.slice(-200)));
+}
+
+// items: [{ id, kind, title, ref, fields: { name: text }, allowEmails?, holdIf?: [{ when, issue }] }]
+// Returns { [id]: { status: "passed" | "fixed" | "held", issues, fields } }.
+export async function guard(env, items) {
+  const out = {};
+  if (!items.length) return out;
+  const hard = Object.fromEntries(items.map((i) => [i.id, hardRules(i)]));
+  let reviews = {};
+  let reviewed = false;
+  if (env.ANTHROPIC_API_KEY) {
+    try {
+      const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+      const f = await structure(client, {
+        model: env.PRIVACY_MODEL || "claude-sonnet-5-5", system: GUARD_SYSTEM, schema: GUARD_SCHEMA,
+        content: `Items (JSON):\n${JSON.stringify(items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, context: i.context || "", fields: hard[i.id].fields })))}`,
+      });
+      reviews = Object.fromEntries(f.output.reviews.map((r) => [r.id, r]));
+      reviewed = true;
+    } catch (e) {
+      console.error("Privacy review failed:", e.message);
+    }
+  }
+  const log = [], held = [];
+  for (const i of items) {
+    const h = hard[i.id];
+    const r = reviews[i.id];
+    const fields = { ...h.fields };
+    let status = h.issues.length ? "fixed" : "passed";
+    const issues = [...h.issues];
+    if (h.hold) status = "held";
+    if (!reviewed) { status = "held"; issues.push("The Claude review could not run, so a person needs to check this"); }
+    else if (!r) { status = "held"; issues.push("The review skipped this item"); }
+    else {
+      issues.push(...r.issues);
+      if (r.verdict === "hold") status = "held";
+      if (r.verdict === "fix" && status !== "held") {
+        for (const fx of r.fixes) if (fx.field in fields) fields[fx.field] = fx.text;
+        // A fix must still pass the code rules.
+        const again = hardRules({ ...i, fields });
+        if (again.issues.length) { status = "held"; issues.push("The rewrite still broke a rule"); } else status = "fixed";
+      }
+    }
+    out[i.id] = { status, issues, fields, checkedAt: new Date().toISOString(), method: reviewed ? "rules and Claude review" : "rules only" };
+    log.push({ t: out[i.id].checkedAt, kind: i.kind, title: i.title.slice(0, 120), status, issues: issues.slice(0, 5) });
+    if (status === "held") held.push({ qid: `${i.kind}:${i.id}`.slice(0, 80), kind: i.kind, title: i.title.slice(0, 160), ref: i.ref, issues, fields, created: out[i.id].checkedAt, status: "held" });
+  }
+  await privacyLog(env, log);
+  await privacyQueue(env, held);
+  return out;
+}
+
+// Daily: delete panel events older than 12 months.
+export async function runRetention(env) {
+  if (!env.PANEL) return { deleted: 0 };
+  await ensurePanel(env);
+  const cutoff = Date.now() - RETENTION_DAYS * DAY_MS;
+  const a = await env.PANEL.prepare("DELETE FROM events WHERE t < ?").bind(cutoff).run();
+  await ensureOfferTable(env);
+  const b = await env.PANEL.prepare("DELETE FROM offer_events WHERE t < ?").bind(cutoff).run();
+  const deleted = (a.meta.changes || 0) + (b.meta.changes || 0);
+  if (env.AGENTS) await env.AGENTS.put("privacy:retention", JSON.stringify({ at: new Date().toISOString(), deleted, keepDays: RETENTION_DAYS }));
+  return { deleted };
+}
+
+async function deliverOne(env, buyer, insights, stats, offers, force = false) {
+  const original = insights && insights.output.reports ? insights.output.reports[buyer.id] : null;
+  if (!original) return null;
   const last = buyer.deliveries[buyer.deliveries.length - 1];
   if (last && last.reportAt === insights.generatedAt) return null;
+  if (!force && (buyer.heldReport === insights.generatedAt || buyer.rejectedReport === insights.generatedAt)) return null;
+  const report = { ...original, findings: original.findings.map((x) => ({ ...x })) };
   const panel = insights.output.panel || {};
   const delivery = {
     org: buyer.org, mode: insights.output.mode, report, reportAt: insights.generatedAt, deliveredAt: new Date().toISOString(),
     panel: { students: panel.students, period: panel.period, products: (panel.products || []).filter((x) => report.chartProducts.some((n) => n.toLowerCase() === x.product.toLowerCase())) },
     offers: offers.filter((o) => o.buyerId === buyer.id).map((o) => ({ text: o.text, points: o.points, shown: forBrand((stats[o.id] || {}).shown || 0), redeemed: forBrand((stats[o.id] || {}).redeemed || 0) })),
   };
-  delivery.privacy = privacyCheck(delivery);
-  if (!delivery.privacy.ok) return null;
+  // The 50 student rule, enforced again on the way out.
+  delivery.panel.products = delivery.panel.products.filter((x) => x.students == null || x.students >= K);
+  if (force) delivery.privacy = { status: "approved", checks: ["Approved by a person at Gate 3"] };
+  else {
+    const fields = { title: report.title, answer: report.answer, recommendation: report.recommendation, method: report.method };
+    report.findings.forEach((x, n) => { fields[`finding${n}`] = x.finding; });
+    const g = (await guard(env, [{
+      id: `${buyer.id}-${insights.generatedAt}`, kind: "delivery", title: `Report for ${buyer.org}: ${report.title}`, ref: { buyerId: buyer.id, reportAt: insights.generatedAt },
+      context: `Panel mode: ${delivery.mode}. ${delivery.mode === "real" ? "" : "This is a sample panel; the buyer page shows a sample banner."}`, fields,
+    }]))[`${buyer.id}-${insights.generatedAt}`];
+    if (g.status === "held") { buyer.heldReport = insights.generatedAt; return null; }
+    Object.assign(report, { title: g.fields.title, answer: g.fields.answer, recommendation: g.fields.recommendation, method: g.fields.method });
+    report.findings.forEach((x, n) => { x.finding = g.fields[`finding${n}`]; });
+    delivery.privacy = { status: g.status, checks: ["Every panel number covers at least 50 students", "No names, emails or locations", g.method === "rules only" ? "Code rules" : "Reviewed by the Privacy guard", ...(delivery.mode !== "real" ? ["Marked as a sample report"] : [])] };
+  }
   await env.AGENTS.put(`delivery:${buyer.token}`, JSON.stringify(delivery));
   buyer.deliveries.push({ reportAt: insights.generatedAt, deliveredAt: delivery.deliveredAt, title: report.title, mode: delivery.mode });
   return delivery;
@@ -1177,6 +1362,73 @@ export async function runRouter(env) {
     },
     sources: { insights: insights ? insights.output.mode : "none", offers: offers.length, buyers: delivery.buyers },
     usage: { input: f.inTok, output: f.outTok },
+  });
+}
+
+async function decideHeld(env, qid, decision) {
+  const q = (await env.AGENTS.get("privacy:queue", "json")) || [];
+  const item = q.find((x) => x.qid === qid && x.status === "held");
+  if (!item || !["approve", "reject"].includes(decision)) return null;
+  const ok = decision === "approve";
+  const ref = item.ref || {};
+  if (item.kind === "delivery") {
+    const buyers = await getBuyers(env);
+    const b = buyers.find((x) => x.id === ref.buyerId);
+    if (b) {
+      b.heldReport = null;
+      if (ok) {
+        const [insights, stats, offers] = await Promise.all([env.AGENTS.get("latest:insights", "json"), offerStats(env), getOffers(env)]);
+        if (insights && insights.generatedAt === ref.reportAt) await deliverOne(env, b, insights, stats, offers, true);
+      } else b.rejectedReport = ref.reportAt;
+      await env.AGENTS.put("buyers", JSON.stringify(buyers));
+    }
+  }
+  if (item.kind === "post") {
+    const c = await env.AGENTS.get("latest:content", "json");
+    const p = c && c.output.pieces.find((x) => x.id === ref.pieceId);
+    if (p) { p.privacy = { ...p.privacy, status: ok ? "approved" : "rejected" }; await env.AGENTS.put("latest:content", JSON.stringify(c)); }
+  }
+  const patchList = async (key, id) => {
+    const list = (await env.AGENTS.get(key, "json")) || [];
+    const x = list.find((y) => y.id === id);
+    if (x) {
+      x.privacy = { ...(x.privacy || {}), status: ok ? "approved" : "rejected" };
+      if (key === "offers") x.active = ok;
+      await env.AGENTS.put(key, JSON.stringify(list));
+    }
+  };
+  if (item.kind === "outreach") await patchList("groups", ref.groupId);
+  if (item.kind === "sales") await patchList("prospects", ref.prospectId);
+  if (item.kind === "offer") await patchList("offers", ref.offerId);
+  item.status = ok ? "approved" : "rejected";
+  item.decidedAt = new Date().toISOString();
+  await env.AGENTS.put("privacy:queue", JSON.stringify(q));
+  await privacyLog(env, [{ t: item.decidedAt, kind: item.kind, title: item.title, status: ok ? "approved at Gate 3" : "rejected at Gate 3", issues: [] }]);
+  return q;
+}
+
+// Run now: re-check this week's posts and active offers, and apply retention.
+export async function runPrivacy(env) {
+  if (!env.AGENTS) throw new Error("NO_STORE");
+  const retention = await runRetention(env).catch(() => ({ deleted: 0 }));
+  const c = await env.AGENTS.get("latest:content", "json");
+  const pieces = c ? c.output.pieces.filter((p) => !p.privacy) : [];
+  if (pieces.length) {
+    const g = await guard(env, pieces.map((p) => ({ id: p.id, kind: "post", title: `${p.format}: ${p.title}`, ref: { pieceId: p.id }, fields: { caption: p.caption } })));
+    for (const p of pieces) { p.caption = g[p.id].fields.caption; p.privacy = { status: g[p.id].status, issues: g[p.id].issues }; }
+    await env.AGENTS.put("latest:content", JSON.stringify(c));
+  }
+  const log = (await env.AGENTS.get("privacy:log", "json")) || [];
+  const since = Date.now() - 30 * DAY_MS;
+  const recent = log.filter((x) => Date.parse(x.t) > since);
+  const count = (st) => recent.filter((x) => x.status === st).length;
+  const queue = ((await env.AGENTS.get("privacy:queue", "json")) || []).filter((x) => x.status === "held");
+  return save(env, "privacy", {
+    agent: "privacy",
+    generatedAt: new Date().toISOString(),
+    output: { last30: { passed: count("passed"), fixed: count("fixed"), held: count("held"), approved: count("approved at Gate 3"), rejected: count("rejected at Gate 3") }, waiting: queue.length, retention, rechecked: pieces.length },
+    sources: { log: log.length },
+    usage: { input: 0, output: 0 },
   });
 }
 
@@ -1327,16 +1579,42 @@ export async function handleAgents(request, env, cors) {
     }
     const offers = validOffers(body.offers);
     if (!offers) return json({ error: "Invalid offer list" }, 400, cors);
+    // New or edited offers go through the Privacy guard; held ones stay paused.
+    const prev = Object.fromEntries((await getOffers(env)).map((o) => [o.id, o]));
+    const sig = (o) => JSON.stringify([o.brand, o.product, o.text, o.note, o.points, o.rule]);
+    const changed = offers.filter((o) => !prev[o.id] || sig(prev[o.id]) !== sig(o) || !prev[o.id].privacy);
+    for (const o of offers) if (!changed.includes(o)) o.privacy = prev[o.id].privacy;
+    const og = await guard(env, changed.map((o) => ({
+      id: o.id, kind: "offer", title: `Offer: ${o.brand}, ${o.text}`, ref: { offerId: o.id }, fields: { text: o.text, note: o.note },
+      context: `Shown in the app labelled Sponsored. Points: ${o.points}. Who sees it: ${o.rule.type === "everyone" ? "everyone with sharing on" : `students who ${o.rule.type} ${o.rule.product} at least ${o.rule.minTimes} times`}.`,
+    })));
+    for (const o of changed) {
+      const r = og[o.id];
+      o.text = r.fields.text; o.note = r.fields.note; o.privacy = { status: r.status, issues: r.issues };
+      if (r.status === "held") o.active = false;
+    }
+    for (const o of offers) if (o.privacy && o.privacy.status === "held") o.active = false;
     await env.AGENTS.put("offers", JSON.stringify(offers));
     return json({ offers }, 200, cors);
+  }
+
+  if (request.method === "GET" && path === "/agents/privacy") {
+    const [log, queue, retention, latest] = await Promise.all(["privacy:log", "privacy:queue", "privacy:retention", "latest:privacy"].map((k) => (env.AGENTS ? env.AGENTS.get(k, "json") : null)));
+    return json({ log: (log || []).slice(-100).reverse(), queue: (queue || []).filter((x) => x.status === "held"), retention, latest }, 200, cors);
+  }
+  if (request.method === "PUT" && path === "/agents/privacy") {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+    const q = env.AGENTS ? await decideHeld(env, String(body.qid || ""), body.decision) : null;
+    return q ? json({ queue: q.filter((x) => x.status === "held") }, 200, cors) : json({ error: "Invalid decision" }, 400, cors);
   }
 
   if (request.method === "POST" && path === "/agents/insights/run") {
     try { return json(await runInsights(env), 200, cors); } catch (error) { return agentError(error, cors); }
   }
 
-  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales, router: runRouter };
-  const runMatch = path.match(/^\/agents\/(chief|market|growth|content|sales|router)\/run$/);
+  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales, router: runRouter, privacy: runPrivacy };
+  const runMatch = path.match(/^\/agents\/(chief|market|growth|content|sales|router|privacy)\/run$/);
   if (request.method === "POST" && runMatch) {
     if (tooManyRuns(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many runs this hour" }, 429, cors);
     try {
