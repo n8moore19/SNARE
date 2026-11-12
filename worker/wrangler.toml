@@ -31,11 +31,11 @@ REWARDS_MODEL = "claude-haiku-5-5"   # Rewards ops weekly close (the checks them
 [[d1_databases]]
 binding = "PANEL"
 database_name = "snare-panel"
-database_id = "PASTE_D1_ID_HERE"
+database_id = "a908e020-3b57-4ef9-866d-da4a7b73f580"
 
 [[kv_namespaces]]
 binding = "AGENTS"
-id = "PASTE_KV_ID_HERE"
+id = "d525cf6e33bd4dbcbfe65eed914ddd68"
 
 # Two daily triggers (fits the free plan's limit):
 # 12:00 UTC runs that weekday's agent: Monday Market intelligence, Tuesday Student
