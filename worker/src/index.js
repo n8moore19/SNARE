@@ -4,6 +4,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { addSpend } from "./agents.js";
+import { handleScan } from "./scan.js";
 import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales, runInsights, collectInsights, runRouter, deliverAll, runRetention, runRewards, tracked } from "./agents.js";
 
 const ACTION_TYPES = [
@@ -99,6 +100,7 @@ export default {
     if (!allowed.includes(origin)) return json({ error: "This site is not allowed" }, 403, cors);
     // Launch agents live under /agents; everything else is the app's chat.
     if (new URL(request.url).pathname.startsWith("/agents")) return handleAgents(request, env, cors);
+    if (request.method === "POST" && new URL(request.url).pathname === "/scan") return handleScan(request, env, cors);
     if (request.method !== "POST") return json({ error: "Use POST" }, 405, cors);
     if (tooMany(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many messages, slow down" }, 429, cors);
 

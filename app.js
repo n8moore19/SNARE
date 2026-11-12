@@ -791,6 +791,7 @@
     receipt: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21z"/><path d="M9 8h6M9 11.5h6M9 15h4"/></svg>',
     shield: '<svg viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.5-3.2 8.2-7.5 9.5-4.3-1.3-7.5-5-7.5-9.5V6z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></svg>',
     star: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>',
+    lock: '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>',
   };
 
   function band(eyebrow, title, sub = '', extra = '') {
@@ -1222,17 +1223,81 @@
           <button class="btn outline" data-action="demoshelf">Try a demo fridge</button>
           <button class="btn outline" data-action="demoitem">Try a demo item</button>
         </div>
-        <div class="banner info"><strong>Prototype</strong>Detection is simulated with sample results. The real app sends the photo to an AI vision model, keeps only the list of items, and deletes the photo.</div>
+        <div class="banner info">${scanUrl() ? '<strong>Real AI scanning</strong>Your photo is read by an AI vision model, which keeps only the list of items. The photo is deleted right after. If it can\'t read a photo, you\'ll see sample results.' : '<strong>Prototype</strong>Detection is simulated with sample results. The real app sends the photo to an AI vision model, keeps only the list of items, and deletes the photo.'}</div>
       </section>`;
   }
 
+  // ---------- real scanning: photo -> worker -> Claude vision ----------
+  // The photo is shrunk on the phone, read once by the AI, and never stored.
+  // If the worker is offline or can't read it, the sample results stand in.
+  const scanUrl = () => (window.SNARE_AI_URL || '').trim().replace(/\/+$/, '');
+  const isRealPhoto = photo => typeof photo === 'string' && photo.startsWith('data:image');
+  function shrinkPhoto(dataUrl, max = 1280) {
+    return new Promise(res => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res({ url: c.toDataURL('image/jpeg', 0.82), aspect: c.width / c.height });
+      };
+      img.onerror = () => res(null);
+      img.src = dataUrl;
+    });
+  }
+  async function readPhoto(mode, small) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      const r = await fetch(scanUrl() + '/scan', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+        body: JSON.stringify({ mode, image: small.url, products: D.products.filter(p => !p.leftover).map(p => ({ id: p.id, name: p.name })) }),
+      });
+      return r.ok ? await r.json() : null;
+    } catch (e) { return null; } finally { clearTimeout(timer); }
+  }
+  const STORE_KEYS = ['nofrills', 'freshco', 'foodbasics', 'walmart', 'metro', 'loblaws'];
+  const matchStore = name => { const n = String(name || '').toLowerCase().replace(/[^a-z]/g, ''); return STORE_KEYS.find(k => n.includes(k)) || null; };
+  const storeLabel = s => (s.store && stores[s.store] ? stores[s.store].name : s.storeName || 'your store');
+
+  async function realScan(mode, photo, fallback) {
+    const token = Date.now();
+    state.scan = { mode, photo, found: [], pending: true, token };
+    go('scanning');
+    const small = await shrinkPhoto(photo);
+    if (small && state.scan.token === token) { state.scan.photo = small.url; state.scan.aspect = small.aspect; if (state.screen === 'scanning') render(); }
+    const res = small ? await readPhoto(mode, small) : null;
+    if (!state.scan || state.scan.token !== token || state.screen !== 'scanning') return; // they left the screen
+    const got = res && res.readable !== false ? (mode === 'receipt' ? res.lines : res.items) || [] : [];
+    if (!got.length) {
+      toast(res ? "Couldn't spot food in that photo, so here are sample results" : 'Scanning is offline right now, so here are sample results');
+      fallback();
+      return;
+    }
+    const s = state.scan;
+    s.pending = false; s.live = true;
+    if (mode === 'receipt') {
+      s.store = matchStore(res.storeName); s.storeName = res.storeName;
+      s.found = got.map(l => ({ ...l, keep: true, days: products[l.id].life }));
+      receiptPrint(s.store || s.storeName, s.found).then(fp => { if (state.scan === s) s.print = fp; });
+    } else {
+      s.found = got.map(x => ({ ...x, keep: true }));
+    }
+    render();
+    setTimeout(() => { if (state.scan === s && state.screen === 'scanning') go('review'); }, revealMs(s));
+  }
+  const revealMs = s => 900 + s.found.length * 260;
+
   function startShelfScan(photo) {
+    if (isRealPhoto(photo) && scanUrl()) return realScan('shelf', photo, () => startShelfScan('demo'));
     state.scan = { mode: 'shelf', photo, found: D.demoScan.map(x => ({ ...x, keep: true })) };
     go('scanning');
     setTimeout(() => { if (state.screen === 'scanning') go('review'); }, SHELF_SCAN_MS);
   }
 
   function startItemScan(photo) {
+    if (isRealPhoto(photo) && scanUrl()) return realScan('item', photo, () => startItemScan(null));
     const guess = D.itemScans[state.itemScanIdx % D.itemScans.length];
     state.itemScanIdx++;
     state.scan = { mode: 'item', photo: photo || 'demo-item:' + guess.id, found: [{ ...guess, keep: true }] };
@@ -1241,6 +1306,7 @@
   }
 
   function startReceiptScan(photo) {
+    if (isRealPhoto(photo) && scanUrl()) return realScan('receipt', photo, () => startReceiptScan('demo-receipt'));
     const r = D.demoReceipt;
     state.scan = { mode: 'receipt', photo, store: r.store, found: r.lines.map(l => ({ ...l, keep: true, days: products[l.id].life })) };
     receiptPrint(r.store, r.lines).then(fp => { if (state.scan && state.scan.mode === 'receipt') state.scan.print = fp; });
@@ -1263,7 +1329,7 @@
     const total = s.found.reduce((t, l) => t + l.price, 0);
     app.innerHTML = `
       <section class="screen">
-        ${band(`Receipt · ${stores[s.store].name}`, `We read ${plural(s.found.length, 'item')}`, `${money(total)} spent today. Untick anything that isn't food for the fridge.`)}
+        ${band(`Receipt · ${esc(storeLabel(s))}`, `We read ${plural(s.found.length, 'item')}`, `${money(total)} spent today. Untick anything that isn't food for the fridge.`)}
         <ul class="review-list receipt-list">
           ${s.found.map((f, i) => `<li class="${f.keep ? '' : 'off'}">
             <button class="tick ${f.keep ? 'on' : ''}" data-action="rkeep" data-id="${i}" aria-label="Keep this item">${ICONS.check}</button>
@@ -1292,13 +1358,55 @@
     const added = kept.map(f => addToFridge(f.id, { src: 'receipt' }));
     state.items = state.items.filter(it => !kept.some(k => k.id === it.id)); // bought, so off the list
     const print = s.print || '';
-    let pts = earn(PTS.receipt, `Receipt, ${stores[s.store].name}`, 'receipt', { fp: print });
+    let pts = earn(PTS.receipt, `Receipt, ${storeLabel(s)}`, 'receipt', { fp: print });
     receiptBonuses(s.found).forEach(o => { pts += earn(o.points, `${o.brand} bonus`, 'bonus', { offer: o.id, fp: print }); offerEvent(o.id, 'redeemed'); });
     state.highlight = added.map(a => a.uid);
     persist();
-    toast(`${plural(added.length, 'item')} added · +${pts} points`);
     go('fridge');
+    showMoment({ pts, kept, store: storeLabel(s), kind: 'receipt' });
   }
+
+  // ---------- after a scan: points, then where the data goes ----------
+  // One short screen that shows the whole model: you earn, your receipt turns
+  // into anonymous totals, and those totals are what buyers pay for.
+  const momentEl = document.getElementById('moment');
+  let panelInfo = null;
+  async function loadPanelInfo() {
+    if (panelInfo || !scanUrl()) return panelInfo;
+    try { const r = await fetch(scanUrl() + '/agents/panel'); if (r.ok) panelInfo = await r.json(); } catch (e) { /* offline */ }
+    return panelInfo;
+  }
+  async function showMoment({ pts = 0, kept, store, kind }) {
+    const first = kept[0] && products[kept[0].id];
+    const time = new Date().toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+    const week = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }); })();
+    const bal = balance(), toCard = bal % CARD_PTS;
+    const panel = await loadPanelInfo();
+    const real = panel && panel.realStudents > 0;
+    const k = (panel && panel.k) || 50, have = real ? panel.realStudents : 38;
+    const live = panel && panel.mode === 'real';
+    const card = (i, icon, body) => `<div class="mo-card" style="animation-delay:${200 + i * 650}ms"><span class="mo-ic">${icon}</span><div>${body}</div></div>`;
+    const cards = [];
+    if (pts) cards.push(card(cards.length, ICONS.star, `<span class="mo-k">You earned</span><b class="mo-big">+${pts} points</b><p>${money(pts / PTS_PER_DOLLAR)} toward your next ${money(CARD_PTS / PTS_PER_DOLLAR)} gift card</p><span class="mo-bar"><i style="width:${(toCard / CARD_PTS) * 100}%"></i></span><small>${toCard} of ${CARD_PTS} points${bal >= CARD_PTS ? ' · a gift card is ready in Rewards' : ''}</small>`));
+    if (P().share && first) {
+      cards.push(card(cards.length, ICONS.lock, `<span class="mo-k">Then it became anonymous</span>
+        <div class="mo-flow"><span class="mo-chip you">${esc(first.name)}<br><small>${kind === 'receipt' ? esc(store) + ', ' : ''}${time}</small></span><span class="mo-arrow">&rarr;</span><span class="mo-chip all">+1 ${esc(lower(first.name))}<br><small>London students, week of ${week}</small></span></div>
+        <p>Your name, photo, store visit and exact time stay on your phone.</p>`));
+      cards.push(card(cards.length, ICONS.leaf, `<span class="mo-k">Added to the London food picture</span><b class="mo-mid">${have} of ${k} students sharing${real ? '' : ' <em class="mo-demo">demo</em>'}</b><span class="mo-bar"><i style="width:${Math.min(100, have / k * 100)}%"></i></span>
+        <p>${live ? 'Totals are live. Grocers, brands and the city buy them, and that pays for your points.' : `At ${k} students, grocers, brands and the city can buy these totals. That is what pays for your points.`}</p>`));
+    } else {
+      cards.push(card(cards.length, ICONS.check, `<span class="mo-k">Sharing is off</span><p>This ${kind === 'receipt' ? 'receipt' : 'scan'} stays on your phone. Turn on anonymous sharing in Preferences to add to the London food picture and collect brand bonuses.</p>`));
+    }
+    momentEl.innerHTML = `<div class="mo-sheet">
+        <span class="eyebrow">${plural(kept.length, 'item')} added to your fridge</span>
+        ${cards.join('')}
+        <button class="btn block mo-done" data-mo="close" style="animation-delay:${200 + cards.length * 650}ms">Back to my fridge</button>
+      </div>`;
+    momentEl.hidden = false;
+    requestAnimationFrame(() => momentEl.classList.add('show'));
+  }
+  function closeMoment() { momentEl.classList.remove('show'); momentEl.hidden = true; }
+  momentEl.addEventListener('click', e => { if (e.target.closest('[data-mo="close"]') || e.target === momentEl) closeMoment(); });
 
   // Simple flat receipt illustration standing in for a photo.
   function receiptSvg() {
@@ -1330,14 +1438,31 @@
   function renderScanning() {
     const s = state.scan;
     const shelf = s.mode === 'shelf' || s.mode === 'receipt';
-    const ms = s.mode === 'receipt' ? RECEIPT_SCAN_MS : shelf ? SHELF_SCAN_MS : ITEM_SCAN_MS;
-    const step = (ms - 600) / s.found.length;
-    const boxes = shelf && s.photo === 'demo'
-      ? s.found.map((f, i) => `<span class="det-box ${f.box[1] < 8 ? 'below' : ''}" style="left:${f.box[0]}%;top:${f.box[1]}%;width:${f.box[2]}%;height:${f.box[3]}%;animation-delay:${300 + i * step}ms"><em>${products[f.id].name}</em></span>`).join('')
+    const ms = s.live ? revealMs(s) : s.mode === 'receipt' ? RECEIPT_SCAN_MS : shelf ? SHELF_SCAN_MS : ITEM_SCAN_MS;
+    const step = s.live ? 260 : (ms - 600) / Math.max(1, s.found.length);
+    const boxes = shelf && (s.photo === 'demo' || s.live)
+      ? s.found.filter(f => f.box).map((f, i) => `<span class="det-box ${f.box[1] < 8 ? 'below' : ''}" style="left:${f.box[0]}%;top:${f.box[1]}%;width:${f.box[2]}%;height:${f.box[3]}%;animation-delay:${300 + i * step}ms"><em>${products[f.id].name}${s.mode === 'receipt' ? ' · ' + money(f.price) : ''}</em></span>`).join('')
       : '';
+    const fit = s.aspect && shelf ? `style="aspect-ratio:${s.aspect.toFixed(3)};width:min(calc(100% - 32px), ${(58 * s.aspect).toFixed(1)}vh)"` : '';
+    if (s.pending) {
+      app.innerHTML = `
+      <section class="scanning">
+        <div class="scan-frame ${shelf ? 'fit' : 'single'}" ${fit}>
+          ${scanImage()}
+          <span class="sweep" style="animation-duration:1.3s"></span>
+          <span class="ai-reading">${ICONS.spark} AI is reading</span>
+        </div>
+        <div class="loading-copy">
+          <h1>${s.mode === 'receipt' ? 'Reading your receipt' : shelf ? 'Spotting your food' : 'Identifying this item'}</h1>
+          <div class="progress waiting"><span></span></div>
+          <p class="hint">${s.mode === 'receipt' ? 'Finding each item and price. ' : 'Working out what each item is and how long it keeps. '}Your photo is deleted right after.</p>
+        </div>
+      </section>`;
+      return;
+    }
     app.innerHTML = `
       <section class="scanning">
-        <div class="scan-frame ${shelf ? '' : 'single'}">
+        <div class="scan-frame ${shelf ? (fit ? 'fit' : '') : 'single'}" ${fit}>
           ${scanImage()}
           ${boxes}
           <span class="sweep" style="animation-duration:${shelf ? 1.6 : 1.1}s"></span>
@@ -3104,7 +3229,7 @@
         state.query = ''; rerender(); break;
       }
       case 'rescan': { const n = confirmScan(); toast(`${plural(n, 'item')} added. Scan the next shelf.`); go('scan'); break; }
-      case 'rconfirm': { const n = confirmScan(); toast(`${plural(n, 'item')} added to your fridge`); go('fridge'); break; }
+      case 'rconfirm': { const kept = state.scan.found.filter(f => f.keep); confirmScan(); go('fridge'); showMoment({ kept, kind: 'shelf' }); break; }
       case 'inext': {
         const n = confirmScan();
         toast(`${products[state.scan.found[0].id].name} added. Next item!`);

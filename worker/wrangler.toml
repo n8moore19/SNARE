@@ -23,6 +23,7 @@ SUPPORT_MODEL = "claude-haiku-5-5"   # Student support help chat (fast and very 
 REWARDS_MODEL = "claude-haiku-5-5"   # Rewards ops weekly close (the checks themselves are code)
 # Monthly spend limit you set in the Anthropic console, shown on the hub scoreboard.
 SPEND_LIMIT = "30"
+SCAN_MODEL = "claude-sonnet-5-5"
 
 # Storage for the agents: team tasks and each agent's latest output.
 # Create it once with: npx wrangler kv namespace create AGENTS

@@ -140,3 +140,12 @@ The same worker runs the launch agents shown on `org.html`.
 - The spend limit in the Anthropic console is the real backstop. Set it.
 - Actions the model suggests are checked against the app's own recipes and products
   before anything runs.
+
+## Scanning (`POST /scan`)
+
+The app sends `{ mode: "receipt" | "shelf" | "item", image: <jpeg data URL>, products: [{id, name}] }`.
+Claude vision (`SCAN_MODEL`, default Sonnet 5.5) reads the photo and maps everything to the app's
+product ids, with boxes for the scanning animation. The photo is used for that one request and is
+never stored or logged. Limits: 12 scans per 10 minutes per visitor, and scanning pauses once the
+month's estimated spend reaches `SPEND_LIMIT`. If the worker can't read a photo, the app shows its
+sample results instead.
