@@ -1990,8 +1990,7 @@
         </div>
         <h2 class="section-title">Privacy</h2>
         ${consentRows()}
-        <div class="banner info"><strong>What buyers see</strong>Only totals across many students, like "41% of large spinach bags get thrown out." Never one person. Fridge photos are deleted after scanning. In this prototype everything stays in your own browser.
-          <div class="actions"><a class="btn small outline" href="insights.html" target="_blank" rel="noopener">See the buyer view</a></div></div>
+        <div class="banner info"><strong>What buyers see</strong>Only totals across many students, like "41% of large spinach bags get thrown out." Never one person. Fridge photos are deleted after scanning. In this prototype everything stays in your own browser.</div>
         <button class="btn outline block" data-action="reset" style="margin-top:14px">Clear my data and start over</button>
       </section>`;
   }
