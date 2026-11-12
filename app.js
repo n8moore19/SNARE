@@ -3769,6 +3769,23 @@
   new ResizeObserver(sizeTourBar).observe(tourBar);
   document.getElementById('tour-start').addEventListener('click', () => startTour());
 
+  // Skip the demo: a ready made fridge to play with.
+  function loadSample() {
+    Object.assign(P(), { done: true, consented: true, share: true });
+    state.fridge = [];
+    D.demoScan.forEach(x => addToFridge(x.id, x));
+    if (!state.points.length) samplePoints();
+    if (!state.cooked.length && !state.trips.length) sampleHistory();
+    persist();
+    go('fridge');
+  }
+  document.getElementById('explore-start').addEventListener('click', () => {
+    if (tour.on) stopTour();
+    closeMenu(); closeMoment(); hideNotif();
+    loadSample();
+    toast('Sample fridge loaded. Tap around, nothing here is real.');
+  });
+
   // Deep links for demos: #demo loads a sample fridge, #welcome starts over,
   // #meals, #shop and #impact open those tabs.
   const hash0 = location.hash.slice(1);
@@ -3778,13 +3795,7 @@
     persist();
     go('welcome');
   } else if (hash0 === 'demo') {
-    Object.assign(P(), { done: true, consented: true, share: true });
-    state.fridge = [];
-    D.demoScan.forEach(x => addToFridge(x.id, x));
-    if (!state.points.length) samplePoints();
-    if (!state.cooked.length && !state.trips.length) sampleHistory();
-    persist();
-    go('fridge');
+    loadSample();
   } else if (hash0 === 'tour') {
     startTour();
   } else if (/^tour\d+$/.test(hash0)) {
