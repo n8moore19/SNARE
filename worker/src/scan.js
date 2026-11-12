@@ -3,7 +3,7 @@
 // is used for this one request and never stored or logged.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { addSpend } from "./agents.js";
+import { aiClient, BudgetError } from "./budget.js";
 
 const MODES = ["receipt", "shelf", "item"];
 const MAX_IMAGE = 2_800_000; // characters of base64, about 2 MB
@@ -82,12 +82,6 @@ export async function handleScan(request, env, cors) {
   if (!env.ANTHROPIC_API_KEY) return json({ error: "No API key" }, 503, cors);
   if (tooMany(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many scans, try again in a few minutes" }, 429, cors);
 
-  // Stop scanning (the app falls back to samples) once the monthly limit is hit.
-  if (env.AGENTS) {
-    const spend = await env.AGENTS.get(`spend:${new Date().toISOString().slice(0, 7)}`, "json");
-    if (spend && spend.usd >= (Number(env.SPEND_LIMIT) || 30)) return json({ error: "Scanning is paused for this month" }, 503, cors);
-  }
-
   let body;
   try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
   const { mode, image, products } = body || {};
@@ -99,7 +93,7 @@ export async function handleScan(request, env, cors) {
   const ids = products.map((p) => p.id);
 
   const model = env.SCAN_MODEL || "claude-sonnet-5-5";
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "scan");
   try {
     const r = await client.beta.messages.create({
       model, max_tokens: 6000,
@@ -114,7 +108,6 @@ export async function handleScan(request, env, cors) {
         ],
       }],
     });
-    await addSpend(env, model, r.usage.input_tokens, r.usage.output_tokens);
     if (r.stop_reason === "refusal") return json({ readable: false }, 200, cors);
     const text = r.content.find((b) => b.type === "text");
     if (!text) return json({ error: "Empty reply" }, 502, cors);
@@ -138,6 +131,7 @@ export async function handleScan(request, env, cors) {
     }
     return json(out, 200, cors);
   } catch (error) {
+    if (error instanceof BudgetError) return json({ error: "Scanning is paused to stay on budget" }, 503, cors);
     console.error("Scan failed:", error.status || "", String(error.message || error).slice(0, 400));
     if (error instanceof Anthropic.RateLimitError) return json({ error: "AI is busy" }, 429, cors);
     if (error instanceof Anthropic.APIError) return json({ error: `AI error ${error.status}` }, 502, cors);

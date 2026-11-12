@@ -3,6 +3,7 @@
 // it. Agent 1 is the Chief of Staff: a daily brief for Team SNARE.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { aiClient, BudgetError, budgetMessage, budgetStatus, setEnabled, recordUsd, costOf } from "./budget.js";
 
 const REPO = "n8moore19/SNARE";
 const TIMEZONE = "America/Toronto";
@@ -145,7 +146,7 @@ export async function runChief(env) {
   const [tasks, github, agents] = await Promise.all([getTasks(env), getCommits(), getAgentOutputs(env)]);
   const inputs = { today: today(), tasks, github, agents, metrics: SAMPLE_METRICS };
 
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "agent");
   const response = await client.beta.messages.create({
     model: env.AGENT_MODEL || "claude-opus-5-5",
     max_tokens: 16000,
@@ -281,6 +282,7 @@ function runSummary(id, rec) {
 
 // Plain words for the activity feed, never raw API errors.
 function plainError(e) {
+  if (e instanceof BudgetError) return `paused, ${budgetMessage(e)}`;
   const known = { NO_KEY: "the API key is missing", NO_STORE: "storage is not set up", REFUSED: "Claude declined the request", TOO_LONG: "the answer was cut off", EMPTY: "Claude sent an empty answer", NO_SOURCES: "web search found nothing" };
   if (known[e.message]) return known[e.message];
   if (e.status === 401) return "the API key was rejected";
@@ -298,29 +300,19 @@ function plainError(e) {
 const PRICES = { opus: [4, 20], sonnet: [2, 10], haiku: [0.1, 0.5] };
 const tierOf = (model) => (String(model).includes("haiku") ? "haiku" : String(model).includes("sonnet") ? "sonnet" : "opus");
 const AGENT_MODEL_VAR = { chief: "AGENT_MODEL", market: "MARKET_MODEL", growth: "GROWTH_MODEL", content: "CONTENT_MODEL", sales: "SALES_MODEL", insights: "INSIGHTS_MODEL", router: "ROUTER_MODEL", privacy: "PRIVACY_MODEL", rewards: "REWARDS_MODEL" };
-const DEFAULT_MODEL = { chief: "claude-opus-5-5", market: "claude-sonnet-5-5", growth: "claude-sonnet-5-5", content: "claude-sonnet-5-5", sales: "claude-opus-5-5", insights: "claude-opus-5-5", router: "claude-sonnet-5-5", privacy: "claude-sonnet-5-5", rewards: "claude-haiku-5-5" };
+const DEFAULT_MODEL = { chief: "claude-sonnet-5-5", market: "claude-sonnet-5-5", growth: "claude-sonnet-5-5", content: "claude-sonnet-5-5", sales: "claude-sonnet-5-5", insights: "claude-sonnet-5-5", router: "claude-sonnet-5-5", privacy: "claude-sonnet-5-5", rewards: "claude-haiku-5-5" };
 export const modelFor = (env, id) => env[AGENT_MODEL_VAR[id]] || DEFAULT_MODEL[id] || "claude-opus-5-5";
 
+// Batch results are recorded when collected (half price); everything else is
+// recorded by aiClient() as each call returns.
 export async function addSpend(env, model, inTok = 0, outTok = 0, extraUsd = 0, factor = 1) {
-  if (!env.AGENTS || (!inTok && !outTok && !extraUsd)) return;
-  try {
-    const [pin, pout] = PRICES[tierOf(model)];
-    const usd = ((inTok * pin + outTok * pout) / 1e6) * factor + extraUsd;
-    const key = `spend:${new Date().toISOString().slice(0, 7)}`;
-    const cur = (await env.AGENTS.get(key, "json")) || { usd: 0, calls: 0 };
-    cur.usd = Math.round((cur.usd + usd) * 10000) / 10000;
-    cur.calls += 1;
-    await env.AGENTS.put(key, JSON.stringify(cur));
-  } catch (e) {
-    console.error("Spend log failed:", e.message);
-  }
+  await recordUsd(env, costOf(model, { input_tokens: inTok, output_tokens: outTok }, factor) * 1.1 + extraUsd);
 }
 
 export async function tracked(env, id, fn) {
   await activity(env, { agent: id, type: "start", from: READS[id] || [], text: "Started" }, [id, true]);
   try {
     const rec = await fn(env);
-    if (rec && rec.usage) await addSpend(env, modelFor(env, id), rec.usage.input, rec.usage.output, ((rec.sources && rec.sources.searches) || 0) * 0.01);
     await activity(env, { agent: id, type: "done", to: rec && rec.pending ? [] : SENDS[id] || [], text: runSummary(id, rec).slice(0, 200) }, [id, false]);
     return rec;
   } catch (error) {
@@ -406,7 +398,7 @@ export async function runMarket(env) {
   if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
   const watchlist = await getWatchlist(env);
   const model = env.MARKET_MODEL || "claude-sonnet-5-5";
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "agent");
 
   // Step 1: research with live web search.
   const r = await research(client, {
@@ -581,7 +573,7 @@ async function joinWaitlist(request, env, cors) {
 export async function runGrowth(env) {
   if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
   const model = env.GROWTH_MODEL || "claude-sonnet-5-5";
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "agent");
   const [groups, waitlist, market] = await Promise.all([
     getGroups(env), waitlistSummary(env), env.AGENTS ? env.AGENTS.get("latest:market", "json") : null,
   ]);
@@ -720,7 +712,7 @@ async function getRecipes() {
 export async function runContent(env) {
   if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
   const model = env.CONTENT_MODEL || "claude-sonnet-5-5";
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "agent");
   const [recipes, market, growth] = await Promise.all([
     getRecipes(),
     env.AGENTS ? env.AGENTS.get("latest:market", "json") : null,
@@ -874,7 +866,7 @@ async function getProspects(env) {
 export async function runSales(env) {
   if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
   const model = env.SALES_MODEL || "claude-opus-5-5";
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "agent");
   const [prospects, market] = await Promise.all([getProspects(env), env.AGENTS ? env.AGENTS.get("latest:market", "json") : null]);
   const known = prospects.map((x) => x.org);
   const leads = market ? market.output.items.filter((i) => i.sendTo === "sales" || i.category === "buyer lead").map((i) => ({ title: i.title, summary: i.summary, url: i.url })) : [];
@@ -1096,7 +1088,7 @@ export async function runInsights(env) {
     params: params(REPORT_SCHEMA, `Today is ${today()}. Write a short insight report for ${p.org} (${p.type}). Their question: "${p.question}". Answer it from the panel only; if the panel cannot answer it directly, say what it does show and what data would answer it. chartProducts: up to 6 product names from the panel to chart. method: one sentence on the panel and the 50 student rule. Panel (JSON): ${data}`),
   }))];
 
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "agent");
   const batch = await client.messages.batches.create({ requests });
   const record = { batchId: batch.id, submittedAt: new Date().toISOString(), mode: snap.mode, realStudents: snap.realStudents, panel: snap.panel, prospects: prospects.map((p) => ({ id: p.id, org: p.org })) };
   await env.AGENTS.put("insights:pending", JSON.stringify(record));
@@ -1107,7 +1099,7 @@ export async function runInsights(env) {
 export async function collectInsights(env) {
   const pending = await getPending(env);
   if (!pending || !env.ANTHROPIC_API_KEY) return null;
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "agent");
   const batch = await client.messages.batches.retrieve(pending.batchId);
   if (batch.processing_status !== "ended") return null;
   let brief = null; const reports = {}; let inTok = 0, outTok = 0, errors = 0;
@@ -1121,7 +1113,7 @@ export async function collectInsights(env) {
     else reports[r.custom_id.replace(/^report-/, "")] = out;
   }
   if (brief && pending.mode !== "real") brief.contentStats = []; // never share sample numbers
-  await addSpend(env, env.INSIGHTS_MODEL || "claude-opus-5-5", inTok, outTok, 0, 0.5); // batch: half price
+  await addSpend(env, env.INSIGHTS_MODEL || "claude-sonnet-5-5", inTok, outTok, 0, 0.5); // batch: half price
   await env.AGENTS.delete("insights:pending");
   if (!brief && !Object.keys(reports).length) return null;
   await activity(env, { agent: "insights", type: "done", to: SENDS.insights, text: `Batch back: weekly brief and ${Object.keys(reports).length} prospect reports (${pending.mode} panel)` });
@@ -1302,13 +1294,12 @@ export async function guard(env, items) {
   let reviewed = false;
   if (env.ANTHROPIC_API_KEY) {
     try {
-      const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+      const client = aiClient(env, "guard");
       const f = await structure(client, {
         model: env.PRIVACY_MODEL || "claude-sonnet-5-5", system: GUARD_SYSTEM, schema: GUARD_SCHEMA,
         content: `Items (JSON):\n${JSON.stringify(items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, context: i.context || "", fields: hard[i.id].fields })))}`,
       });
       reviews = Object.fromEntries(f.output.reviews.map((r) => [r.id, r]));
-      await addSpend(env, env.PRIVACY_MODEL || "claude-sonnet-5-5", f.inTok, f.outTok);
       reviewed = true;
     } catch (e) {
       console.error("Privacy review failed:", e.message);
@@ -1457,7 +1448,7 @@ export async function runRouter(env) {
   if (!env.AGENTS) throw new Error("NO_STORE");
   const delivery = await deliverAll(env);
   const [insights, offers, prospects, stats] = await Promise.all([env.AGENTS.get("latest:insights", "json"), getOffers(env), getProspects(env), offerStats(env)]);
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "agent");
   const f = await structure(client, {
     model: env.ROUTER_MODEL || "claude-sonnet-5-5", system: ROUTER_SYSTEM, schema: ROUTER_SCHEMA,
     content: `Today is ${today()}.\nProduct ids: ${PRODUCT_IDS.join(", ")}\nInsights (JSON): ${JSON.stringify(insights ? { mode: insights.output.mode, brief: insights.output.brief, panel: insights.output.panel } : "none yet")}\nPipeline: ${JSON.stringify(prospects.filter((p) => p.status !== "lost").map((p) => ({ org: p.org, type: p.type, status: p.status, question: p.question })))}\nCurrent offers: ${JSON.stringify(offers.map((o) => ({ brand: o.brand, product: o.product, rule: o.rule, text: o.text })))}`,
@@ -1614,7 +1605,7 @@ async function supportAsk(request, env, cors) {
     anonymousSharing: !!a.share, weeklyBudget: Number(a.budget) || 0, sharedHouseFridge: !!a.house,
   };
   const help = await getHelp(env);
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "help");
   try {
     const r = await client.messages.create({
       model: env.SUPPORT_MODEL || "claude-haiku-5-5",
@@ -1631,7 +1622,6 @@ async function supportAsk(request, env, cors) {
     const out = JSON.parse(textOf(r));
     out.articleIds = out.articleIds.filter((id) => help.some((h) => h.id === id));
     await bumpSupport(env, { asks: 1, handoffs: out.handoff ? 1 : 0, articles: out.articleIds });
-    await addSpend(env, env.SUPPORT_MODEL || "claude-haiku-5-5", r.usage.input_tokens, r.usage.output_tokens);
     // One activity line a minute at most, so a busy help chat doesn't flood the log.
     const last = (await readActivity(env)).events.filter((e) => e.agent === "support").pop();
     if (!last || Date.now() - Date.parse(last.t) > 60e3) await activity(env, { agent: "support", type: "chat", text: out.handoff ? "Answered a student and offered to pass it to the team" : "Answered a student question" });
@@ -1767,7 +1757,7 @@ export async function runRewards(env) {
   const [book, billing] = await Promise.all([rewardsBook(env), invoiceDrafts(env)]);
   let summary = { headline: "Weekly close ready.", notes: [] }, usage = { input: 0, output: 0 };
   if (env.ANTHROPIC_API_KEY && book) try {
-    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const client = aiClient(env, "agent");
     const r = await client.messages.create({
       model: env.REWARDS_MODEL || "claude-haiku-5-5", max_tokens: 2000,
       output_config: { effort: "low", format: { type: "json_schema", schema: REWARDS_SCHEMA } },
@@ -1887,7 +1877,7 @@ async function chiefAsk(request, env, cors) {
   const msgs = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
   if (!msgs.length || !msgs.every((m) => ["user", "assistant"].includes(m.role) && typeof m.content === "string" && m.content.length > 0 && m.content.length <= 2000) || msgs[0].role !== "user" || msgs[msgs.length - 1].role !== "user") return json({ error: "Invalid request" }, 400, cors);
   const snapshot = await orgSnapshot(env);
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const client = aiClient(env, "ask");
   try {
     const r = await client.beta.messages.create({
       model: env.AGENT_MODEL || "claude-opus-5-5", max_tokens: 8000, ...FALLBACK,
@@ -1897,7 +1887,6 @@ async function chiefAsk(request, env, cors) {
     });
     if (r.stop_reason === "refusal") return json({ reply: "I can't help with that one. Ask me about the organization.", actions: [] }, 200, cors);
     const out = JSON.parse(textOf(r));
-    await addSpend(env, env.AGENT_MODEL || "claude-opus-5-5", r.usage.input_tokens, r.usage.output_tokens);
     out.actions = out.actions.filter((a) => (a.type === "run" && RUN_IDS.includes(a.agent)) || (a.type === "open" && ALL_IDS.includes(a.agent)) || (a.type === "addTask" && a.task.trim() && a.task.length <= 200)).slice(0, 3);
     return json(out, 200, cors);
   } catch (error) {
@@ -1950,7 +1939,13 @@ export async function handleAgents(request, env, cors) {
   if (request.method === "GET" && path === "/agents/spend") {
     const month = new Date().toISOString().slice(0, 7);
     const cur = (env.AGENTS ? await env.AGENTS.get(`spend:${month}`, "json") : null) || { usd: 0, calls: 0 };
-    return json({ month, usd: cur.usd, calls: cur.calls, limit: Number(env.SPEND_LIMIT) || 30 }, 200, cors);
+    return json({ month, usd: cur.usd, calls: cur.calls, limit: Number(env.SPEND_LIMIT) || 30, budget: await budgetStatus(env) }, 200, cors);
+  }
+  if (request.method === "POST" && path === "/agents/ai") {
+    if (!teamOk(request, env)) return json({ error: "Team passcode needed" }, 401, cors);
+    let body = {};
+    try { body = await request.json(); } catch { /* empty */ }
+    return json(await setEnabled(env, !!body.on), 200, cors);
   }
   if (request.method === "GET" && path === "/agents/activity") {
     const a = await readActivity(env);
@@ -2179,6 +2174,7 @@ export async function handleAgents(request, env, cors) {
 }
 
 function agentError(error, cors) {
+  if (error instanceof BudgetError) return json({ error: `AI is paused: ${budgetMessage(error)}`, budget: error.reason }, 503, cors);
   if (error.message === "NO_KEY") return json({ error: "The worker has no Anthropic API key yet" }, 500, cors);
   if (error.message === "REFUSED") return json({ error: "Claude declined to write this brief" }, 502, cors);
   if (error.message === "TOO_LONG") return json({ error: "The brief was cut off. Try again." }, 502, cors);

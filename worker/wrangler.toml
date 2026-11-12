@@ -9,14 +9,14 @@ compatibility_flags = ["nodejs_compat"]
 # Sites allowed to call this worker (comma separated).
 ALLOWED_ORIGINS = "https://n8moore19.github.io"
 # Claude model. claude-opus-5-5 is the default; claude-haiku-5-5 is much cheaper.
-MODEL = "claude-opus-5-5"
+MODEL = "claude-haiku-5-5"
 # Models for the launch agents.
-AGENT_MODEL = "claude-opus-5-5"      # Chief of Staff
+AGENT_MODEL = "claude-sonnet-5-5"    # Chief of Staff
 MARKET_MODEL = "claude-sonnet-5-5"   # Market intelligence (web search heavy, so the cheaper model)
 GROWTH_MODEL = "claude-sonnet-5-5"   # Student acquisition
 CONTENT_MODEL = "claude-sonnet-5-5"  # Content creation
-SALES_MODEL = "claude-opus-5-5"      # B2B sales (judgement on fit and tone matters most here)
-INSIGHTS_MODEL = "claude-opus-5-5"   # Insights analyst (runs as a half price batch)
+SALES_MODEL = "claude-sonnet-5-5"    # B2B sales
+INSIGHTS_MODEL = "claude-sonnet-5-5" # Insights analyst (runs as a half price batch)
 ROUTER_MODEL = "claude-sonnet-5-5"   # Data and offers router (offer ideas; deliveries need no model)
 PRIVACY_MODEL = "claude-sonnet-5-5"  # Privacy guard (reviews posts, outreach, offers and deliveries)
 SUPPORT_MODEL = "claude-haiku-5-5"   # Student support help chat (fast and very cheap)
@@ -24,6 +24,13 @@ REWARDS_MODEL = "claude-haiku-5-5"   # Rewards ops weekly close (the checks them
 # Monthly spend limit you set in the Anthropic console, shown on the hub scoreboard.
 SPEND_LIMIT = "30"
 SCAN_MODEL = "claude-sonnet-5-5"
+# The AI budget (see src/budget.js). Every call checks it first and scales down
+# as the day's budget runs low. Raise BUDGET_EPOCH to restart the total after a top up.
+DAILY_BUDGET = "1.00"
+TOTAL_BUDGET = "4.50"
+BUDGET_EPOCH = "2026-11-12"
+# "false" pauses the daily timetable; agents can still be run by hand from the hub.
+CRONS_ON = "false"
 
 # Storage for the agents: team tasks and each agent's latest output.
 # Create it once with: npx wrangler kv namespace create AGENTS

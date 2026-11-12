@@ -549,6 +549,8 @@
     .tile .ts.warn { color: var(--warn); font-weight: 700; }
     .tbar { display: block; height: 6px; border-radius: 99px; background: #E3EEDB; overflow: hidden; margin: 3px 0 2px; }
     .tbar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #1E8A4C, var(--lime)); transition: width 0.8s ease; }
+    .ai-switch { margin-left: 6px; border: 0; border-radius: 99px; padding: 2px 8px; font: inherit; font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; background: var(--forest); color: var(--lime); cursor: pointer; vertical-align: middle; }
+    .ai-switch.off { background: #E3E6E1; color: var(--muted); }
     .tbar i.hot { background: linear-gradient(90deg, #F0A066, var(--warn)); }
     @container (max-width: 900px) { .score-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
@@ -843,7 +845,7 @@
             <button class="tile" data-agent="insights" type="button"><span class="tk">Students sharing data</span><b id="sc-share">–</b><span class="tbar"><i id="sc-share-bar"></i></span><span class="ts" id="sc-share-sub">Real data unlocks at 50</span></button>
             <button class="tile" data-scroll="feed" type="button"><span class="tk">Agent runs this week</span><b id="sc-runs">–</b><span class="ts" id="sc-runs-sub">&nbsp;</span></button>
             <button class="tile" data-loadwait type="button"><span class="tk">Waiting for you</span><b id="sc-wait">–</b><span class="ts" id="sc-wait-sub">&nbsp;</span></button>
-            <div class="tile"><span class="tk">AI spend this month</span><b id="sc-spend">–</b><span class="tbar"><i id="sc-spend-bar"></i></span><span class="ts" id="sc-spend-sub">Estimated from usage</span></div>
+            <div class="tile"><span class="tk">AI budget today <button class="ai-switch" id="ai-switch" type="button" hidden></button></span><b id="sc-spend">–</b><span class="tbar"><i id="sc-spend-bar"></i></span><span class="ts" id="sc-spend-sub">Estimated from usage</span></div>
           </div>
         </section>
 
@@ -3296,6 +3298,10 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       sub.textContent = n ? 'Gates and student questions' : 'All clear';
       sub.className = 'ts ' + (n ? 'warn' : 'up');
     }
+    let budget = null;
+    async function flipAI() {
+      try { await call('/agents/ai', { method: 'POST', body: JSON.stringify({ on: !(budget && budget.enabled) }) }); loadScore(); } catch (e) { /* passcode prompt shown */ }
+    }
     async function loadScore() {
       greet();
       if (!API) { ['sc-wl-sub', 'sc-runs-sub', 'sc-wait-sub'].forEach(i => { document.getElementById(i).textContent = 'Connect the worker'; }); return; }
@@ -3313,11 +3319,20 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
         document.getElementById('sc-share-sub').textContent = panel.mode === 'real' ? 'Real data is on' : `Real data unlocks at ${panel.k}`;
       }
       if (spend) {
-        scoreNum('sc-spend', spend.usd, x => '$' + x.toFixed(2));
-        const pct = spend.usd / spend.limit * 100;
-        const bar = document.getElementById('sc-spend-bar');
-        bar.style.width = Math.min(100, pct) + '%'; bar.classList.toggle('hot', pct > 80);
-        document.getElementById('sc-spend-sub').textContent = `of your $${spend.limit} limit · estimated`;
+        const bg = spend.budget;
+        if (bg) {
+          budget = bg;
+          scoreNum('sc-spend', bg.dayUsd, x => '$' + x.toFixed(2));
+          const pct = bg.dayUsd / bg.dayLimit * 100;
+          const bar = document.getElementById('sc-spend-bar');
+          bar.style.width = Math.min(100, pct) + '%'; bar.classList.toggle('hot', pct > 70);
+          const sub = document.getElementById('sc-spend-sub');
+          sub.textContent = `of $${bg.dayLimit.toFixed(2)} · $${Math.max(0, bg.totalLimit - bg.totalUsd).toFixed(2)} left in total · ${bg.enabled ? bg.mode + ' mode' : 'AI off'}`;
+          sub.className = 'ts' + (bg.level <= 1 ? ' warn' : '');
+          const sw = document.getElementById('ai-switch');
+          sw.hidden = false; sw.textContent = bg.enabled ? 'AI on' : 'AI off'; sw.classList.toggle('off', !bg.enabled);
+          sw.title = bg.enabled ? 'Turn AI off (passcode)' : 'Turn AI on (passcode)';
+        }
       }
       paintRuns(); paintWaiting();
     }
@@ -3369,6 +3384,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       const ca = e.target.closest('[data-cca]');
       if (ca) { const [i, k] = ca.dataset.cca.split(':').map(Number); chiefAction(i, k); }
       if (e.target.closest('[data-loadwait]')) { if (waiting) document.getElementById('hub-waiting').scrollIntoView({ behavior: 'smooth', block: 'center' }); else needPass(loadWaiting); }
+      if (e.target.closest('#ai-switch')) { e.stopPropagation(); needPass(flipAI); }
       const sc = e.target.closest('[data-scroll]');
       if (sc) document.getElementById(sc.dataset.scroll).scrollIntoView({ behavior: 'smooth', block: 'center' });
     });

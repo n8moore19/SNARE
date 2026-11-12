@@ -149,3 +149,23 @@ product ids, with boxes for the scanning animation. The photo is used for that o
 never stored or logged. Limits: 12 scans per 10 minutes per visitor, and scanning pauses once the
 month's estimated spend reaches `SPEND_LIMIT`. If the worker can't read a photo, the app shows its
 sample results instead.
+
+## AI budget (`src/budget.js`)
+
+Every Claude call goes through `aiClient(env, purpose)`, which checks the budget before calling and
+records what the call cost afterwards. Limits live in `wrangler.toml`:
+
+- `DAILY_BUDGET` (default $1.00, resets at midnight Toronto time) and `TOTAL_BUDGET` (default $4.50).
+  Raise `BUDGET_EPOCH` to restart the total after a top up.
+- The worker picks a mode from what's left today:
+  - **Full** (over half left): models as configured, answers up to 12,000 tokens, up to 5 web searches.
+  - **Saving** (20 to 50% left): one model cheaper (Opus to Sonnet, Sonnet to Haiku, never below Sonnet
+    for scans or search), 6,000 tokens, low effort, web search agents wait.
+  - **Minimal** (under 20%): Haiku only, 2,000 tokens; only the help chat and app chat run.
+  - **Paused**: nothing calls Claude. The app uses its built in answers and sample scans.
+- Before each call it estimates the cost (padded 25%) and refuses if it won't fit what's left.
+- Site wide daily caps for public features: 40 chat messages, 25 scans, 40 help questions, 30 Chief questions.
+- `POST /agents/ai {on}` (team passcode) switches AI on or off; the hub's budget tile has the switch.
+- `CRONS_ON = "false"` pauses the daily timetable. Agents can still be run by hand from the hub.
+
+`node budget.test.mjs` checks the gate offline (fake storage, no API calls).

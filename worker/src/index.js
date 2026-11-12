@@ -3,7 +3,7 @@
 // of app actions. The website never sees the API key.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { addSpend } from "./agents.js";
+import { aiClient, BudgetError } from "./budget.js";
 import { handleScan } from "./scan.js";
 import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales, runInsights, collectInsights, runRouter, deliverAll, runRetention, runRewards, tracked } from "./agents.js";
 
@@ -113,11 +113,11 @@ export default {
     const context = JSON.stringify(body.context || {});
     if (!validMessages(body.messages) || context.length > 60_000) return json({ error: "Invalid request" }, 400, cors);
 
-    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const client = aiClient(env, "chat");
 
     try {
       const response = await client.beta.messages.create({
-        model: env.MODEL || "claude-opus-5-5",
+        model: env.MODEL || "claude-haiku-5-5",
         max_tokens: 16000,
         // If Claude declines, retry on Anthropic's recommended fallback model.
         betas: ["server-side-fallback-2026-07-01"],
@@ -136,9 +136,9 @@ export default {
       }
       const text = response.content.find((b) => b.type === "text");
       if (!text) return json({ error: "Empty reply" }, 502, cors);
-      await addSpend(env, env.MODEL || "claude-opus-5-5", response.usage.input_tokens, response.usage.output_tokens);
       return json(JSON.parse(text.text), 200, cors);
     } catch (error) {
+      if (error instanceof BudgetError) return json({ error: "AI is paused to stay on budget" }, 503, cors);
       if (error instanceof Anthropic.AuthenticationError) return json({ error: "Server API key is missing or invalid" }, 500, cors);
       if (error instanceof Anthropic.RateLimitError) return json({ error: "AI is busy, try again shortly" }, 429, cors);
       if (error instanceof Anthropic.BadRequestError) return json({ error: "AI rejected the request" }, 502, cors);
@@ -153,6 +153,7 @@ export default {
   // finished insights batch, delivers new reports to approved buyers, then the
   // Chief of Staff writes the daily brief.
   async scheduled(event, env, ctx) {
+    if (String(env.CRONS_ON || "true") !== "true") return; // timetable paused (wrangler.toml)
     const log = (name) => (error) => console.error(`${name} run failed:`, error.message);
     if (event.cron === "0 12 * * *") {
       const WEEKDAY = { 0: "rewards", 1: "market", 2: "growth", 3: "content", 4: "sales", 5: "insights", 6: "router" };
