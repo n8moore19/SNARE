@@ -22,6 +22,7 @@ worker in `worker/` (see `worker/README.md`) and put its URL in `config.js`.
 - `#demo` also loads sample points (430) and history, so one demo receipt passes the $5 cash out
 - `#meals`, `#shop`, `#impact`, `#rewards` open those tabs
 - `insights.html` the buyer view
+- `org.html` the Agentic Launch Organization: ten mostly autonomous agents, three human gates, data routing to buyers, and monthly cost estimates at launch, growth and scale
 
 ## Files
 

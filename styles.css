@@ -1225,3 +1225,9 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
   .pitch-link:hover { background: #fff; }
 }
 @media (min-width: 760px) { .pitch-link + small { display: block; } }
+@media (min-width: 760px) {
+  .pitch-links { display: flex; flex-wrap: wrap; gap: 8px; margin: -10px 0 26px; }
+  .pitch-links .pitch-link { margin: 0; }
+  .pitch-link.alt { background: transparent; color: var(--lime); border: 1.5px solid rgba(162, 220, 93, 0.5); }
+  .pitch-link.alt:hover { background: rgba(162, 220, 93, 0.12); }
+}

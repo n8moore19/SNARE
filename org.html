@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#004230">
+  <title>SNARE Launch Organization</title>
+  <meta name="description" content="SNARE's human plus AI launch organization: ten mostly autonomous agents, three human gates, and monthly cost estimates.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --forest: #004230; --lime: #A2DC5D; --soft: #EAF6DC; --accent: #BBD004; --ink: #1F1E1E;
+      --muted: #5B6660; --line: #E3EADD; --bg: #F7F9F4; --card: #FFFFFF; --warn: #B4541A; --warn-bg: #FDF1E6;
+      --grow: #2F7D5B; --sell: #1F1E1E; --safe: #B4541A;
+      --shadow: 0 1px 2px rgba(31, 30, 30, 0.04), 0 6px 18px rgba(0, 66, 48, 0.06);
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; height: 100%; }
+    body { font-family: 'Poppins', system-ui, sans-serif; font-size: 15px; line-height: 1.5; color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
+    h1, h2, h3, p { margin: 0; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    button:focus-visible, a:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+    a { color: inherit; }
+
+    /* ---------- frame: pitch beside a dashboard window, like the phone view ---------- */
+    .pitch, .win-dots, .expand { display: none; }
+    .window { min-height: 100%; background: var(--bg); }
+    .titlebar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 12px max(16px, env(safe-area-inset-left)); background: #fff; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .brand { font-weight: 800; font-size: 22px; letter-spacing: -0.04em; display: flex; align-items: baseline; gap: 3px; }
+    .brand i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+    .brand small { font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; color: var(--forest); margin-left: 8px; }
+    .seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 10px; overflow: hidden; margin-left: auto; }
+    .seg button { border: 0; background: #fff; padding: 6px 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+    .seg button + button { border-left: 1.5px solid var(--ink); }
+    .seg button.on { background: var(--ink); color: var(--lime); }
+    .seg button span { display: block; font-size: 9.5px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; opacity: 0.75; }
+    .body { padding: 22px max(16px, env(safe-area-inset-right)) 60px max(16px, env(safe-area-inset-left)); max-width: 1180px; margin: 0 auto; }
+
+    @media (min-width: 1000px) {
+      body { display: flex; align-items: center; gap: 48px; padding: 28px 44px; overflow: hidden;
+        background: radial-gradient(120% 120% at 0% 0%, #0B5A40 0%, #004230 45%, #02281D 100%); }
+      .pitch { display: block; flex: 0 0 300px; color: #fff; }
+      .pitch .brand { font-size: 32px; color: #fff; }
+      .pitch h2 { font-size: 40px; line-height: 1.05; font-weight: 800; letter-spacing: -0.03em; margin: 20px 0 14px; text-wrap: balance; }
+      .pitch h2 .hl { color: var(--lime); }
+      .pitch p { color: #CFE5C4; font-size: 15px; }
+      .pitch .links { display: grid; gap: 8px; margin-top: 24px; }
+      .pitch .links a { text-decoration: none; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 10px 14px; border-radius: 10px; border: 1.5px solid rgba(162, 220, 93, 0.5); color: var(--lime); }
+      .pitch .links a:first-child { background: var(--lime); color: var(--ink); border-color: var(--lime); }
+      .pitch small { display: block; margin-top: 22px; font-size: 12px; color: #8FB6A3; }
+      .window { flex: 1; height: calc(100vh - 56px); min-height: 0; border-radius: 18px; overflow: auto; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); transition: all 0.35s ease; }
+      .win-dots { display: flex; gap: 6px; }
+      .win-dots i { width: 11px; height: 11px; border-radius: 50%; background: #E3E6E1; }
+      .win-dots i:first-child { background: #F26B5B; } .win-dots i:nth-child(2) { background: #F5BF4F; } .win-dots i:nth-child(3) { background: #62C554; }
+      .expand { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--ink); background: #fff; border-radius: 10px; padding: 6px 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+      .expand svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+      body.expanded { padding: 0; }
+      body.expanded .pitch { display: none; }
+      body.expanded .window { height: 100vh; border-radius: 0; }
+    }
+
+    /* ---------- shared bits ---------- */
+    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--forest); }
+    .section { margin-top: 34px; }
+    .section > h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; text-wrap: balance; }
+    .section > .sub { color: var(--muted); font-size: 13.5px; margin: 2px 0 14px; max-width: 70ch; }
+    .note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+    .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+    .pill.auto { background: var(--soft); color: var(--forest); }
+    .pill.guard { background: #FFF6D6; color: #7A5A00; }
+    .pill.gate { background: var(--warn-bg); color: var(--warn); }
+    .pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* ---------- summary ---------- */
+    .hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; align-items: end; }
+    .hero h1 { font-size: clamp(26px, 3.4vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.08; margin-top: 6px; text-wrap: balance; }
+    .hero p { color: var(--muted); margin-top: 8px; max-width: 60ch; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 18px; }
+    .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); min-width: 0; }
+    .kpi b { display: block; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+    .kpi span { font-size: 12px; color: var(--muted); }
+    .kpi.dark { background: var(--ink); border-color: var(--ink); color: #fff; }
+    .kpi.dark b { color: var(--lime); }
+    .kpi.dark span { color: #C9D4CE; }
+
+    /* ---------- org chart ---------- */
+    .org { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; box-shadow: var(--shadow); }
+    .chief { display: flex; justify-content: center; }
+    .chief .agent { max-width: 340px; width: 100%; background: var(--ink); color: #fff; border-color: var(--ink); }
+    .chief .agent .meta, .chief .agent p { color: #C9D4CE; }
+    .chief .agent .cost { color: var(--lime); }
+    .wire { height: 22px; position: relative; margin: 0 16.66%; }
+    .wire::before { content: ''; position: absolute; left: 50%; top: 0; height: 11px; border-left: 2px solid var(--line); }
+    .wire::after { content: ''; position: absolute; left: 0; right: 0; top: 11px; height: 11px; border: 2px solid var(--line); border-bottom: 0; border-radius: 10px 10px 0 0; }
+    .groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .group { min-width: 0; }
+    .group-head { display: flex; align-items: center; gap: 8px; margin: 2px 0 8px; }
+    .group-head b { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+    .group-head span { font-size: 11.5px; color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+    .group-head i { width: 10px; height: 10px; border-radius: 3px; }
+    .stack { display: grid; gap: 8px; }
+    .agent { text-align: left; width: 100%; background: #fff; border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 4px; transition: border-color 0.15s, transform 0.15s; position: relative; }
+    .agent:hover { border-color: var(--ink); transform: translateY(-1px); }
+    .agent .top { display: flex; align-items: center; gap: 8px; }
+    .agent strong { font-size: 15px; letter-spacing: -0.01em; }
+    .agent .cost { margin-left: auto; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .agent p { font-size: 12.5px; color: var(--muted); }
+    .agent .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); }
+    .agent .live { position: absolute; top: 12px; right: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 0 rgba(162, 220, 93, 0.7); animation: ping 1.4s ease-out; }
+    @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(162, 220, 93, 0.8); } 100% { box-shadow: 0 0 0 12px rgba(162, 220, 93, 0); } }
+    .new-tag { font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; padding: 1px 6px; border-radius: 5px; background: var(--lime); color: var(--ink); }
+    .humans { margin-top: 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-radius: 14px; background: var(--soft); padding: 12px 16px; }
+    .faces { display: flex; }
+    .faces span { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: var(--forest); color: var(--lime); border: 2px solid var(--soft); margin-left: -8px; }
+    .faces span:first-child { margin-left: 0; }
+    .humans strong { display: block; font-size: 14.5px; }
+    .humans div > span { font-size: 12.5px; color: var(--forest); }
+    .humans .faces span { color: var(--lime); font-size: 12px; }
+    .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+
+    /* ---------- activity + gates ---------- */
+    .two { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+    .panel h3 { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .panel .sub { font-size: 12.5px; color: var(--muted); margin: 2px 0 12px; }
+    .dot-live { width: 8px; height: 8px; border-radius: 50%; background: #2DBE60; animation: blink 1.6s infinite; }
+    @keyframes blink { 50% { opacity: 0.3; } }
+    .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 360px; overflow: hidden; }
+    .feed li { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 8px 6px; border-radius: 10px; font-size: 13px; animation: slide 0.4s ease both; }
+    .feed li.gate { background: var(--warn-bg); }
+    .feed time { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
+    .feed b { font-weight: 700; }
+    .feed .act { display: inline-block; margin-top: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warn); }
+    @keyframes slide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+    .gates { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    .gates li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; }
+    .gates .n { width: 28px; height: 28px; border-radius: 50%; background: var(--warn); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+    .gates strong { display: block; font-size: 14px; }
+    .gates span { font-size: 12.5px; color: var(--muted); }
+    .everything { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+    .everything b { color: var(--forest); }
+
+    /* ---------- data flow ---------- */
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; align-items: stretch; }
+    .step { position: relative; padding: 14px 14px 14px 16px; background: var(--card); border: 1px solid var(--line); min-width: 0; }
+    .step:first-child { border-radius: 16px 0 0 16px; }
+    .step:last-child { border-radius: 0 16px 16px 0; }
+    .step + .step { border-left: 0; }
+    .step::after { content: ''; position: absolute; right: -9px; top: 50%; width: 16px; height: 16px; background: inherit; border-top: 1px solid var(--line); border-right: 1px solid var(--line); transform: translateY(-50%) rotate(45deg); z-index: 1; }
+    .step:last-child::after { display: none; }
+    .step .k { font-size: 10.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+    .step strong { display: block; font-size: 14.5px; margin: 2px 0 4px; }
+    .step p { font-size: 12px; color: var(--muted); }
+    .step.hot { background: var(--soft); }
+    .step.guard { background: #FFF8E3; }
+    .outs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .scroll table { min-width: 640px; }
+    th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    tr:last-child td { border-bottom: 0; }
+    .status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--soft); color: var(--forest); white-space: nowrap; }
+    .status.wait { background: var(--warn-bg); color: var(--warn); }
+    .status.idle { background: #EEF1EC; color: var(--muted); }
+    .match { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .match div { border-radius: 12px; padding: 12px; font-size: 12.5px; }
+    .match div:nth-child(1) { background: var(--ink); color: #fff; }
+    .match div:nth-child(2) { background: var(--soft); color: var(--forest); }
+    .match div:nth-child(3) { background: #fff; border: 1.5px solid var(--line); }
+    .match .k { display: block; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.75; margin-bottom: 6px; }
+    .match b { display: block; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 2px; }
+    .match div:nth-child(1) b { color: var(--lime); }
+
+    /* ---------- costs ---------- */
+    .costs td:first-child { font-weight: 600; }
+    .costs tfoot td { font-weight: 800; border-top: 2px solid var(--ink); border-bottom: 0; }
+    .costs .math { font-size: 11.5px; color: var(--muted); }
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .compare div { border-radius: 14px; padding: 14px; }
+    .compare div:first-child { background: var(--ink); color: #fff; }
+    .compare div:first-child b { color: var(--lime); }
+    .compare div:last-child { background: #fff; border: 1.5px solid var(--line); }
+    .compare b { display: block; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .compare span { font-size: 12.5px; opacity: 0.85; }
+
+    /* ---------- detail view (expanded agent) ---------- */
+    .detail { position: fixed; inset: 0; z-index: 100; background: rgba(16, 24, 20, 0.55); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); animation: fade 0.2s ease both; }
+    @keyframes fade { from { opacity: 0; } }
+    .sheet { background: var(--bg); width: min(980px, 100%); max-height: 100%; overflow: auto; border-radius: 22px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4); }
+    .sheet-head { position: sticky; top: 0; z-index: 2; background: var(--ink); color: #fff; padding: 18px 20px; display: flex; gap: 14px; align-items: flex-start; }
+    .sheet-head h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+    .sheet-head p { color: #C9D4CE; font-size: 13.5px; margin-top: 2px; max-width: 60ch; }
+    .sheet-head .eyebrow { color: var(--lime); }
+    .close { margin-left: auto; flex: none; border: 1.5px solid #fff; background: none; color: #fff; border-radius: 10px; padding: 6px 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+    .sheet-body { padding: 18px 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .sheet-body .wide { grid-column: 1 / -1; }
+    .facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; margin: 0; }
+    .facts dt { color: var(--muted); }
+    .facts dd { margin: 0; font-weight: 600; }
+    .ul { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 4px; }
+    .sample { background: #fff; border: 1.5px dashed var(--line); border-radius: 14px; padding: 14px 16px; font-size: 13.5px; white-space: pre-line; }
+    .sample-k { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .bigcost { display: flex; align-items: baseline; gap: 8px; }
+    .bigcost b { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips button { border: 1.5px solid var(--line); background: #fff; border-radius: 99px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
+    .chips button:hover { border-color: var(--ink); }
+
+    @media (max-width: 900px) {
+      .hero, .two, .outs { grid-template-columns: 1fr; }
+      .kpis { grid-template-columns: 1fr 1fr; }
+      .groups { grid-template-columns: 1fr; }
+      .wire { display: none; }
+      .chief { margin-bottom: 14px; }
+      .flow { grid-template-columns: 1fr; }
+      .step, .step:first-child, .step:last-child { border-radius: 0; border-left: 1px solid var(--line); }
+      .step + .step { border-top: 0; }
+      .step:first-child { border-radius: 16px 16px 0 0; }
+      .step:last-child { border-radius: 0 0 16px 16px; }
+      .step::after { right: auto; left: 24px; top: auto; bottom: -9px; transform: rotate(135deg); }
+      .match, .compare, .sheet-body { grid-template-columns: 1fr; }
+      .seg { margin-left: 0; }
+      .titlebar .grow { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <aside class="pitch">
+    <div class="brand">snare<i></i></div>
+    <h2>Five students. <span class="hl">Ten agents.</span> One launch.</h2>
+    <p>SNARE's launch runs on a team of AI agents that work on their own. The five of us step in at three gates: new data buyers, money out, and anything the privacy agent flags.</p>
+    <div class="links">
+      <a href="index.html">Open the app prototype</a>
+      <a href="insights.html">See what buyers see</a>
+    </div>
+    <small>Team SNARE · Ivey Venturing Field Project · Agentic Launch Organization</small>
+  </aside>
+
+  <div class="window" id="window">
+    <div class="titlebar">
+      <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand">snare<i></i><small>Launch Organization</small></span>
+      <div class="seg" role="group" aria-label="Number of students">
+        <button data-scale="0" class="on">Launch<span>500 students</span></button>
+        <button data-scale="1">Growth<span>5,000</span></button>
+        <button data-scale="2">Scale<span>50,000</span></button>
+      </div>
+      <button class="expand" id="expand" type="button"></button>
+    </div>
+
+    <div class="body">
+      <div class="hero">
+        <div>
+          <span class="eyebrow">Human plus AI organization</span>
+          <h1>Ten agents run the launch. Humans hold three keys.</h1>
+          <p>Each agent has one job, a Claude model sized to it, and a clear limit on what it can do alone. Click any agent to expand it.</p>
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi dark"><b id="k-ai">$0</b><span>AI cost per month</span></div>
+        <div class="kpi"><b id="k-all">$0</b><span>AI plus tools per month</span></div>
+        <div class="kpi"><b id="k-hours">3 hrs</b><span>human time per week</span></div>
+        <div class="kpi"><b id="k-hire">$0</b><span>same work with hires (est.)</span></div>
+      </div>
+
+      <section class="section">
+        <h2>The organization</h2>
+        <p class="sub">Grouped by the business model: grow students, sell data, run safely. The Chief of Staff coordinates all ten and writes the team a daily brief.</p>
+        <div class="org">
+          <div class="chief" id="chief"></div>
+          <div class="wire" aria-hidden="true"></div>
+          <div class="groups" id="groups"></div>
+          <div class="humans">
+            <div class="faces" aria-hidden="true"><span>E</span><span>A</span><span>S</span><span>N</span><span>R</span></div>
+            <div><strong>Team SNARE, 5 people</strong><span id="human-line">Approve the three gates and read the daily brief. About 3 hours a week in total.</span></div>
+            <div class="legend">
+              <span class="pill auto"><i></i>Fully autonomous</span>
+              <span class="pill guard"><i></i>Autonomous, checked by the privacy agent</span>
+              <span class="pill gate"><i></i>Has a human gate</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section two">
+        <div class="panel">
+          <h3><span class="dot-live"></span>Live activity</h3>
+          <p class="sub">A simulated day of the organization at work.</p>
+          <ul class="feed" id="feed"></ul>
+        </div>
+        <div class="panel">
+          <h3>The three human gates</h3>
+          <p class="sub">Everything else runs on its own.</p>
+          <ul class="gates">
+            <li><span class="n">1</span><div><strong>New data buyers</strong><span>The first delivery to any new buyer, and any new contract or price, needs a person to approve it.</span></div></li>
+            <li><span class="n">2</span><div><strong>Money out above the cap</strong><span>Rewards and gift cards pay out automatically up to $500 a week. Anything above waits for approval.</span></div></li>
+            <li><span class="n">3</span><div><strong>Privacy flags</strong><span>When the Privacy guard blocks something and can't fix it alone, a person decides.</span></div></li>
+          </ul>
+          <p class="everything"><b>Runs alone:</b> research, outreach drafts, posts, student support, reports to existing buyers, offer matching, payouts under the cap.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Where the data goes</h2>
+        <p class="sub">The Data and offers router knows which buyer gets what, and when. Targeting happens inside SNARE: buyers choose a group of students, SNARE shows the offer, and buyers only get counts back.</p>
+        <div class="flow">
+          <div class="step"><span class="k">1 · Collect</span><strong>Students who opted in</strong><p>Receipts, weekly check ins, used and tossed items. No names leave the app.</p></div>
+          <div class="step"><span class="k">2 · Analyse</span><strong>Insights analyst</strong><p>Turns events into totals: what gets wasted, when, and why.</p></div>
+          <div class="step guard"><span class="k">3 · Check</span><strong>Privacy guard</strong><p>Every number covers 50+ students. Consent checked. Blocks or merges anything smaller.</p></div>
+          <div class="step hot"><span class="k">4 · Route</span><strong>Data and offers router</strong><p>Matches each insight to the buyers who pay for it, and each offer to a student group.</p></div>
+          <div class="step"><span class="k">5 · Deliver</span><strong>Reports and in app offers</strong><p>Reports go to brands, grocers and the city. Offers show inside SNARE.</p></div>
+        </div>
+        <div class="outs">
+          <div class="panel">
+            <h3>Buyer routing</h3>
+            <p class="sub">Who gets what. Illustrative: no agreements exist yet.</p>
+            <div class="scroll"><table>
+              <thead><tr><th>Buyer</th><th>Gets</th><th>How often</th><th class="num">Price</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td><b>Valley Greens</b><br><small>Produce brand</small></td><td>Pack fit report: spinach and salad</td><td>Each quarter</td><td class="num">$5K a report</td><td><span class="status">Scheduled</span></td></tr>
+                <tr><td><b>Golden Crust</b><br><small>Bakery brand</small></td><td>Bread waste report plus a sponsored bonus</td><td>Monthly</td><td class="num">$5K + offer fees</td><td><span class="status">Offer live</span></td></tr>
+                <tr><td><b>Discount grocer</b><br><small>Target: No Frills, FreshCo</small></td><td>Home spoilage by category for campus area stores</td><td>Monthly</td><td class="num">$10K a year</td><td><span class="status wait">Gate 1</span></td></tr>
+                <tr><td><b>City of London</b><br><small>Waste services</small></td><td>Household waste baseline and term timing</td><td>Each term</td><td class="num">$20K to $50K</td><td><span class="status idle">Proposal</span></td></tr>
+              </tbody>
+            </table></div>
+            <p class="note">Brand names are made up for the prototype. Grocers and the city are targets, not partners.</p>
+          </div>
+          <div class="panel">
+            <h3>How an offer is matched</h3>
+            <p class="sub">Golden Crust wants to reach students who throw out bread.</p>
+            <div class="match">
+              <div><span class="k">SNARE keeps inside</span><b>184</b>students tossed bread twice this month</div>
+              <div><span class="k">Brand chooses</span><b>+100</b>points and a freezer tip, shown to that group</div>
+              <div><span class="k">Brand gets back</span><b>41</b>redeemed, and bread waste in the group fell 22% the next month</div>
+            </div>
+            <p class="note">The brand never gets a list of students. Only students who turned on anonymous sharing are matched. Offers are always labelled Sponsored and never change meal ranking or the cheapest trip.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>What it costs</h2>
+        <p class="sub" id="cost-sub"></p>
+        <div class="panel">
+          <div class="scroll"><table class="costs">
+            <thead><tr><th>Agent</th><th>Model</th><th>How we estimated it (launch month)</th><th class="num">Per month</th></tr></thead>
+            <tbody id="cost-rows"></tbody>
+            <tfoot id="cost-foot"></tfoot>
+          </table></div>
+          <div class="compare">
+            <div><span>Agents plus tools, per month</span><b id="c-ai">$0</b><span id="c-ai-sub"></span></div>
+            <div><span>Hiring people for the same work, per month (estimate)</span><b id="c-hire">$0</b><span id="c-hire-sub"></span></div>
+          </div>
+          <p class="note">Claude API prices: Opus 5.5 $4 in and $20 out, Sonnet 5.5 $2 and $10, Haiku 5.5 $0.10 and $0.50 per million tokens. Batch jobs are half price. Web search about $10 per 1,000 searches. Usage per agent is our estimate; hiring costs assume junior roles at about $4,300 a month each in London, ON.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="detail" id="detail" role="dialog" aria-modal="true" aria-label="Agent details" hidden></div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    const PRICE = { opus: [4, 20, 'Claude Opus 5.5'], sonnet: [2, 10, 'Claude Sonnet 5.5'], haiku: [0.1, 0.5, 'Claude Haiku 5.5'] };
+    const SCALES = [
+      { label: 'Launch', students: 500, tools: 25, hires: 3, hours: 3 },
+      { label: 'Growth', students: 5000, tools: 80, hires: 5, hours: 5 },
+      { label: 'Scale', students: 50000, tools: 300, hires: 9, hours: 8 },
+    ];
+    const HIRE_MONTH = 4300;
+    const GROUPS = [
+      ['grow', 'Grow students', '#2F7D5B'],
+      ['sell', 'Sell data', '#1F1E1E'],
+      ['safe', 'Run safely', '#B4541A'],
+    ];
+
+    // runs, input and output tokens per run in a launch month; f = cost multiplier at growth and scale.
+    const AGENTS = [
+      { id: 'chief', name: 'Chief of Staff', group: 'chief', model: 'opus', auto: 'auto', runs: 30, inTok: 60000, outTok: 5000, f: [1.5, 2.5],
+        job: 'Coordinates every agent and writes the team a daily brief.',
+        cadence: 'Every morning at 8:00, plus on demand',
+        does: ['Reads every agent\'s log and the key numbers', 'Writes a five minute daily brief and a weekly report', 'Assigns work when an agent needs another agent', 'Collects anything waiting at a human gate into one list'],
+        tools: ['Read access to all agent logs', 'App metrics', 'Team chat'],
+        gate: 'None. It only reads and reports.',
+        talks: ['market', 'growth', 'sales', 'router'],
+        sample: `Good morning. 2 things need you today:
+1. Gate 1: first report delivery to a discount grocer. Privacy guard passed it. Approve or hold.
+2. Gate 2: gift card payouts reached $468 of the $500 weekly cap.
+
+This week: 84 new students (goal 75), 1,212 receipts scanned, 31,400 points earned.
+Biggest risk: weekly check ins fell from 71% to 64%. Growth agent is testing a Sunday reminder.` },
+
+      { id: 'market', name: 'Market intelligence', group: 'grow', model: 'sonnet', auto: 'auto', runs: 30, inTok: 120000, outTok: 8000, extra: 6, extraNote: '600 web searches', f: [1.3, 2],
+        job: 'Watches competitors, prices, grants and buyer news.',
+        cadence: 'Daily scan, weekly brief on Mondays',
+        does: ['Tracks food waste and rewards apps, and grocery flyer prices', 'Finds grants and pitch competitions', 'Spots buyer news, like a brand launching smaller packs', 'Feeds leads to B2B sales and ideas to Content'],
+        tools: ['Web search', 'Flyer data', 'Shared research notes'],
+        gate: 'None. Research only.',
+        talks: ['sales', 'content', 'chief'],
+        sample: `Weekly brief, Nov 16
+- A food rescue app added two London stores. Our angle is still different: we track the student's own fridge.
+- Two bakery brands launched half loaves this fall. Strong fit for our bread waste report. Sent to B2B sales.
+- Grant: a provincial food waste fund opens in January, up to $25K. Added to the team calendar.` },
+
+      { id: 'growth', name: 'Student acquisition', group: 'grow', model: 'sonnet', auto: 'guard', runs: 200, inTok: 25000, outTok: 3000, f: [2, 4],
+        job: 'Brings students in through unions, ambassadors and referrals.',
+        cadence: 'Runs all day',
+        does: ['Drafts and sends outreach to students\' union clubs and residence councils', 'Runs the campus ambassador program and referral codes', 'Tests reminders and onboarding messages', 'Tracks the sign up funnel and reports what works'],
+        tools: ['Email and social scheduling', 'Referral codes', 'App analytics'],
+        gate: 'Autonomous. The Privacy guard checks every message before it goes out.',
+        talks: ['content', 'support', 'chief'],
+        sample: `Experiment result: Sunday 6 pm check in reminder
+Group A (no reminder): 61% checked in
+Group B (reminder): 74% checked in
+Rolling out to everyone tonight. Next test: ambassador codes in first year residences.` },
+
+      { id: 'content', name: 'Content creation', group: 'grow', model: 'sonnet', auto: 'guard', runs: 180, inTok: 30000, outTok: 4000, f: [2, 4],
+        job: 'Makes the posts, videos and recipes students see.',
+        cadence: 'About 30 pieces a week',
+        does: ['Writes TikTok and Instagram scripts and captions', 'Turns real waste totals into posts, like "what London students threw out this month"', 'Writes recipe cards for food that is about to expire', 'Writes copy for sponsored offers'],
+        tools: ['Canva', 'Post scheduler', 'Recipe library', 'Approved insight totals'],
+        gate: 'Autonomous. The Privacy guard checks any post that uses data.',
+        talks: ['growth', 'market', 'privacy'],
+        sample: `TikTok script, 20 seconds
+Hook: "London students threw out 41% of their spinach last month."
+Shot 2: wilted bag in a student fridge.
+Shot 3: SNARE notification: "Still got the spinach?"
+Shot 4: 10 minute spinach pasta.
+End card: "Snap your receipt. Earn grocery money. Waste less."` },
+
+      { id: 'sales', name: 'B2B sales', group: 'sell', model: 'opus', auto: 'gate', runs: 100, inTok: 40000, outTok: 6000, f: [1.5, 3],
+        job: 'Finds and works data buyers: brands, grocers and cities.',
+        cadence: 'About 25 prospects a week',
+        does: ['Researches each prospect and what question our data answers for them', 'Writes outreach and follow ups', 'Builds a sample report for each prospect', 'Hands signed buyers to the router'],
+        tools: ['Web search', 'CRM', 'Email', 'Sample report builder'],
+        gate: 'Gate 1: a person approves new contracts and prices. Follow ups run alone.',
+        talks: ['market', 'insights', 'router'],
+        sample: `To: Insights manager, bakery brand
+Subject: How much of your bread do students throw out?
+
+Students in London throw out 31% of the bread they buy, mostly from full size loaves, mostly around day 5. We track this every week across 1,240 students who opted in.
+Can I send you a free two page sample for your brand?` },
+
+      { id: 'insights', name: 'Insights analyst', group: 'sell', model: 'opus', auto: 'auto', runs: 8, inTok: 1500000, outTok: 40000, batch: true, f: [3, 10],
+        job: 'Turns the panel into reports buyers pay for.',
+        cadence: 'Weekly totals, monthly and quarterly reports',
+        does: ['Builds totals: waste by product, pack size, week of term and reason', 'Writes buyer reports with charts', 'Answers buyer questions from the data', 'Flags surprising patterns to Content and Sales'],
+        tools: ['Panel database (anonymous events only)', 'Code execution for charts', 'Report templates'],
+        gate: 'None directly. Every report goes through the Privacy guard and the router.',
+        talks: ['privacy', 'router', 'sales'],
+        sample: `Pack fit, spinach (Fall 2026, 1,240 students)
+Large 312 g bag: 41% thrown out, median 4 days to bin
+Small 142 g bag: 12% thrown out
+Students living alone waste 3 times more of the large bag.
+Recommendation: lead with the small bag near campus.` },
+
+      { id: 'router', name: 'Data and offers router', group: 'sell', model: 'sonnet', auto: 'gate', isNew: true, runs: 300, inTok: 20000, outTok: 2000, f: [3, 10],
+        job: 'Knows which buyer gets what data, and which students see which offer.',
+        cadence: 'Runs all day',
+        does: ['Keeps the list of buyers, what each one bought and when it is due', 'Packages approved totals and delivers them to each buyer', 'Matches sponsored offers to student groups inside the app', 'Sends buyers counts back: reached, redeemed, waste change', 'Tracks consent: drops anyone who turns sharing off'],
+        tools: ['Buyer list', 'Consent records', 'Offer engine in the app', 'Secure report delivery'],
+        gate: 'Gate 1 for a new buyer\'s first delivery. Repeat deliveries run alone after the Privacy guard passes them.',
+        talks: ['insights', 'privacy', 'rewards', 'sales'],
+        sample: `Delivery queue
+- Valley Greens: spinach pack fit report. Privacy passed (smallest group 62 students). Sends Monday.
+- Discount grocer: first delivery. Waiting at Gate 1.
+
+Offer matching
+- Golden Crust bonus shown to 184 students who tossed bread twice this month.
+- Brand receives: 184 reached, 41 redeemed. No names, no list.` },
+
+      { id: 'privacy', name: 'Privacy guard', group: 'safe', model: 'sonnet', auto: 'gate', runs: 250, inTok: 15000, outTok: 1000, f: [2.5, 8],
+        job: 'Checks everything that uses student data before it leaves.',
+        cadence: 'Before every report, post and offer',
+        does: ['Blocks any number built from fewer than 50 students', 'Checks that only opted in students are counted', 'Removes anything that could point to one person or address', 'Logs every decision for an audit'],
+        tools: ['Consent records', 'Report and post queue', 'Audit log'],
+        gate: 'Gate 3: if it cannot fix a problem by merging groups, a person decides.',
+        talks: ['insights', 'router', 'content'],
+        sample: `Checked 7 items this morning
+Passed: 6
+Fixed: "Bread waste, Byron, vegan" had 14 students. Merged into "West London", now 212 students.
+Escalated: none.` },
+
+      { id: 'support', name: 'Student support', group: 'safe', model: 'haiku', auto: 'auto', runs: 2000, inTok: 4000, outTok: 400, f: [10, 100],
+        job: 'Answers students in the app, any time.',
+        cadence: 'Instant replies, around the clock',
+        does: ['Answers questions about points, gift cards, premium and privacy', 'Fixes simple problems, like a receipt that did not scan', 'Passes anything unusual to a person', 'Tells Growth what students keep asking'],
+        tools: ['Help articles', 'Read only account view', 'Receipt rescan'],
+        gate: 'None. Hard cases go to the team.',
+        talks: ['rewards', 'growth'],
+        sample: `Student: my receipt didn't give me points
+SNARE: Found it. The photo was blurry, so it didn't count. I reread it and added your 25 points. Next time, lay it flat in good light.` },
+
+      { id: 'rewards', name: 'Rewards ops', group: 'safe', model: 'haiku', auto: 'gate', runs: 30, inTok: 50000, outTok: 3000, f: [10, 100],
+        job: 'Keeps points, payouts and brand bonus billing in balance.',
+        cadence: 'Daily, plus a weekly close',
+        does: ['Tracks points owed to students', 'Orders gift cards from the reseller', 'Bills brands for the bonuses they sponsor', 'Spots fraud, like the same receipt scanned twice'],
+        tools: ['Points ledger', 'Gift card reseller', 'Invoicing'],
+        gate: 'Gate 2: payouts over $500 a week wait for a person.',
+        talks: ['router', 'support', 'chief'],
+        sample: `Week 46 close
+Points earned: 31,400 ($314)
+Gift cards: 18 x $5 = $90
+Brand bonuses billed: Golden Crust $460, Hearty Pantry $210
+Duplicate receipts blocked: 6` },
+    ];
+    const byId = Object.fromEntries(AGENTS.map(a => [a.id, a]));
+
+    const FEED = [
+      ['8:00', 'chief', 'Daily brief sent: 2 items waiting at the gates.'],
+      ['8:12', 'market', 'Two bakery brands launched half loaves. Lead sent to B2B sales.'],
+      ['8:30', 'support', 'Answered 46 student questions overnight. 1 passed to the team.'],
+      ['9:05', 'privacy', 'Merged a group of 14 students into West London (212). Report passed.'],
+      ['9:20', 'insights', 'Weekly totals ready: bread waste down 6% after the freezer tip.'],
+      ['9:41', 'router', 'Golden Crust bonus matched to 184 students. Brand gets counts only.'],
+      ['10:02', 'content', 'Scheduled 3 posts for this week. Privacy guard passed all 3.'],
+      ['10:30', 'sales', 'Sample report sent to a produce brand. Follow up set for Thursday.'],
+      ['11:15', 'router', 'First delivery to a discount grocer is ready.', 'Waiting at gate 1'],
+      ['12:00', 'growth', 'Sunday reminder test: check ins up from 61% to 74%. Rolling out.'],
+      ['13:10', 'rewards', 'Payouts at $468 of the $500 weekly cap.', 'Gate 2 if it goes over'],
+      ['14:25', 'support', 'Rescanned a blurry receipt and added 25 points.'],
+      ['15:00', 'market', 'Provincial food waste grant opens in January. Added to calendar.'],
+      ['16:40', 'chief', 'Weekly report drafted for Friday.'],
+    ];
+
+    let scale = 0;
+    const money = n => '$' + Math.round(n).toLocaleString('en-CA');
+    const kTok = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.0', '') + 'M' : Math.round(n / 1000) + 'K';
+    const autoPill = a => a.auto === 'auto' ? '<span class="pill auto"><i></i>Autonomous</span>'
+      : a.auto === 'guard' ? '<span class="pill guard"><i></i>Privacy checked</span>' : '<span class="pill gate"><i></i>Human gate</span>';
+
+    function launchCost(a) {
+      const [pin, pout] = PRICE[a.model];
+      const tokens = a.runs * (a.inTok * pin + a.outTok * pout) / 1e6;
+      return tokens * (a.batch ? 0.5 : 1) + (a.extra || 0);
+    }
+    const cost = a => launchCost(a) * (scale === 0 ? 1 : a.f[scale - 1]);
+    const mathText = a => `${a.runs.toLocaleString('en-CA')} runs × ${kTok(a.inTok)} in, ${kTok(a.outTok)} out${a.batch ? ', batch half price' : ''}${a.extra ? ` + ${a.extraNote}` : ''}`;
+
+    function card(a) {
+      return `<button class="agent" data-agent="${a.id}">
+        <span class="top"><strong>${a.name}</strong>${a.isNew ? '<span class="new-tag">NEW</span>' : ''}<span class="cost">${money(cost(a))}</span></span>
+        <p>${a.job}</p>
+        <span class="meta">${autoPill(a)}<span>${PRICE[a.model][2].replace('Claude ', '')}</span></span>
+      </button>`;
+    }
+
+    function render() {
+      const s = SCALES[scale];
+      const ai = AGENTS.reduce((t, a) => t + cost(a), 0);
+      document.getElementById('chief').innerHTML = card(byId.chief);
+      document.getElementById('groups').innerHTML = GROUPS.map(([g, label, color]) => {
+        const list = AGENTS.filter(a => a.group === g);
+        return `<div class="group"><div class="group-head"><i style="background:${color}"></i><b>${label}</b><span>${money(list.reduce((t, a) => t + cost(a), 0))} a month</span></div>
+          <div class="stack">${list.map(card).join('')}</div></div>`;
+      }).join('');
+      document.getElementById('k-ai').textContent = money(ai);
+      document.getElementById('k-all').textContent = money(ai + s.tools);
+      document.getElementById('k-hours').textContent = s.hours + ' hrs';
+      document.getElementById('k-hire').textContent = money(s.hires * HIRE_MONTH);
+      document.getElementById('human-line').textContent = `Approve the three gates and read the daily brief. About ${s.hours} hours a week in total.`;
+      document.getElementById('cost-sub').textContent = `${s.label}: ${s.students.toLocaleString('en-CA')} students. Student support and rewards grow with students; research and sales grow slowly.`;
+      document.getElementById('cost-rows').innerHTML = AGENTS.map(a => `<tr><td>${a.name}</td><td>${PRICE[a.model][2].replace('Claude ', '')}</td><td class="math">${mathText(a)}${scale ? ` · × ${a.f[scale - 1]} at ${s.label.toLowerCase()}` : ''}</td><td class="num">${money(cost(a))}</td></tr>`).join('');
+      document.getElementById('cost-foot').innerHTML = `<tr><td colspan="3">AI agents</td><td class="num">${money(ai)}</td></tr><tr><td colspan="3">Tools: CRM, scheduler, Canva, hosting</td><td class="num">${money(s.tools)}</td></tr><tr><td colspan="3">Total</td><td class="num">${money(ai + s.tools)}</td></tr>`;
+      document.getElementById('c-ai').textContent = money(ai + s.tools);
+      document.getElementById('c-ai-sub').textContent = `10 agents, ${s.hours} human hours a week`;
+      document.getElementById('c-hire').textContent = money(s.hires * HIRE_MONTH);
+      document.getElementById('c-hire-sub').textContent = `${s.hires} junior hires: marketing, sales, analyst${s.hires > 3 ? ', support and operations' : ''}`;
+      document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', Number(b.dataset.scale) === scale));
+    }
+
+    // ---------- expanded agent ----------
+    const detail = document.getElementById('detail');
+    let lastFocus = null;
+    function openAgent(id) {
+      const a = byId[id];
+      lastFocus = document.activeElement;
+      detail.innerHTML = `<div class="sheet">
+        <div class="sheet-head">
+          <div><span class="eyebrow">${a.group === 'chief' ? 'Coordinator' : GROUPS.find(g => g[0] === a.group)[1]}</span><h2>${a.name}</h2><p>${a.job}</p></div>
+          <button class="close" data-close>Close</button>
+        </div>
+        <div class="sheet-body">
+          <div class="panel">
+            <h3>How it runs</h3>
+            <dl class="facts" style="margin-top:10px">
+              <dt>Model</dt><dd>${PRICE[a.model][2]}</dd>
+              <dt>Runs</dt><dd>${a.cadence}</dd>
+              <dt>Autonomy</dt><dd>${autoPill(a)}</dd>
+              <dt>Human role</dt><dd>${a.gate}</dd>
+            </dl>
+          </div>
+          <div class="panel">
+            <h3>Cost per month</h3>
+            <div class="bigcost" style="margin-top:6px"><b>${money(cost(a))}</b><span class="note">at ${SCALES[scale].label.toLowerCase()}</span></div>
+            <p class="note">${mathText(a)} on ${PRICE[a.model][2]} ($${PRICE[a.model][0]} in, $${PRICE[a.model][1]} out per million tokens).</p>
+          </div>
+          <div class="panel"><h3>What it does</h3><ul class="ul" style="margin-top:8px">${a.does.map(d => `<li>${d}</li>`).join('')}</ul></div>
+          <div class="panel"><h3>Tools it uses</h3><ul class="ul" style="margin-top:8px">${a.tools.map(d => `<li>${d}</li>`).join('')}</ul>
+            <h3 style="margin-top:14px">Works with</h3><div class="chips" style="margin-top:8px">${a.talks.map(t => `<button data-agent="${t}">${byId[t].name}</button>`).join('')}</div></div>
+          <div class="panel wide"><div class="sample-k"><h3>Sample output</h3><span class="pill auto"><i></i>Illustrative</span></div><div class="sample">${a.sample.replace(/</g, '&lt;')}</div></div>
+        </div>
+      </div>`;
+      detail.hidden = false;
+      detail.querySelector('[data-close]').focus();
+    }
+    function closeAgent() { detail.hidden = true; if (lastFocus) lastFocus.focus(); }
+    document.addEventListener('click', e => {
+      const ag = e.target.closest('[data-agent]');
+      if (ag) { openAgent(ag.dataset.agent); return; }
+      if (e.target.closest('[data-close]') || e.target === detail) closeAgent();
+      const sc = e.target.closest('[data-scale]');
+      if (sc) { scale = Number(sc.dataset.scale); render(); }
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !detail.hidden) closeAgent(); });
+
+    // ---------- live feed: shows a full day at rest, then plays new items ----------
+    const feed = document.getElementById('feed');
+    const feedItem = ([t, id, text, act]) => `<li class="${act ? 'gate' : ''}"><time>${t}</time><div><b>${byId[id].name}:</b> ${text}${act ? `<br><span class="act">${act}</span>` : ''}</div></li>`;
+    feed.innerHTML = FEED.slice(0, 7).reverse().map(feedItem).join('');
+    let fi = 7;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce) setInterval(() => {
+      const item = FEED[fi % FEED.length]; fi++;
+      feed.insertAdjacentHTML('afterbegin', feedItem(item));
+      while (feed.children.length > 8) feed.lastElementChild.remove();
+      const c = document.querySelector(`.agent[data-agent="${item[1]}"]`);
+      if (c) { const dot = document.createElement('span'); dot.className = 'live'; c.appendChild(dot); setTimeout(() => dot.remove(), 1500); }
+    }, 2800);
+
+    // ---------- expand, same idea as the phone view ----------
+    const ex = document.getElementById('expand');
+    const ICON = { expand: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>', shrink: '<svg viewBox="0 0 24 24"><path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7"/></svg>' };
+    function setExpanded(on) {
+      document.body.classList.toggle('expanded', on);
+      ex.innerHTML = on ? `${ICON.shrink}<span>Window view</span>` : `${ICON.expand}<span>Expand</span>`;
+      try { localStorage.setItem('snare.org.expanded', on ? '1' : ''); } catch (e) { /* ignore */ }
+    }
+    ex.addEventListener('click', () => setExpanded(!document.body.classList.contains('expanded')));
+    let start = false;
+    try { start = localStorage.getItem('snare.org.expanded') === '1'; } catch (e) { /* ignore */ }
+    setExpanded(start);
+
+    render();
+  })();
+  </script>
+</body>
+</html>
