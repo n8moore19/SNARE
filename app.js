@@ -3410,7 +3410,8 @@
   expandBtn.addEventListener('click', () => setExpanded(!document.body.classList.contains('expanded')));
   let startExpanded = false;
   try { startExpanded = localStorage.getItem('snare.expanded') === '1'; } catch (e) { /* ignore */ }
-  setExpanded(startExpanded);
+  const startOnSplash = !location.hash && getComputedStyle(document.querySelector('.pitch')).display !== 'none';
+  setExpanded(startExpanded && !startOnSplash);
 
   backBtn.addEventListener('click', () => {
     const to = { scan: 'fridge', review: 'scan', recipe: 'meals', results: 'shop', profile: 'fridge', checkin: 'fridge', impact: 'fridge', rewards: 'fridge' }[state.screen];
@@ -3767,7 +3768,26 @@
     phoneEl.style.setProperty('--tourb', on ? (phoneEl.getBoundingClientRect().bottom - tourBar.getBoundingClientRect().top) + 'px' : '0px');
   }
   new ResizeObserver(sizeTourBar).observe(tourBar);
-  document.getElementById('tour-start').addEventListener('click', () => startTour());
+  // ---------- what the phone shows: welcome, the app, or the launch organization ----------
+  // The buttons beside the phone switch it in place; nothing opens a new tab.
+  // Expand and Phone view work the same for the app and the organization.
+  const splashEl = document.getElementById('splash');
+  const orgFrame = document.getElementById('org-frame');
+  let phoneMode = 'app';
+  function setPhone(mode, orgHash = '') {
+    phoneMode = mode;
+    phoneEl.classList.toggle('mode-splash', mode === 'splash');
+    phoneEl.classList.toggle('mode-org', mode === 'org');
+    splashEl.hidden = mode !== 'splash';
+    orgFrame.hidden = mode !== 'org';
+    if (mode === 'org') orgFrame.src = 'org.html?embed=1&t=' + Date.now() + orgHash;
+    else if (orgFrame.getAttribute('src')) orgFrame.removeAttribute('src');
+    if (mode !== 'app') { if (tour.on) stopTour(); closeMenu(); closeMoment(); hideNotif(); state.aiOpen = false; renderAI(); }
+  }
+  document.getElementById('tour-start').addEventListener('click', () => { setPhone('app'); startTour(); });
+  document.getElementById('org-open').addEventListener('click', () => setPhone('org'));
+  document.getElementById('org-tour').addEventListener('click', () => setPhone('org', '#tour'));
+  document.getElementById('home-brand').addEventListener('click', () => setPhone('splash'));
 
   // Skip the demo: a ready made fridge to play with.
   function loadSample() {
@@ -3780,6 +3800,7 @@
     go('fridge');
   }
   document.getElementById('explore-start').addEventListener('click', () => {
+    setPhone('app');
     if (tour.on) stopTour();
     closeMenu(); closeMoment(); hideNotif();
     loadSample();
@@ -3806,4 +3827,5 @@
   } else {
     go(P().done ? 'fridge' : 'welcome');
   }
+  if (startOnSplash) setPhone('splash');
 })();

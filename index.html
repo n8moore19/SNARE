@@ -17,15 +17,15 @@
 
   <!-- Shown beside the phone on wide screens, for screen recordings -->
   <aside class="pitch">
-    <div class="pitch-brand">snare<span class="dot"></span></div>
+    <button class="pitch-brand" type="button" id="home-brand" aria-label="Back to the welcome screen">snare<span class="dot"></span></button>
+    <div class="sdgs"><span>SDG 12.3 Halve food waste</span><span>SDG 12 Responsible consumption</span></div>
     <h2><span class="hl">Cook</span> what you have. Waste less.</h2>
     <p>A free digital fridge for students. Snap your receipt, cook what expires first, and earn grocery money for logging. Brands, grocers and cities pay for the anonymous food waste totals.</p>
-    <div class="sdgs"><span>SDG 12.3 Halve food waste</span><span>SDG 12 Responsible consumption</span></div>
     <div class="pitch-links">
       <button class="pitch-link" type="button" id="tour-start">&#9654; Watch user demo</button>
       <button class="pitch-link alt" type="button" id="explore-start">Explore on my own</button>
-      <a class="pitch-link alt" href="org.html" target="_blank" rel="noopener">Launch organization</a>
-      <a class="pitch-link" href="org.html#tour" target="_blank" rel="noopener">&#9654; Watch launch organization demo</a>
+      <button class="pitch-link alt" type="button" id="org-open">Launch organization</button>
+      <button class="pitch-link" type="button" id="org-tour">&#9654; Watch launch organization demo</button>
     </div>
     <small>Team SNARE · Ivey Venturing Field Project prototype</small>
     <div class="tour-panel" id="tour-panel" hidden></div>
@@ -41,6 +41,15 @@
           <svg width="26" height="12" viewBox="0 0 26 12"><rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="17" height="8" rx="1.8"/><rect x="23.5" y="4" width="2" height="4" rx="1" opacity="0.5"/></svg>
         </span>
       </div>
+      <section class="splash" id="splash" aria-label="Welcome to SNARE" hidden>
+        <div class="splash-in">
+          <div class="splash-logo">snare<span class="dot"></span></div>
+          <h1>Welcome to SNARE</h1>
+          <p>Cook what you have. Waste less. Earn grocery money for logging your food.</p>
+        </div>
+        <small class="splash-hint">Pick an option beside the phone to start</small>
+      </section>
+      <iframe class="org-frame" id="org-frame" title="Launch organization" hidden></iframe>
       <div class="viewport" id="viewport">
         <header class="bar">
           <button class="back" id="back" aria-label="Back" hidden>&#8249;</button>

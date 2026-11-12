@@ -764,6 +764,11 @@
       .stage { margin-left: 0; }
       .titlebar .grow { display: none; }
     }
+    /* ---------- embedded inside the app's phone frame ---------- */
+    html.embed .pitch, html.embed .expand, html.embed .win-dots { display: none !important; }
+    html.embed body { display: block; padding: 0; background: var(--bg); overflow: hidden; }
+    html.embed .window { height: 100vh; min-height: 0; border-radius: 0; box-shadow: none; overflow: auto; }
+
     /* ---------- guided demo ---------- */
     .hub-btns { display: flex; gap: 8px; flex-wrap: wrap; }
     .pitch .links button.ot-start { font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--lime); background: var(--lime); color: var(--ink); cursor: pointer; text-align: center; }
@@ -811,6 +816,7 @@
   </style>
 </head>
 <body>
+  <script>if (/[?&]embed=1/.test(location.search)) document.documentElement.classList.add('embed');</script>
   <aside class="pitch">
     <div class="brand">snare<i></i></div>
     <h2>Five students. <span class="hl">Ten agents.</span> One launch.</h2>
