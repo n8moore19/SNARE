@@ -862,7 +862,7 @@
               <h1>THE DREAM TEAM</h1>
               <p class="hub-state"><span class="live-dot" id="hub-dot"></span><span id="hub-state">Connecting</span> <span class="hub-sub" id="hub-sub"></span></p>
             </div>
-            <div class="hub-btns"><button class="btn small ot-start" type="button">&#9654; Guided demo</button><button class="btn outline small" id="mc-replay" type="button">Replay the week</button></div>
+            <div class="hub-btns"><button class="btn small ot-start" type="button">&#9654; Guided demo</button><button class="btn outline small" id="mc-replay" type="button">Replay the week</button><button class="btn outline small" id="run-all" type="button">Run all agents</button></div>
           </div>
           <div class="hub-grid">
             <div class="stage-card">
@@ -1001,12 +1001,11 @@
           <span id="brief-time" class="note" style="margin:0"></span>
           <button class="btn" id="run-chief" type="button" disabled>Run now</button>
         </div>
-        <p class="sub">Written by the Chief of Staff agent every morning from your team's tasks, real GitHub activity and the other agents' latest work. App numbers are sample data until SNARE has real users.</p>
+        <p class="sub">Written by the Chief of Staff agent every morning from the team's tasks and every agent's latest work. App numbers are sample data until SNARE has real users.</p>
         <div class="brief-grid">
           <div class="panel brief" id="brief"></div>
           <div class="side">
             <div class="panel"><h3>Team tasks and deadlines</h3><p class="sub" id="tasks-sub">The brief reads this list.</p><ul class="tasks" id="tasks"></ul><div id="task-form"></div></div>
-            <div class="panel"><h3>GitHub activity <span class="src real">Real</span></h3><p class="sub">Recent changes to the SNARE prototype.</p><ul class="gh" id="gh"><li>Loading</li></ul></div>
           </div>
         </div>
         </div>
@@ -1192,8 +1191,8 @@
   <div class="detail" id="op-modal" role="dialog" aria-modal="true" aria-label="One page pitch" hidden></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="config.js?v=202611121101"></script>
-  <script src="data.js?v=202611121101"></script>
+  <script src="config.js?v=202611121114"></script>
+  <script src="data.js?v=202611121114"></script>
   <script>
   (function () {
     'use strict';
@@ -1442,28 +1441,28 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     // Same starting list as the worker, shown until it is connected.
     const DEFAULT_TASKS = [
       { id: 't1', text: 'Pivot SNARE to a free app plus a household food waste data business', owner: 'Team', due: '', done: true },
-      { id: 't2', text: 'Add rewards, receipt scanning, consent screens and the buyer view to the prototype', owner: 'Nate', due: '', done: true },
-      { id: 't3', text: 'Build the Agentic Launch Organization, one agent at a time', owner: 'Nate', due: '', done: false },
-      { id: 't4', text: "Run five validation interviews: a brand, a grocer, City of London, a students' union, students", owner: 'Team', due: '', done: false },
-      { id: 't5', text: 'Plan a two week pilot with 20 students', owner: 'Team', due: '', done: false },
-      { id: 't6', text: 'Set up the Anthropic API key and deploy the Cloudflare worker', owner: 'Nate', due: '', done: false },
+      { id: 't2', text: 'Run five validation interviews: a brand, a grocer, City of London, a students\' union, students', owner: 'Team', due: '', done: false },
+      { id: 't3', text: 'Launch a two week pilot with 20 students near Western', owner: 'Team', due: '', done: false },
+      { id: 't4', text: 'Reach 50 students sharing data so real reports can be sold', owner: 'Team', due: '', done: false },
+      { id: 't5', text: 'Send the first pitches to a bakery brand and a produce brand', owner: 'Team', due: '', done: false },
+      { id: 't6', text: 'Book an intro call with City of London waste services', owner: 'Team', due: '', done: false },
       { id: 't7', text: 'Confirm a gift card reseller sells Loblaw gift cards in Canada', owner: 'Team', due: '', done: false },
     ];
     const PREVIEW = {
-      headline: 'Two agents are built. Two decisions this week, and the interviews need dates.',
+      headline: 'Pre launch week: interviews and the pilot come first, then the first buyer pitches.',
       needsYou: [
-        { title: 'Set up the API key and worker', detail: 'Until then every agent stays in preview. About 10 minutes.', when: 'today' },
-        { title: 'Put dates on the five validation interviews', detail: 'They have no due dates, so nothing can flag them as late.', when: 'this week' },
+        { title: 'Book the five validation interviews', detail: 'A brand, a grocer, City of London, a students\' union and students. Nothing else moves without them.', when: 'this week' },
+        { title: 'Pick the pilot residence', detail: 'Twenty students for two weeks gets the first real data.', when: 'this week' },
       ],
       deadlines: [
-        { title: 'Build the Agentic Launch Organization', due: '', status: 'no date' },
         { title: 'Run five validation interviews', due: '', status: 'no date' },
-        { title: 'Plan a two week pilot with 20 students', due: '', status: 'no date' },
+        { title: 'Launch a two week pilot with 20 students', due: '', status: 'no date' },
+        { title: 'Reach 50 students sharing data', due: '', status: 'no date' },
       ],
-      shipped: ['Rewards, receipt scanning, consent screens and the buyer view went live in the prototype.', 'The Launch Organization page went live, set to launch size.'],
+      shipped: ['The pivot to a free app plus a food waste data business is decided.'],
       metrics: [{ label: 'New students this week', value: '84', sample: true }, { label: 'Weekly check ins', value: '64%', sample: true }, { label: 'Gift card payouts', value: '$468 of $500', sample: true }],
-      risks: ['No real users yet, so every app number is a placeholder.', 'Eight agents are not built yet, so the brief mostly sees tasks, GitHub and the market brief.'],
-      nextSteps: ['Connect the worker, then press Run now.', 'Add due dates to open tasks.', 'Build agent 3: Student acquisition.'],
+      risks: ['No real users yet, so every app number is a placeholder.', 'No buyer has signed, so revenue is still a plan.'],
+      nextSteps: ['Book the interviews.', 'Choose the pilot residence.', 'Send the first two brand pitches.'],
     };
 
     const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1509,7 +1508,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       time.textContent = latest ? `Written ${fmtTime(latest.generatedAt)}` : '';
       const b = latest ? latest.output : PREVIEW;
       const srcs = latest
-        ? [`<span class="src real">Tasks: ${latest.sources.tasks}</span>`, `<span class="src real">GitHub: ${typeof latest.sources.commits === 'number' ? latest.sources.commits + ' commits' : esc(latest.sources.commits)}</span>`,
+        ? [`<span class="src real">Tasks: ${latest.sources.tasks}</span>`,
            `<span class="src ${latest.sources.agentsLive.length ? 'real' : ''}">Agents live: ${latest.sources.agentsLive.length || 'none yet'}</span>`, '<span class="src samp">App metrics: sample</span>']
         : ['<span class="src samp">Sample brief</span>'];
       box.innerHTML = `
@@ -1567,7 +1566,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     }
 
     async function loadLive() {
-      renderBrief(); renderTasks(); loadGithub();
+      renderBrief(); renderTasks();
       if (!API) return;
       try {
         live.status = await call('/agents/status');
@@ -3181,6 +3180,24 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       paintNodes(); renderHubBrief();
     }
 
+    // One click: every agent that does scheduled work, in the order the work
+    // flows, so each one builds on the last. Uses the team passcode and the
+    // AI budget like any other run; a run the budget holds is skipped.
+    const RUN_ALL = ['growth', 'sales', 'insights', 'router', 'privacy', 'rewards', 'chief'];
+    async function runAll() {
+      const btn = document.getElementById('run-all');
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try { await call('/agents/activity/clear', { method: 'POST' }); } catch (e) { btn.disabled = false; return; }
+      await pollActivity();
+      for (let i = 0; i < RUN_ALL.length; i++) {
+        btn.textContent = `Running ${i + 1} of ${RUN_ALL.length}: ${NAME(RUN_ALL[i])}`;
+        try { await runFromMap(RUN_ALL[i]); } catch (e) { /* shown in the feed */ }
+      }
+      btn.textContent = 'Run all agents'; btn.disabled = false;
+      loadScore();
+    }
+
     async function replayWeek() {
       if (mc.replay) return;
       mc.replay = true;
@@ -3381,6 +3398,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       const r = e.target.closest('[data-mcrun]');
       if (r) { e.stopPropagation(); needPass(() => runFromMap(r.dataset.mcrun)); }
       if (e.target.closest('#mc-replay')) replayWeek();
+      if (e.target.closest('#run-all')) needPass(runAll);
       if (e.target.closest('[data-home]')) { location.hash = ''; }
       const q = e.target.closest('[data-ccq]');
       if (q) askChief(q.dataset.ccq);

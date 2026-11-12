@@ -21,11 +21,11 @@ const SAMPLE_METRICS = {
 
 const DEFAULT_TASKS = [
   { id: "t1", text: "Pivot SNARE to a free app plus a household food waste data business", owner: "Team", due: "", done: true },
-  { id: "t2", text: "Add rewards, receipt scanning, consent screens and the buyer view to the prototype", owner: "Nate", due: "", done: true },
-  { id: "t3", text: "Build the Agentic Launch Organization, one agent at a time", owner: "Nate", due: "", done: false },
-  { id: "t4", text: "Run five validation interviews: a brand, a grocer, City of London, a students' union, students", owner: "Team", due: "", done: false },
-  { id: "t5", text: "Plan a two week pilot with 20 students", owner: "Team", due: "", done: false },
-  { id: "t6", text: "Set up the Anthropic API key and deploy the Cloudflare worker", owner: "Nate", due: "", done: false },
+  { id: "t2", text: "Run five validation interviews: a brand, a grocer, City of London, a students' union, students", owner: "Team", due: "", done: false },
+  { id: "t3", text: "Launch a two week pilot with 20 students near Western", owner: "Team", due: "", done: false },
+  { id: "t4", text: "Reach 50 students sharing data so real reports can be sold", owner: "Team", due: "", done: false },
+  { id: "t5", text: "Send the first pitches to a bakery brand and a produce brand", owner: "Team", due: "", done: false },
+  { id: "t6", text: "Book an intro call with City of London waste services", owner: "Team", due: "", done: false },
   { id: "t7", text: "Confirm a gift card reseller sells Loblaw gift cards in Canada", owner: "Team", due: "", done: false },
 ];
 
@@ -72,18 +72,19 @@ const CHIEF_SYSTEM = `You are the Chief of Staff agent for Team SNARE, five stud
 
 SNARE is a free digital fridge app for students: snap a receipt, track what expires first, cook what you have, earn points (100 points = $1) that cash out as grocery gift cards. Students who opt in to anonymous sharing feed a household food waste panel; brands, grocers and cities pay for aggregate insights. Ten AI agents run most of the launch; humans approve three gates: the first data delivery to a new buyer, payouts over $500 a week, and anything the privacy agent cannot fix.
 
-Each morning you write the team's daily brief from the inputs you are given:
+Each morning you write the team's daily operating brief for the business from the inputs you are given:
 - tasks: the team's real task list and deadlines
-- github: real recent commits to the prototype repository
-- agents: the latest real output of each other agent, or a note that it is not built yet
+- agents: the latest real output of each other agent (market research, student acquisition, content, sales prospects, insights, deliveries and offers, privacy checks, rewards)
 - metrics: SAMPLE numbers, because there are no real users yet
+
+Write about the business only: students, buyers, revenue, costs, risks and the launch. Never mention software, code, the website, the prototype, AI models, APIs, keys, workers, deployments or how the agents were built. Treat the agents as the team's operating staff.
 
 Rules:
 - Use only the inputs. Never invent tasks, deadlines, commits, buyers or numbers.
 - Every metric taken from the sample block must have sample set to true. Never present sample numbers as real.
 - needsYou lists only things a human must do or decide, most urgent first. Include gate items from agent outputs.
 - deadlines covers open tasks. If a task has no due date, use status "no date" and due "". Mark overdue or at risk against today's date.
-- shipped summarises real progress in plain words, mostly from GitHub commits and tasks marked done this week. Skip merge noise.
+- shipped summarises real business progress in plain words: what the agents produced (leads found, groups found, posts ready, prospects pitched, reports written, checks passed) and tasks marked done.
 - risks and nextSteps: at most 4 each, concrete and specific to the inputs.
 - If an input is missing or empty, say so once in the most relevant section instead of guessing.
 - Plain, warm, brief. Short sentences. No em dashes or hyphens used as dashes.`;
@@ -143,8 +144,8 @@ const today = () => new Date().toLocaleDateString("en-CA", { timeZone: TIMEZONE,
 
 export async function runChief(env) {
   if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
-  const [tasks, github, agents] = await Promise.all([getTasks(env), getCommits(), getAgentOutputs(env)]);
-  const inputs = { today: today(), tasks, github, agents, metrics: SAMPLE_METRICS };
+  const [tasks, agents] = await Promise.all([getTasks(env), getAgentOutputs(env)]);
+  const inputs = { today: today(), tasks, agents, metrics: SAMPLE_METRICS };
 
   const client = aiClient(env, "agent");
   const response = await client.beta.messages.create({
@@ -163,7 +164,6 @@ export async function runChief(env) {
     output: JSON.parse(textOf(response)),
     sources: {
       tasks: tasks.length,
-      commits: Array.isArray(github) ? github.length : github.error,
       agentsLive: AGENT_IDS.filter((id) => agents[id] !== "not built yet"),
       metrics: "sample",
     },
@@ -1940,6 +1940,12 @@ export async function handleAgents(request, env, cors) {
     const month = new Date().toISOString().slice(0, 7);
     const cur = (env.AGENTS ? await env.AGENTS.get(`spend:${month}`, "json") : null) || { usd: 0, calls: 0 };
     return json({ month, usd: cur.usd, calls: cur.calls, limit: Number(env.SPEND_LIMIT) || 30, budget: await budgetStatus(env) }, 200, cors);
+  }
+  // Start the activity log fresh (team only), e.g. before going live.
+  if (request.method === "POST" && path === "/agents/activity/clear") {
+    if (!teamOk(request, env)) return json({ error: "Team passcode needed" }, 401, cors);
+    if (env.AGENTS) await env.AGENTS.put("activity", JSON.stringify({ running: {}, events: [] }));
+    return json({ ok: true }, 200, cors);
   }
   if (request.method === "POST" && path === "/agents/ai") {
     if (!teamOk(request, env)) return json({ error: "Team passcode needed" }, 401, cors);
