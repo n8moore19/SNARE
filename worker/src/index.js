@@ -3,7 +3,7 @@
 // of app actions. The website never sees the API key.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales, runInsights, collectInsights, runRouter, deliverAll, runRetention, runRewards } from "./agents.js";
+import { handleAgents, runChief, runMarket, runGrowth, runContent, runSales, runInsights, collectInsights, runRouter, deliverAll, runRetention, runRewards, tracked } from "./agents.js";
 
 const ACTION_TYPES = [
   "open_recipe",      // target: recipe id
@@ -151,14 +151,16 @@ export default {
   async scheduled(event, env, ctx) {
     const log = (name) => (error) => console.error(`${name} run failed:`, error.message);
     if (event.cron === "0 12 * * *") {
-      const WEEKDAY = { 0: ["Rewards ops", runRewards], 1: ["Market intelligence", runMarket], 2: ["Student acquisition", runGrowth], 3: ["Content creation", runContent], 4: ["B2B sales", runSales], 5: ["Insights analyst", runInsights], 6: ["Data and offers router", runRouter] };
-      const job = WEEKDAY[new Date(event.scheduledTime).getUTCDay()];
-      if (job) ctx.waitUntil(job[1](env).catch(log(job[0])));
+      const WEEKDAY = { 0: "rewards", 1: "market", 2: "growth", 3: "content", 4: "sales", 5: "insights", 6: "router" };
+      const RUN = { rewards: runRewards, market: runMarket, growth: runGrowth, content: runContent, sales: runSales, insights: runInsights, router: runRouter };
+      const id = WEEKDAY[new Date(event.scheduledTime).getUTCDay()];
+      if (id) ctx.waitUntil(tracked(env, id, RUN[id]).catch(log(id)));
       return;
     }
     ctx.waitUntil(collectInsights(env).catch(log("Insights collect"))
       .then(() => runRetention(env)).catch(log("Retention"))
       .then(() => deliverAll(env)).catch(log("Deliveries"))
-      .then(() => runChief(env)).catch(log("Chief of Staff")));
+      .then(() => tracked(env, "chief", runChief)).catch(log("Chief of Staff")));
   },
+
 };

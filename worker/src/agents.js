@@ -229,6 +229,81 @@ async function structure(client, { model, system, schema, content }) {
   return { output: JSON.parse(textOf(f)), inTok: f.usage.input_tokens, outTok: f.usage.output_tokens };
 }
 
+// ---------- live activity ----------
+// One small KV record the org page polls: which agents are working right now,
+// and the latest events (starts, finishes, reviews, deliveries, gate items).
+// "from" and "to" name the agents whose work flows in and out, so the page can
+// animate real communication along the network.
+
+const READS = {
+  chief: ["market", "growth", "content", "sales", "insights", "router", "privacy", "support", "rewards"],
+  market: [], growth: ["market"], content: ["market", "growth", "insights"], sales: ["market"],
+  insights: ["sales"], router: ["insights", "sales"], privacy: ["content", "growth", "sales", "router"], support: [], rewards: ["router"],
+};
+const SENDS = {
+  chief: ["team"], market: ["sales", "content", "growth", "chief"], growth: ["content", "privacy", "chief"], content: ["privacy", "chief"],
+  sales: ["insights", "router", "privacy", "chief"], insights: ["sales", "router", "content", "chief"], router: ["privacy", "rewards", "chief"],
+  privacy: ["content", "growth", "sales", "router", "chief"], support: ["chief"], rewards: ["chief"],
+};
+const STALE_MS = 10 * 60e3;
+
+async function readActivity(env) {
+  const a = env.AGENTS ? await env.AGENTS.get("activity", "json") : null;
+  return a || { running: {}, events: [] };
+}
+
+export async function activity(env, ev, running) {
+  if (!env.AGENTS) return;
+  try {
+    const a = await readActivity(env);
+    if (ev) a.events = [...a.events, { t: new Date().toISOString(), ...ev }].slice(-120);
+    if (running) {
+      const [id, on] = running;
+      if (on) a.running[id] = Date.now(); else delete a.running[id];
+    }
+    await env.AGENTS.put("activity", JSON.stringify(a));
+  } catch (e) {
+    console.error("Activity log failed:", e.message);
+  }
+}
+
+function runSummary(id, rec) {
+  if (!rec) return "Finished";
+  if (rec.pending) return "Sent this week's reports to Claude as a half price batch";
+  const o = rec.output || {};
+  if (id === "privacy") return `Checked the queue: ${o.waiting || 0} waiting at Gate 3`;
+  if (id === "rewards" && o.book) return `Weekly close: ${o.book.flags.length} fraud flags, ${o.billing.invoices.length} invoices ready`;
+  if (id === "growth" && o.newGroups) return `${o.newGroups.length} new student groups. ${o.headline || ""}`.trim();
+  if (id === "sales" && o.newProspects) return `${o.newProspects.length} new prospects. ${o.headline || ""}`.trim();
+  if (id === "content" && o.pieces) return `${o.pieces.length} posts ready. ${o.headline || ""}`.trim();
+  return o.headline || "Finished";
+}
+
+// Plain words for the activity feed, never raw API errors.
+function plainError(e) {
+  const known = { NO_KEY: "the API key is missing", NO_STORE: "storage is not set up", REFUSED: "Claude declined the request", TOO_LONG: "the answer was cut off", EMPTY: "Claude sent an empty answer", NO_SOURCES: "web search found nothing" };
+  if (known[e.message]) return known[e.message];
+  if (e.status === 401) return "the API key was rejected";
+  if (e.status === 429) return "Claude was busy, it will try again next run";
+  if (e.status >= 500) return "Claude had a temporary problem";
+  if (e.status === 400) return "Claude rejected the request";
+  if (e instanceof SyntaxError) return "the answer was not in the expected format";
+  return "an unexpected error";
+}
+
+// Wraps a run so the org page can see it start, work and finish.
+export async function tracked(env, id, fn) {
+  await activity(env, { agent: id, type: "start", from: READS[id] || [], text: "Started" }, [id, true]);
+  try {
+    const rec = await fn(env);
+    await activity(env, { agent: id, type: "done", to: rec && rec.pending ? [] : SENDS[id] || [], text: runSummary(id, rec).slice(0, 200) }, [id, false]);
+    return rec;
+  } catch (error) {
+    await activity(env, { agent: id, type: "error", text: `Stopped: ${plainError(error)}` }, [id, false]);
+    throw error;
+  }
+}
+
 // ---------- agent 2: Market intelligence ----------
 // Two steps: research with live web search (Claude's server tool), then turn
 // the notes into a structured brief. Findings keep only links that search
@@ -1023,6 +1098,7 @@ export async function collectInsights(env) {
   if (brief && pending.mode !== "real") brief.contentStats = []; // never share sample numbers
   await env.AGENTS.delete("insights:pending");
   if (!brief && !Object.keys(reports).length) return null;
+  await activity(env, { agent: "insights", type: "done", to: SENDS.insights, text: `Batch back: weekly brief and ${Object.keys(reports).length} prospect reports (${pending.mode} panel)` });
   return save(env, "insights", {
     agent: "insights",
     generatedAt: new Date().toISOString(),
@@ -1237,6 +1313,10 @@ export async function guard(env, items) {
   }
   await privacyLog(env, log);
   await privacyQueue(env, held);
+  const AGENT_OF = { post: "content", outreach: "growth", sales: "sales", offer: "router", delivery: "router" };
+  const from = [...new Set(items.map((i) => AGENT_OF[i.kind]).filter(Boolean))];
+  const count = (st) => Object.values(out).filter((x) => x.status === st).length;
+  await activity(env, { agent: "privacy", type: "review", from, to: [...from, ...(held.length ? ["team"] : [])], text: `Checked ${items.length} item${items.length === 1 ? "" : "s"}: ${count("passed")} passed, ${count("fixed")} fixed, ${held.length} held at Gate 3` });
   return out;
 }
 
@@ -1296,7 +1376,9 @@ export async function deliverAll(env) {
   let delivered = 0;
   for (const b of buyers.filter((x) => x.approved && !x.revoked)) if (await deliverOne(env, b, insights, stats, offers)) delivered++;
   await env.AGENTS.put("buyers", JSON.stringify(buyers));
-  return { delivered, buyers: buyers.length, waiting: buyers.filter((b) => !b.approved && !b.revoked).length };
+  const waiting = buyers.filter((b) => !b.approved && !b.revoked).length;
+  if (delivered || waiting) await activity(env, { agent: "router", type: "deliver", to: waiting ? ["team"] : [], text: `${delivered} report${delivered === 1 ? "" : "s"} delivered to buyers${waiting ? `, ${waiting} waiting at Gate 1` : ""}` });
+  return { delivered, buyers: buyers.length, waiting };
 }
 
 async function updateBuyer(env, id, action) {
@@ -1522,6 +1604,9 @@ async function supportAsk(request, env, cors) {
     const out = JSON.parse(textOf(r));
     out.articleIds = out.articleIds.filter((id) => help.some((h) => h.id === id));
     await bumpSupport(env, { asks: 1, handoffs: out.handoff ? 1 : 0, articles: out.articleIds });
+    // One activity line a minute at most, so a busy help chat doesn't flood the log.
+    const last = (await readActivity(env)).events.filter((e) => e.agent === "support").pop();
+    if (!last || Date.now() - Date.parse(last.t) > 60e3) await activity(env, { agent: "support", type: "chat", text: out.handoff ? "Answered a student and offered to pass it to the team" : "Answered a student question" });
     return json(out, 200, cors);
   } catch (error) {
     return agentError(error, cors);
@@ -1544,6 +1629,7 @@ async function supportTicket(request, env, cors) {
   tickets.push(t);
   await env.AGENTS.put("tickets", JSON.stringify(tickets.slice(-500)));
   await bumpSupport(env, { tickets: 1 });
+  await activity(env, { agent: "support", type: "handoff", to: ["team"], text: "A student sent a question to the team" });
   return json({ ticket: { id: t.id, question: t.question, status: t.status, created: t.created } }, 200, cors);
 }
 
@@ -1729,6 +1815,12 @@ export async function handleAgents(request, env, cors) {
     return recordEvents(request, env, cors);
   }
   if (request.method === "GET" && path === "/agents/panel") return json(await panelSnapshot(env), 200, cors);
+  if (request.method === "GET" && path === "/agents/activity") {
+    const a = await readActivity(env);
+    const now = Date.now();
+    const running = Object.fromEntries(Object.entries(a.running).filter(([, t]) => now - t < STALE_MS).map(([k, t]) => [k, new Date(t).toISOString()]));
+    return json({ running, events: a.events.slice(-60), now: new Date(now).toISOString() }, 200, cors);
+  }
   // Public: the app downloads active offers and reports anonymous shown and redeemed events.
   if (request.method === "GET" && path === "/agents/offers") return json({ offers: (await getOffers(env)).filter((o) => o.active).map(({ id, brand, product, text, note, points, rule }) => ({ id, brand, product, text, note, points, rule })) }, 200, cors);
   if (request.method === "POST" && path === "/agents/offers/event") {
@@ -1927,7 +2019,7 @@ export async function handleAgents(request, env, cors) {
   }
 
   if (request.method === "POST" && path === "/agents/insights/run") {
-    try { return json(await runInsights(env), 200, cors); } catch (error) { return agentError(error, cors); }
+    try { return json(await tracked(env, "insights", runInsights), 200, cors); } catch (error) { return agentError(error, cors); }
   }
 
   const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent, sales: runSales, router: runRouter, privacy: runPrivacy, rewards: runRewards };
@@ -1935,7 +2027,7 @@ export async function handleAgents(request, env, cors) {
   if (request.method === "POST" && runMatch) {
     if (tooManyRuns(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many runs this hour" }, 429, cors);
     try {
-      return json({ latest: await RUNNERS[runMatch[1]](env) }, 200, cors);
+      return json({ latest: await tracked(env, runMatch[1], RUNNERS[runMatch[1]]) }, 200, cors);
     } catch (error) {
       return agentError(error, cors);
     }

@@ -463,6 +463,75 @@
     .feef input { width: 80px; font: inherit; font-size: 12.5px; padding: 5px 8px; border: 1.5px solid var(--line); border-radius: 8px; }
     @media (max-width: 900px) { .wtiles { grid-template-columns: repeat(2, 1fr); } }
 
+
+    /* ---------- live network (mission control) ---------- */
+    .mc { --mc-bg: #06110C; --mc-ink: #E9F5E1; --mc-dim: #8FB6A3; --mc-line: rgba(162,220,93,0.16); --mc-lime: #A2DC5D; --mc-hot: #E9FFC9;
+      position: relative; border-radius: 22px; overflow: hidden; color: var(--mc-ink);
+      background: radial-gradient(120% 90% at 50% 0%, #123A2A 0%, #0A2017 45%, var(--mc-bg) 100%); box-shadow: 0 20px 60px rgba(0, 30, 20, 0.35), inset 0 0 0 1px rgba(162,220,93,0.12); }
+    .mc::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 0%, rgba(162,220,93,0.04) 50%, transparent 100%); background-size: 100% 6px; opacity: 0.5; }
+    .mc-bar { position: relative; z-index: 3; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid rgba(162,220,93,0.12); font-family: 'DM Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.04em; }
+    .mc-live { display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.14em; }
+    .mc-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--mc-dim); box-shadow: 0 0 0 0 rgba(162,220,93,0.6); }
+    .mc-live.on i { background: var(--mc-lime); animation: mcping 1.8s infinite; }
+    .mc-live.busy i { background: var(--mc-hot); animation: mcping 0.9s infinite; }
+    @keyframes mcping { 0% { box-shadow: 0 0 0 0 rgba(162,220,93,0.7); } 100% { box-shadow: 0 0 0 10px rgba(162,220,93,0); } }
+    .mc-sub { color: var(--mc-dim); }
+    .mc-btn { margin-left: auto; font: inherit; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mc-lime); background: rgba(162,220,93,0.08); border: 1px solid rgba(162,220,93,0.4); border-radius: 9px; padding: 7px 12px; }
+    .mc-btn:hover { background: rgba(162,220,93,0.16); }
+    .mc-btn:disabled { opacity: 0.4; }
+    .mc-scroll { overflow-x: auto; position: relative; z-index: 2; }
+    .mc-stage { position: relative; min-width: 860px; aspect-ratio: 1000 / 720; }
+    .mc-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .mc-col { position: absolute; top: 2.5%; transform: translateX(-50%); font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(162,220,93,0.55); }
+    .edge { fill: none; stroke: var(--mc-line); stroke-width: 1.2; transition: stroke 0.4s, stroke-width 0.4s; }
+    .edge-flow { fill: none; stroke: rgba(162,220,93,0.28); stroke-width: 1.2; stroke-dasharray: 2 14; animation: mcflow 6s linear infinite; }
+    .edge.hot { stroke: rgba(162,220,93,0.9); stroke-width: 2.6; filter: drop-shadow(0 0 5px rgba(162,220,93,0.9)); }
+    .edge-flow.hot { stroke: var(--mc-hot); stroke-width: 2.4; stroke-dasharray: 8 9; animation-duration: 0.8s; filter: drop-shadow(0 0 4px #E9FFC9); }
+    .edge-flow.hot.rev { animation-direction: reverse; }
+    .edge.gate { stroke: rgba(240,160,102,0.25); stroke-dasharray: 4 6; }
+    @keyframes mcflow { to { stroke-dashoffset: -160; } }
+    .nd { position: absolute; transform: translate(-50%, -50%); width: 178px; z-index: 2; }
+    .nd-core { position: relative; display: grid; gap: 2px; width: 100%; text-align: left; padding: 10px 12px 10px 14px; border-radius: 14px; border: 1px solid rgba(162,220,93,0.3);
+      background: linear-gradient(160deg, rgba(20,52,38,0.92), rgba(8,22,16,0.92)); color: var(--mc-ink); backdrop-filter: blur(6px); box-shadow: 0 8px 24px rgba(0,0,0,0.35); transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s; }
+    .nd-core:hover { border-color: var(--mc-lime); transform: translateY(-1px); box-shadow: 0 0 0 1px rgba(162,220,93,0.3), 0 10px 30px rgba(0,0,0,0.4), 0 0 24px rgba(162,220,93,0.18); }
+    .nd-core strong { font-size: 13.5px; letter-spacing: -0.01em; padding-right: 24px; }
+    .nd-meta { font-family: 'DM Mono', ui-monospace, monospace; font-size: 10.5px; color: var(--mc-dim); }
+    .nd-state { display: flex; align-items: center; gap: 6px; font-family: 'DM Mono', ui-monospace, monospace; font-size: 10.5px; color: var(--mc-dim); margin-top: 3px; }
+    .nd-state i { width: 6px; height: 6px; border-radius: 50%; background: rgba(143,182,163,0.6); flex: none; }
+    .nd-run { position: absolute; top: 8px; right: 8px; z-index: 3; width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(162,220,93,0.5); background: rgba(162,220,93,0.1); color: var(--mc-lime); display: grid; place-items: center; padding: 0; font-size: 10px; }
+    .nd-run:hover { background: var(--mc-lime); color: #06110C; }
+    .nd-run:disabled { opacity: 0.3; cursor: not-allowed; }
+    .nd-ring { position: absolute; inset: -6px; border-radius: 19px; pointer-events: none; opacity: 0; transition: opacity 0.3s; padding: 3px; filter: drop-shadow(0 0 6px rgba(162,220,93,0.8));
+      background: conic-gradient(from var(--a, 0deg), transparent 0deg, var(--mc-hot) 60deg, var(--mc-lime) 120deg, transparent 200deg);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+    @property --a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+    .nd.working .nd-ring { opacity: 1; animation: mcspin 1.6s linear infinite; }
+    .nd.working .nd-core { border-color: var(--mc-hot); box-shadow: 0 0 30px rgba(162,220,93,0.35), 0 10px 30px rgba(0,0,0,0.4); }
+    .nd.working .nd-state { color: var(--mc-hot); }
+    .nd.working .nd-state i { background: var(--mc-hot); animation: mcping 0.9s infinite; }
+    @keyframes mcspin { to { --a: 360deg; } }
+    .nd.flash .nd-core { animation: mcflash 1.4s ease-out; }
+    @keyframes mcflash { 0% { box-shadow: 0 0 0 0 rgba(233,255,201,0.8), 0 0 40px rgba(162,220,93,0.6); } 100% { box-shadow: 0 0 0 14px rgba(233,255,201,0), 0 8px 24px rgba(0,0,0,0.35); } }
+    .nd.error .nd-core { border-color: #F0A066; }
+    .nd.chief .nd-core { background: linear-gradient(160deg, rgba(162,220,93,0.22), rgba(8,22,16,0.95)); border-color: rgba(162,220,93,0.6); }
+    .nd.team { width: 230px; }
+    .nd.team .nd-core { background: linear-gradient(160deg, rgba(240,160,102,0.16), rgba(8,22,16,0.95)); border-color: rgba(240,160,102,0.5); text-align: center; justify-items: center; }
+    .nd.team .nd-core strong { padding-right: 0; }
+    .nd-built { position: absolute; top: -8px; left: 12px; font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px; letter-spacing: 0.14em; padding: 1px 6px; border-radius: 5px; background: #06110C; border: 1px solid rgba(162,220,93,0.45); color: var(--mc-lime); }
+    .mc-replaying { position: absolute; left: 2%; top: 7%; font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #06110C; background: var(--mc-lime); padding: 5px 12px; border-radius: 99px; z-index: 4; }
+    .mc-legend { position: relative; z-index: 3; display: flex; gap: 18px; flex-wrap: wrap; padding: 12px 18px 16px; border-top: 1px solid rgba(162,220,93,0.12); font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px; color: var(--mc-dim); }
+    .mc-legend span { display: inline-flex; align-items: center; gap: 8px; }
+    .mc-legend i { display: inline-block; }
+    .lg-work { width: 12px; height: 12px; border-radius: 4px; border: 2px solid var(--mc-hot); box-shadow: 0 0 8px var(--mc-lime); }
+    .lg-pulse { width: 22px; height: 2px; background: linear-gradient(90deg, transparent, var(--mc-hot), transparent); box-shadow: 0 0 6px var(--mc-lime); }
+    .lg-idle { width: 22px; height: 2px; background: rgba(162,220,93,0.25); }
+    .lg-gate { width: 22px; height: 0; border-top: 2px dashed rgba(240,160,102,0.6); }
+    .feed li.start time, .feed li.done time { color: var(--forest); font-weight: 700; }
+    .feed .ev { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 6px; border-radius: 5px; margin-right: 4px; background: var(--soft); color: var(--forest); }
+    .feed .ev.error, .feed .ev.handoff { background: var(--warn-bg); color: var(--warn); }
+    .feed .empty { color: var(--muted); font-size: 13px; padding: 8px 6px; }
+    @media (prefers-reduced-motion: reduce) { .edge-flow { animation: none; } .nd.working .nd-ring { animation: none; } }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -782,19 +851,37 @@
 
       <section class="section">
         <h2>The organization</h2>
-        <p class="sub">Grouped by the business model: grow students, sell data, run safely. The Chief of Staff coordinates all ten and writes the team a daily brief.</p>
-        <div class="org">
-          <div class="chief" id="chief"></div>
-          <div class="wire" aria-hidden="true"></div>
-          <div class="groups" id="groups"></div>
-          <div class="humans">
-            <div class="faces" aria-hidden="true"><span>E</span><span>A</span><span>S</span><span>N</span><span>R</span></div>
-            <div><strong>Team SNARE, 5 people</strong><span id="human-line">Approve the three gates and read the daily brief. About 3 hours a week in total.</span></div>
-            <div class="legend">
-              <span class="pill auto"><i></i>Fully autonomous</span>
-              <span class="pill guard"><i></i>Autonomous, checked by the privacy agent</span>
-              <span class="pill gate"><i></i>Has a human gate</span>
+        <p class="sub">The live network. A glowing ring means an agent is working right now. Bright pulses along a line are real work moving between agents: what an agent reads when it starts, and where its results go when it finishes. Press ▶ on any agent to run it.</p>
+        <div class="mc" id="mc">
+          <div class="mc-bar">
+            <span class="mc-live" id="mc-live"><i></i><b id="mc-state">Connecting</b></span>
+            <span class="mc-sub" id="mc-sub"></span>
+            <button class="mc-btn" id="mc-replay" type="button">Replay the week</button>
+          </div>
+          <div class="mc-scroll">
+            <div class="mc-stage" id="mc-stage">
+              <svg class="mc-svg" id="mc-svg" viewBox="0 0 1000 720" aria-hidden="true">
+                <defs>
+                  <pattern id="mc-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(162,220,93,0.06)" stroke-width="1"/></pattern>
+                  <radialGradient id="mc-glow"><stop offset="0" stop-color="#E9FFC9"/><stop offset="0.35" stop-color="#A2DC5D"/><stop offset="1" stop-color="#A2DC5D" stop-opacity="0"/></radialGradient>
+                  <filter id="mc-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+                </defs>
+                <rect width="1000" height="720" fill="url(#mc-grid)"/>
+                <g id="mc-edges"></g>
+                <g id="mc-packets"></g>
+              </svg>
+              <div class="mc-col" style="left:16%">Grow students</div>
+              <div class="mc-col" style="left:50%">Sell data</div>
+              <div class="mc-col" style="left:84%">Run safely</div>
+              <div id="mc-nodes"></div>
+              <div class="mc-replaying" id="mc-replaying" hidden>Replay · animation only, nothing is running</div>
             </div>
+          </div>
+          <div class="mc-legend">
+            <span><i class="lg-work"></i>Working</span>
+            <span><i class="lg-pulse"></i>Work moving between agents</span>
+            <span><i class="lg-idle"></i>Idle</span>
+            <span><i class="lg-gate"></i>Human gate</span>
           </div>
         </div>
       </section>
@@ -802,7 +889,7 @@
       <section class="section two">
         <div class="panel">
           <h3><span class="dot-live"></span>Live activity</h3>
-          <p class="sub">A simulated day of the organization at work.</p>
+          <p class="sub" id="feed-sub">Real events from the agents, newest first.</p>
           <ul class="feed" id="feed"></ul>
         </div>
         <div class="panel">
@@ -1023,22 +1110,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     ];
     const byId = Object.fromEntries(AGENTS.map(a => [a.id, a]));
 
-    const FEED = [
-      ['8:00', 'chief', 'Daily brief sent: 2 items waiting at the gates.'],
-      ['8:12', 'market', 'Two bakery brands launched half loaves. Lead sent to B2B sales.'],
-      ['8:30', 'support', 'Answered 46 student questions overnight. 1 passed to the team.'],
-      ['9:05', 'privacy', 'Merged a group of 14 students into West London (212). Report passed.'],
-      ['9:20', 'insights', 'Weekly totals ready: bread waste down 6% after the freezer tip.'],
-      ['9:41', 'router', 'Golden Crust bonus matched to 184 students. Brand gets counts only.'],
-      ['10:02', 'content', 'Scheduled 3 posts for this week. Privacy guard passed all 3.'],
-      ['10:30', 'sales', 'Sample report sent to a produce brand. Follow up set for Thursday.'],
-      ['11:15', 'router', 'First delivery to a discount grocer is ready.', 'Waiting at gate 1'],
-      ['12:00', 'growth', 'Sunday reminder test: check ins up from 61% to 74%. Rolling out.'],
-      ['13:10', 'rewards', 'Payouts at $468 of the $500 weekly cap.', 'Gate 2 if it goes over'],
-      ['14:25', 'support', 'Rescanned a blurry receipt and added 25 points.'],
-      ['15:00', 'market', 'Provincial food waste grant opens in January. Added to calendar.'],
-      ['16:40', 'chief', 'Weekly report drafted for Friday.'],
-    ];
+
 
     let scale = 0;
     const money = n => '$' + Math.round(n).toLocaleString('en-CA');
@@ -1065,17 +1137,10 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
     function render() {
       const s = SCALES[scale];
       const ai = AGENTS.reduce((t, a) => t + cost(a), 0);
-      document.getElementById('chief').innerHTML = card(byId.chief);
-      document.getElementById('groups').innerHTML = GROUPS.map(([g, label, color]) => {
-        const list = AGENTS.filter(a => a.group === g);
-        return `<div class="group"><div class="group-head"><i style="background:${color}"></i><b>${label}</b><span>${money(list.reduce((t, a) => t + cost(a), 0))} a month</span></div>
-          <div class="stack">${list.map(card).join('')}</div></div>`;
-      }).join('');
       document.getElementById('k-ai').textContent = money(ai);
       document.getElementById('k-all').textContent = money(ai + s.tools);
       document.getElementById('k-hours').textContent = s.hours + ' hrs';
       document.getElementById('k-hire').textContent = money(s.hires * HIRE_MONTH);
-      document.getElementById('human-line').textContent = `Approve the three gates and read the daily brief. About ${s.hours} hours a week in total.`;
       document.getElementById('cost-sub').textContent = `Launch month, ${s.students.toLocaleString('en-CA')} students. Every cost is shown with the math behind it.`;
       document.getElementById('cost-rows').innerHTML = AGENTS.map(a => `<tr><td>${a.name}</td><td>${PRICE[a.model][2].replace('Claude ', '')}</td><td class="math">${mathText(a)}${scale ? ` · × ${a.f[scale - 1]} at ${s.label.toLowerCase()}` : ''}</td><td class="num">${money(cost(a))}</td></tr>`).join('');
       document.getElementById('cost-foot').innerHTML = `<tr><td colspan="3">AI agents</td><td class="num">${money(ai)}</td></tr><tr><td colspan="3">Tools: CRM, scheduler, Canva, hosting</td><td class="num">${money(s.tools)}</td></tr><tr><td colspan="3">Total</td><td class="num">${money(ai + s.tools)}</td></tr>`;
@@ -1095,7 +1160,7 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       detail.innerHTML = `<div class="sheet">
         <div class="sheet-head">
           <div><span class="eyebrow">${a.group === 'chief' ? 'Coordinator' : GROUPS.find(g => g[0] === a.group)[1]}</span><h2>${a.name}</h2><p>${a.job}</p></div>
-          <button class="close" data-close>Close</button>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:flex-start">${RUNNABLE[a.id] ? `<button class="close" data-mcrun="${a.id}" ${API && live.status && live.status.hasKey ? '' : 'disabled'}>▶ Run now</button>` : ''}<button class="close" data-close style="margin-left:0">Close</button></div>
         </div>
         <div class="sheet-body">
           <div class="panel">
@@ -1130,20 +1195,6 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       if (sc) { scale = Number(sc.dataset.scale); render(); }
     });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !detail.hidden) closeAgent(); });
-
-    // ---------- live feed: shows a full day at rest, then plays new items ----------
-    const feed = document.getElementById('feed');
-    const feedItem = ([t, id, text, act]) => `<li class="${act ? 'gate' : ''}"><time>${t}</time><div><b>${byId[id].name}:</b> ${text}${act ? `<br><span class="act">${act}</span>` : ''}</div></li>`;
-    feed.innerHTML = FEED.slice(0, 7).reverse().map(feedItem).join('');
-    let fi = 7;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reduce) setInterval(() => {
-      const item = FEED[fi % FEED.length]; fi++;
-      feed.insertAdjacentHTML('afterbegin', feedItem(item));
-      while (feed.children.length > 8) feed.lastElementChild.remove();
-      const c = document.querySelector(`.agent[data-agent="${item[1]}"]`);
-      if (c) { const dot = document.createElement('span'); dot.className = 'live'; c.appendChild(dot); setTimeout(() => dot.remove(), 1500); }
-    }, 2800);
 
     // ---------- expand, same idea as the phone view ----------
     const ex = document.getElementById('expand');
@@ -2681,7 +2732,201 @@ Invoices ready: Golden Crust, 62 redemptions, $93.00.` },
       needPass(() => rwPut({ fee: Number(document.getElementById('fee-in').value) }));
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy(), loadSupport(), loadRewardsTab()]));
+
+    // ---------- live network (mission control) ----------
+    // Real status from GET /agents/activity every few seconds: who is working,
+    // and events with "from" (what an agent read) and "to" (where its results
+    // went). New events become pulses travelling along those lines.
+    const POS = {
+      chief: [500, 92], market: [160, 236], growth: [160, 396], content: [160, 556],
+      sales: [500, 286], insights: [500, 436], router: [500, 586],
+      privacy: [840, 236], support: [840, 396], rewards: [840, 556], team: [500, 680],
+    };
+    const EDGES = [
+      ['market', 'chief'], ['growth', 'chief'], ['content', 'chief'], ['sales', 'chief'], ['insights', 'chief'], ['router', 'chief'], ['privacy', 'chief'], ['support', 'chief'], ['rewards', 'chief'],
+      ['market', 'growth'], ['market', 'content'], ['market', 'sales'], ['growth', 'content'], ['insights', 'content'],
+      ['sales', 'insights'], ['insights', 'router'], ['sales', 'router'],
+      ['content', 'privacy'], ['growth', 'privacy'], ['sales', 'privacy'], ['router', 'privacy'], ['router', 'rewards'],
+      ['chief', 'team', 'gate'], ['privacy', 'team', 'gate'], ['router', 'team', 'gate'], ['rewards', 'team', 'gate'], ['support', 'team', 'gate'],
+    ];
+    const READS_UI = {
+      chief: ['market', 'growth', 'content', 'sales', 'insights', 'router', 'privacy', 'support', 'rewards'], market: [], growth: ['market'], content: ['market', 'growth', 'insights'],
+      sales: ['market'], insights: ['sales'], router: ['insights', 'sales'], privacy: ['content', 'growth', 'sales', 'router'], support: [], rewards: ['router'],
+    };
+    const SENDS_UI = {
+      chief: ['team'], market: ['sales', 'content', 'growth', 'chief'], growth: ['content', 'privacy', 'chief'], content: ['privacy', 'chief'], sales: ['insights', 'router', 'privacy', 'chief'],
+      insights: ['sales', 'router', 'content', 'chief'], router: ['privacy', 'rewards', 'chief'], privacy: ['content', 'growth', 'sales', 'router', 'chief'], support: ['chief'], rewards: ['chief'],
+    };
+    const RUNNABLE = { chief: () => runChief(), market: () => runMarketNow(), growth: () => runGrowthNow(), content: () => runContentNow(), sales: () => runSalesNow(), insights: () => runInsightsNow(), router: () => runRouterNow(), privacy: () => runPrivacyNow(), rewards: () => runRewardsNow() };
+    const NAME = id => id === 'team' ? 'Team SNARE' : byId[id].name;
+    const mc = { running: {}, events: [], seen: new Set(), localRun: {}, lastRun: {}, flashT: {}, errors: {}, replay: false, first: true };
+    const edgeKey = (a, b) => [a, b].sort().join('|');
+    const pathEls = {};
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function edgePath(a, b) {
+      const [x1, y1] = POS[a], [x2, y2] = POS[b];
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+      const bend = Math.min(60, len * 0.14) * ((x1 + y1) % 2 ? 1 : -1);
+      return `M${x1} ${y1} Q${mx - dy / len * bend} ${my + dx / len * bend} ${x2} ${y2}`;
+    }
+
+    function buildNetwork() {
+      const g = document.getElementById('mc-edges');
+      g.innerHTML = EDGES.map(([a, b, kind]) => {
+        const d = edgePath(a, b);
+        return `<path class="edge ${kind === 'gate' ? 'gate' : ''}" data-e="${edgeKey(a, b)}" d="${d}"/>${kind === 'gate' ? '' : `<path class="edge-flow" data-f="${edgeKey(a, b)}" data-from="${a}" d="${d}"/>`}`;
+      }).join('');
+      g.querySelectorAll('.edge').forEach(el => { pathEls[el.dataset.e] = el; });
+      document.getElementById('mc-nodes').innerHTML = Object.keys(POS).map(id => {
+        const [x, y] = POS[id];
+        if (id === 'team') return `<div class="nd team" style="left:${x / 10}%;top:${y / 7.2}%"><div class="nd-ring"></div><div class="nd-core"><strong>Team SNARE · 5 people</strong><span class="nd-meta">Gate 1 buyers · Gate 2 payouts · Gate 3 privacy</span></div></div>`;
+        const a = byId[id];
+        return `<div class="nd ${id === 'chief' ? 'chief' : ''}" data-node="${id}" style="left:${x / 10}%;top:${y / 7.2}%">
+          <div class="nd-ring"></div>
+          <button class="nd-core" data-agent="${id}">${a.built ? '<span class="nd-built">BUILT</span>' : ''}<strong>${esc(a.name)}</strong><span class="nd-meta">${PRICE[a.model][2].replace('Claude ', '')} · ${money(cost(a))}/mo</span><span class="nd-state"><i></i><span data-state="${id}">Idle</span></span></button>
+          ${RUNNABLE[id] ? `<button class="nd-run" data-mcrun="${id}" aria-label="Run ${esc(a.name)}" title="Run now">▶</button>` : `<button class="nd-run" data-ltabgo="support" aria-label="Open Student support" title="Answers students instantly; open its tab">?</button>`}
+        </div>`;
+      }).join('');
+    }
+
+    const ago = iso => { const s2 = Math.max(0, (Date.now() - Date.parse(iso)) / 1000); return s2 < 60 ? 'just now' : s2 < 3600 ? Math.round(s2 / 60) + ' min ago' : s2 < 86400 ? Math.round(s2 / 3600) + ' h ago' : Math.round(s2 / 86400) + ' d ago'; };
+    const clock = ms => { const s2 = Math.floor(ms / 1000); return `${Math.floor(s2 / 60)}:${String(s2 % 60).padStart(2, '0')}`; };
+
+    function paintNodes() {
+      const connected = API && live.status && live.status.hasKey;
+      for (const id of Object.keys(POS)) {
+        if (id === 'team') continue;
+        const el = document.querySelector(`.nd[data-node="${id}"]`); if (!el) continue;
+        const since = mc.running[id] || mc.localRun[id];
+        el.classList.toggle('working', !!since);
+        el.classList.toggle('error', !!mc.errors[id] && !since);
+        const st = el.querySelector(`[data-state="${id}"]`);
+        st.textContent = since ? `Working ${clock(Date.now() - Date.parse(since))}` : mc.errors[id] ? 'Last run stopped' : mc.lastRun[id] ? `Idle · ran ${ago(mc.lastRun[id])}` : id === 'support' ? 'Answers on demand' : 'Idle';
+        const run = el.querySelector('[data-mcrun]');
+        if (run) run.disabled = !connected || !!since;
+      }
+      const busy = Object.keys(mc.running).length + Object.keys(mc.localRun).length;
+      const lv = document.getElementById('mc-live');
+      lv.className = 'mc-live' + (busy ? ' busy' : connected ? ' on' : '');
+      document.getElementById('mc-state').textContent = !API ? 'Not connected' : !live.status ? 'Worker unreachable' : busy ? `${busy} agent${busy === 1 ? '' : 's'} working` : 'Live · idle';
+      document.getElementById('mc-sub').textContent = !API ? 'Connect the worker to see agents work.' : busy ? [...new Set([...Object.keys(mc.running), ...Object.keys(mc.localRun)])].map(NAME).join(', ') : `Next scheduled runs at 12:00 and 13:00 UTC`;
+    }
+
+    // A glowing packet with a short tail travelling along a line.
+    function pulse(from, to, delay = 0) {
+      const key = edgeKey(from, to), el = pathEls[key];
+      if (!el || reduceMotion) { hot(key, from, 1200); return; }
+      const total = el.getTotalLength(), forward = el.getAttribute('d').startsWith(`M${POS[from][0]} ${POS[from][1]}`);
+      const g = document.getElementById('mc-packets');
+      setTimeout(() => {
+        hot(key, from, 1500);
+        const dots = [13, 6, 4.5, 3.5, 2.5].map((r, i) => { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('r', r); c.setAttribute('fill', i ? '#A2DC5D' : 'url(#mc-glow)'); c.setAttribute('opacity', i ? 0.95 - i * 0.18 : 0.9); if (!i) c.setAttribute('filter', 'url(#mc-blur)'); g.appendChild(c); return c; });
+        const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); core.setAttribute('r', 3.4); core.setAttribute('fill', '#F4FFE6'); g.appendChild(core);
+        const dur = 1100 + total * 0.9, t0 = performance.now();
+        (function step(now) {
+          const k = Math.min(1, (now - t0) / dur);
+          dots.concat(core).forEach((c, i) => {
+            const kk = Math.max(0, k - (c === core ? 0 : i * 0.035));
+            const e = kk < 0.5 ? 2 * kk * kk : 1 - Math.pow(-2 * kk + 2, 2) / 2;
+            const pt = el.getPointAtLength((forward ? e : 1 - e) * total);
+            c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y);
+          });
+          if (k < 1) requestAnimationFrame(step); else { dots.concat(core).forEach(c => c.remove()); flash(to); }
+        })(t0);
+      }, delay);
+    }
+    function hot(key, from, ms) {
+      const e = pathEls[key], f = document.querySelector(`[data-f="${key}"]`);
+      if (e) e.classList.add('hot');
+      if (f) { f.classList.add('hot'); f.classList.toggle('rev', f.dataset.from !== from); }
+      clearTimeout(mc.flashT[key]);
+      mc.flashT[key] = setTimeout(() => { if (e) e.classList.remove('hot'); if (f) f.classList.remove('hot', 'rev'); }, ms);
+    }
+    function flash(id) {
+      const el = document.querySelector(id === 'team' ? '.nd.team' : `.nd[data-node="${id}"]`);
+      if (!el) return;
+      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    }
+    function animateEvent(ev) {
+      (ev.from || []).forEach((f, i) => pulse(f, ev.agent, i * 140));
+      const outDelay = (ev.from || []).length ? 1400 : 0;
+      (ev.to || []).forEach((t, i) => pulse(ev.agent, t, outDelay + i * 160));
+      if (!(ev.from || []).length && !(ev.to || []).length) flash(ev.agent);
+    }
+
+    // Real feed: the same events, as text.
+    const EVLABEL = { start: 'started', done: 'finished', error: 'stopped', review: 'checked', deliver: 'delivered', chat: 'answered', handoff: 'to team' };
+    function renderFeed() {
+      const feed = document.getElementById('feed');
+      const evs = mc.events.slice(-12).reverse();
+      document.getElementById('feed-sub').textContent = API ? 'Real events from the agents, newest first.' : 'Real events appear here once the worker is connected.';
+      feed.innerHTML = evs.length ? evs.map(e => `<li class="${e.type}"><time>${new Date(e.t).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}</time><div><span class="ev ${e.type}">${esc(EVLABEL[e.type] || e.type)}</span><b>${esc(NAME(e.agent))}:</b> ${esc(e.text || '')}${(e.to || []).length ? `<br><span class="note" style="margin:0">To ${esc(e.to.map(NAME).join(', '))}</span>` : ''}</div></li>`).join('')
+        : '<li class="empty">Nothing yet. Press ▶ on an agent, or wait for the next scheduled run.</li>';
+    }
+
+    async function pollActivity() {
+      if (!API || document.hidden) return;
+      let d;
+      try { d = await (await fetch(API + '/agents/activity')).json(); } catch (e) { return; }
+      mc.running = d.running || {};
+      for (const ev of d.events || []) {
+        const key = ev.t + ev.agent + ev.type;
+        if (mc.seen.has(key)) continue;
+        mc.seen.add(key);
+        if (ev.type === 'done') { mc.lastRun[ev.agent] = ev.t; delete mc.errors[ev.agent]; }
+        if (ev.type === 'error') mc.errors[ev.agent] = ev.t;
+        if (!mc.first && !mc.replay) animateEvent(ev);
+      }
+      mc.events = d.events || [];
+      mc.first = false;
+      paintNodes(); renderFeed();
+    }
+
+    async function runFromMap(id) {
+      if (!RUNNABLE[id] || mc.localRun[id]) return;
+      mc.localRun[id] = new Date().toISOString();
+      paintNodes();
+      setTimeout(pollActivity, 1500);
+      try { await RUNNABLE[id](); } finally { delete mc.localRun[id]; }
+      await pollActivity();
+      paintNodes();
+    }
+
+    // Replay: the weekly order, animation only.
+    async function replayWeek() {
+      if (mc.replay) return;
+      mc.replay = true;
+      const btn = document.getElementById('mc-replay'); btn.disabled = true;
+      document.getElementById('mc-replaying').hidden = false;
+      const order = ['market', 'growth', 'content', 'sales', 'insights', 'router', 'privacy', 'rewards', 'chief'];
+      const wait = ms => new Promise(r => setTimeout(r, ms));
+      for (const id of order) {
+        mc.localRun[id] = new Date().toISOString(); paintNodes();
+        animateEvent({ agent: id, from: READS_UI[id], to: [] });
+        await wait(id === 'chief' ? 2600 : 2000);
+        delete mc.localRun[id]; paintNodes();
+        animateEvent({ agent: id, from: [], to: SENDS_UI[id] });
+        await wait(1500);
+      }
+      document.getElementById('mc-replaying').hidden = true;
+      btn.disabled = false; mc.replay = false;
+    }
+
+    buildNetwork(); paintNodes(); renderFeed();
+    setInterval(() => { if (Object.keys(mc.running).length || Object.keys(mc.localRun).length) paintNodes(); }, 1000);
+    setInterval(pollActivity, 5000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollActivity(); });
+    document.addEventListener('click', e => {
+      const r = e.target.closest('[data-mcrun]');
+      if (r) { e.stopPropagation(); if (!detail.hidden) closeAgent(); needPass(() => runFromMap(r.dataset.mcrun)); }
+      if (e.target.closest('#mc-replay')) replayWeek();
+      const go = e.target.closest('[data-ltabgo]');
+      if (go) { showTab(go.dataset.ltabgo); document.getElementById('brief-section').scrollIntoView({ behavior: 'smooth' }); }
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent(), loadSales(), loadInsights(), loadRouter(), loadPrivacy(), loadSupport(), loadRewardsTab()])).then(() => { paintNodes(); pollActivity(); });
     render();
   })();
   </script>
