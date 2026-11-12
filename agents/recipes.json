@@ -1,0 +1,848 @@
+{
+ "recipes": [
+  {
+   "id": "omelette",
+   "name": "Spinach and Cheddar Omelette",
+   "minutes": 10,
+   "serves": 1,
+   "meal": "breakfast",
+   "ingredients": [
+    {
+     "name": "Eggs",
+     "amount": "3",
+     "optional": false
+    },
+    {
+     "name": "Fresh spinach",
+     "amount": "1 handful",
+     "optional": false
+    },
+    {
+     "name": "Cheddar cheese",
+     "amount": "1/4 cup",
+     "optional": false
+    },
+    {
+     "name": "Whole wheat bread",
+     "amount": "2 slices",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Whisk the eggs with a pinch of salt.",
+    "Wilt the spinach in an oiled pan for 1 minute.",
+    "Pour in the eggs and cook until almost set.",
+    "Add the cheddar, fold in half and serve with toast."
+   ],
+   "usesUp": [
+    "Fresh spinach"
+   ]
+  },
+  {
+   "id": "friedrice",
+   "name": "Leftover Egg Fried Rice",
+   "minutes": 15,
+   "serves": 2,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Leftover rice",
+     "amount": "2 cups",
+     "optional": false
+    },
+    {
+     "name": "Eggs",
+     "amount": "2",
+     "optional": false
+    },
+    {
+     "name": "Frozen mixed vegetables",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Green onions",
+     "amount": "2 stalks",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Heat oil in a big pan until very hot.",
+    "Fry the vegetables for 3 minutes.",
+    "Add the cold rice and fry until it crackles.",
+    "Push it aside, scramble the eggs, then mix everything with soy sauce."
+   ],
+   "usesUp": [
+    "Leftover rice"
+   ]
+  },
+  {
+   "id": "quesadilla",
+   "name": "Black Bean Quesadillas",
+   "minutes": 15,
+   "serves": 2,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Flour tortillas",
+     "amount": "4",
+     "optional": false
+    },
+    {
+     "name": "Black beans",
+     "amount": "1 can",
+     "optional": false
+    },
+    {
+     "name": "Cheddar cheese",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Bell pepper",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Salsa",
+     "amount": "to serve",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Drain and lightly mash the beans.",
+    "Slice the pepper thinly.",
+    "Fill half of each tortilla with beans, pepper and cheese, then fold.",
+    "Toast in a dry pan for 2 to 3 minutes a side."
+   ],
+   "usesUp": [
+    "Bell pepper"
+   ]
+  },
+  {
+   "id": "burritobowl",
+   "name": "Chicken Burrito Bowl",
+   "minutes": 25,
+   "serves": 3,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Chicken thighs",
+     "amount": "500 g",
+     "optional": false
+    },
+    {
+     "name": "White rice",
+     "amount": "1.5 cups",
+     "optional": false
+    },
+    {
+     "name": "Black beans",
+     "amount": "1 can",
+     "optional": false
+    },
+    {
+     "name": "Salsa",
+     "amount": "1/2 cup",
+     "optional": false
+    },
+    {
+     "name": "Romaine lettuce",
+     "amount": "2 cups",
+     "optional": false
+    },
+    {
+     "name": "Cheddar cheese",
+     "amount": "a handful",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Cook the rice.",
+    "Season the chicken with salt, pepper and chili powder, then pan fry 6 minutes a side.",
+    "Warm the beans.",
+    "Slice the chicken and build bowls with rice, beans, lettuce and salsa."
+   ],
+   "usesUp": [
+    "Chicken thighs",
+    "Romaine lettuce"
+   ]
+  },
+  {
+   "id": "stirfry",
+   "name": "Chicken and Veggie Stir Fry",
+   "minutes": 25,
+   "serves": 3,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Chicken thighs",
+     "amount": "500 g",
+     "optional": false
+    },
+    {
+     "name": "Broccoli",
+     "amount": "1 head",
+     "optional": false
+    },
+    {
+     "name": "Carrots",
+     "amount": "2",
+     "optional": false
+    },
+    {
+     "name": "Garlic",
+     "amount": "2 cloves",
+     "optional": false
+    },
+    {
+     "name": "White rice",
+     "amount": "1.5 cups",
+     "optional": false
+    }
+   ],
+   "steps": [
+    "Cook the rice.",
+    "Slice the chicken and vegetables into bite size pieces.",
+    "Stir fry the chicken until golden, then add the vegetables and garlic.",
+    "Finish with soy sauce and a splash of water. Serve over rice."
+   ],
+   "usesUp": [
+    "Chicken thighs",
+    "Broccoli"
+   ]
+  },
+  {
+   "id": "tomatopasta",
+   "name": "One Pot Tomato Spinach Pasta",
+   "minutes": 20,
+   "serves": 3,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Spaghetti",
+     "amount": "300 g",
+     "optional": false
+    },
+    {
+     "name": "Pasta sauce",
+     "amount": "1 jar",
+     "optional": false
+    },
+    {
+     "name": "Fresh spinach",
+     "amount": "2 handfuls",
+     "optional": false
+    },
+    {
+     "name": "Onions",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Garlic",
+     "amount": "2 cloves",
+     "optional": false
+    },
+    {
+     "name": "Cheddar cheese",
+     "amount": "to top",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Soften the chopped onion and garlic in a large pot.",
+    "Add the sauce, pasta and 3 cups of water.",
+    "Simmer for 12 minutes, stirring often.",
+    "Stir in the spinach until wilted."
+   ],
+   "usesUp": [
+    "Fresh spinach"
+   ]
+  },
+  {
+   "id": "shakshuka",
+   "name": "Shakshuka",
+   "minutes": 25,
+   "serves": 2,
+   "meal": "breakfast",
+   "ingredients": [
+    {
+     "name": "Eggs",
+     "amount": "4",
+     "optional": false
+    },
+    {
+     "name": "Tomatoes",
+     "amount": "4",
+     "optional": false
+    },
+    {
+     "name": "Onions",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Bell pepper",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Garlic",
+     "amount": "2 cloves",
+     "optional": false
+    },
+    {
+     "name": "Whole wheat bread",
+     "amount": "to dip",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Soften the onion, pepper and garlic.",
+    "Add chopped tomatoes, cumin and paprika and simmer 10 minutes.",
+    "Make 4 wells and crack in the eggs.",
+    "Cover and cook until the whites set."
+   ],
+   "usesUp": [
+    "Tomatoes",
+    "Bell pepper"
+   ]
+  },
+  {
+   "id": "lentilcurry",
+   "name": "Red Lentil Curry",
+   "minutes": 35,
+   "serves": 4,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Red lentils",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Onions",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Garlic",
+     "amount": "3 cloves",
+     "optional": false
+    },
+    {
+     "name": "Tomatoes",
+     "amount": "2",
+     "optional": false
+    },
+    {
+     "name": "Fresh spinach",
+     "amount": "2 handfuls",
+     "optional": false
+    },
+    {
+     "name": "White rice",
+     "amount": "to serve",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Soften the onion and garlic with curry powder.",
+    "Add the lentils, tomatoes and 3 cups of water.",
+    "Simmer for 20 minutes until thick.",
+    "Stir in the spinach and serve with rice."
+   ],
+   "usesUp": [
+    "Tomatoes",
+    "Fresh spinach"
+   ]
+  },
+  {
+   "id": "tacos",
+   "name": "Beef Tacos",
+   "minutes": 20,
+   "serves": 3,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Ground beef",
+     "amount": "450 g",
+     "optional": false
+    },
+    {
+     "name": "Flour tortillas",
+     "amount": "6",
+     "optional": false
+    },
+    {
+     "name": "Romaine lettuce",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Tomatoes",
+     "amount": "2",
+     "optional": false
+    },
+    {
+     "name": "Cheddar cheese",
+     "amount": "1/2 cup",
+     "optional": false
+    },
+    {
+     "name": "Salsa",
+     "amount": "to serve",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Brown the beef with chili powder, cumin and salt.",
+    "Chop the lettuce and tomatoes.",
+    "Warm the tortillas in a dry pan.",
+    "Fill and top with cheese and salsa."
+   ],
+   "usesUp": [
+    "Ground beef",
+    "Romaine lettuce",
+    "Tomatoes"
+   ]
+  },
+  {
+   "id": "tofubowl",
+   "name": "Crispy Tofu Rice Bowl",
+   "minutes": 25,
+   "serves": 2,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Firm tofu",
+     "amount": "1 block",
+     "optional": false
+    },
+    {
+     "name": "White rice",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Broccoli",
+     "amount": "1 head",
+     "optional": false
+    },
+    {
+     "name": "Carrots",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Green onions",
+     "amount": "2 stalks",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Press and cube the tofu, then toss with cornstarch.",
+    "Pan fry until crispy on all sides.",
+    "Steam or stir fry the vegetables.",
+    "Serve over rice with soy sauce."
+   ],
+   "usesUp": [
+    "Broccoli"
+   ]
+  },
+  {
+   "id": "pancakes",
+   "name": "Banana Oat Pancakes",
+   "minutes": 15,
+   "serves": 2,
+   "meal": "breakfast",
+   "ingredients": [
+    {
+     "name": "Bananas",
+     "amount": "2 ripe",
+     "optional": false
+    },
+    {
+     "name": "Eggs",
+     "amount": "2",
+     "optional": false
+    },
+    {
+     "name": "Large flake oats",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Milk 2%",
+     "amount": "1/2 cup",
+     "optional": false
+    }
+   ],
+   "steps": [
+    "Blend or mash everything into a batter.",
+    "Rest for 5 minutes.",
+    "Cook small pancakes in a buttered pan, 2 minutes a side."
+   ],
+   "usesUp": [
+    "Bananas"
+   ]
+  },
+  {
+   "id": "potatoes",
+   "name": "Loaded Microwave Potatoes",
+   "minutes": 20,
+   "serves": 2,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Potatoes",
+     "amount": "2 large",
+     "optional": false
+    },
+    {
+     "name": "Cheddar cheese",
+     "amount": "1/2 cup",
+     "optional": false
+    },
+    {
+     "name": "Broccoli",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Plain yogurt",
+     "amount": "1/4 cup",
+     "optional": false
+    },
+    {
+     "name": "Green onions",
+     "amount": "1 stalk",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Prick the potatoes and microwave 8 to 10 minutes until soft.",
+    "Steam the broccoli.",
+    "Split the potatoes, fluff and add cheese.",
+    "Top with broccoli, yogurt and green onion."
+   ],
+   "usesUp": [
+    "Broccoli"
+   ]
+  },
+  {
+   "id": "tunapasta",
+   "name": "Tuna Pasta Salad",
+   "minutes": 15,
+   "serves": 3,
+   "meal": "lunch",
+   "ingredients": [
+    {
+     "name": "Spaghetti",
+     "amount": "250 g",
+     "optional": false
+    },
+    {
+     "name": "Canned tuna",
+     "amount": "1 can",
+     "optional": false
+    },
+    {
+     "name": "Cucumber",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Plain yogurt",
+     "amount": "1/3 cup",
+     "optional": false
+    },
+    {
+     "name": "Green onions",
+     "amount": "2 stalks",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Cook and cool the pasta.",
+    "Dice the cucumber.",
+    "Mix the tuna, yogurt, salt and pepper.",
+    "Toss everything together and chill."
+   ],
+   "usesUp": [
+    "Cucumber"
+   ]
+  },
+  {
+   "id": "mushroompasta",
+   "name": "Creamy Mushroom Spinach Pasta",
+   "minutes": 20,
+   "serves": 3,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Spaghetti",
+     "amount": "300 g",
+     "optional": false
+    },
+    {
+     "name": "Mushrooms",
+     "amount": "1 pack",
+     "optional": false
+    },
+    {
+     "name": "Fresh spinach",
+     "amount": "2 handfuls",
+     "optional": false
+    },
+    {
+     "name": "Garlic",
+     "amount": "2 cloves",
+     "optional": false
+    },
+    {
+     "name": "Milk 2%",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Cheddar cheese",
+     "amount": "1/2 cup",
+     "optional": false
+    }
+   ],
+   "steps": [
+    "Cook the pasta.",
+    "Brown the sliced mushrooms with garlic.",
+    "Add milk and cheese and simmer until creamy.",
+    "Stir in the spinach and pasta."
+   ],
+   "usesUp": [
+    "Mushrooms",
+    "Fresh spinach"
+   ]
+  },
+  {
+   "id": "parfait",
+   "name": "Yogurt Fruit Parfait",
+   "minutes": 5,
+   "serves": 1,
+   "meal": "breakfast",
+   "ingredients": [
+    {
+     "name": "Plain yogurt",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Bananas",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Apples",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Large flake oats",
+     "amount": "1/4 cup",
+     "optional": false
+    }
+   ],
+   "steps": [
+    "Chop the fruit.",
+    "Layer yogurt, fruit and oats in a glass or container."
+   ],
+   "usesUp": [
+    "Bananas"
+   ]
+  },
+  {
+   "id": "frenchtoast",
+   "name": "French Toast",
+   "minutes": 15,
+   "serves": 2,
+   "meal": "breakfast",
+   "ingredients": [
+    {
+     "name": "Whole wheat bread",
+     "amount": "4 slices",
+     "optional": false
+    },
+    {
+     "name": "Eggs",
+     "amount": "2",
+     "optional": false
+    },
+    {
+     "name": "Milk 2%",
+     "amount": "1/2 cup",
+     "optional": false
+    },
+    {
+     "name": "Bananas",
+     "amount": "to top",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Whisk the eggs, milk and a pinch of cinnamon.",
+    "Soak each slice for a few seconds.",
+    "Cook in a buttered pan until golden on both sides."
+   ],
+   "usesUp": [
+    "Whole wheat bread"
+   ]
+  },
+  {
+   "id": "beefchili",
+   "name": "Beef and Bean Chili",
+   "minutes": 35,
+   "serves": 4,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Ground beef",
+     "amount": "450 g",
+     "optional": false
+    },
+    {
+     "name": "Tomatoes",
+     "amount": "4",
+     "optional": false
+    },
+    {
+     "name": "Black beans",
+     "amount": "1 can",
+     "optional": false
+    },
+    {
+     "name": "Onions",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Garlic",
+     "amount": "2 cloves",
+     "optional": false
+    },
+    {
+     "name": "Bell pepper",
+     "amount": "1",
+     "optional": true
+    },
+    {
+     "name": "Cheddar cheese",
+     "amount": "to top",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Brown the beef in a large pot, then add the chopped onion and garlic.",
+    "Stir in chili powder, cumin and salt.",
+    "Add the chopped tomatoes and drained beans with a splash of water.",
+    "Simmer for 20 minutes. Freezes well for later in the week."
+   ],
+   "usesUp": [
+    "Ground beef",
+    "Tomatoes"
+   ]
+  },
+  {
+   "id": "chili",
+   "name": "Black Bean Veggie Chili",
+   "minutes": 35,
+   "serves": 4,
+   "meal": "dinner",
+   "ingredients": [
+    {
+     "name": "Black beans",
+     "amount": "2 cans",
+     "optional": false
+    },
+    {
+     "name": "Tomatoes",
+     "amount": "3",
+     "optional": false
+    },
+    {
+     "name": "Onions",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Bell pepper",
+     "amount": "1",
+     "optional": false
+    },
+    {
+     "name": "Carrots",
+     "amount": "2",
+     "optional": false
+    },
+    {
+     "name": "White rice",
+     "amount": "to serve",
+     "optional": true
+    }
+   ],
+   "steps": [
+    "Soften the onion, pepper and carrots with chili powder.",
+    "Add the beans and chopped tomatoes.",
+    "Simmer for 20 minutes.",
+    "Serve on rice or with bread."
+   ],
+   "usesUp": [
+    "Tomatoes",
+    "Bell pepper"
+   ]
+  },
+  {
+   "id": "wraps",
+   "name": "Chicken Veggie Wraps",
+   "minutes": 15,
+   "serves": 2,
+   "meal": "lunch",
+   "ingredients": [
+    {
+     "name": "Chicken thighs",
+     "amount": "300 g",
+     "optional": false
+    },
+    {
+     "name": "Flour tortillas",
+     "amount": "4",
+     "optional": false
+    },
+    {
+     "name": "Romaine lettuce",
+     "amount": "1 cup",
+     "optional": false
+    },
+    {
+     "name": "Cucumber",
+     "amount": "1/2",
+     "optional": false
+    },
+    {
+     "name": "Plain yogurt",
+     "amount": "1/4 cup",
+     "optional": false
+    }
+   ],
+   "steps": [
+    "Pan fry the seasoned chicken and slice it.",
+    "Mix the yogurt with garlic, salt and lemon for a sauce.",
+    "Fill the tortillas with chicken, lettuce and cucumber.",
+    "Add sauce, roll up and toast if you like."
+   ],
+   "usesUp": [
+    "Chicken thighs",
+    "Romaine lettuce",
+    "Cucumber"
+   ]
+  }
+ ]
+}

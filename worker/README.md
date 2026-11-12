@@ -59,11 +59,18 @@ The same worker runs the launch agents shown on `org.html`.
   group (with its own `join.html?src=` link), and reads the real waitlist. New groups go into
   the outreach pipeline on the org page; the team sends the messages and updates the status.
   Sonnet 5.5, about 55 to 70 cents a run.
+- **Content creation** (built): every Wednesday at 12:00 UTC it researches real, cited food
+  waste facts, reads ideas from Market intelligence and events from Student acquisition, and
+  writes 6 pieces (Instagram, LinkedIn, campus posters and club blurbs) using the app's real
+  recipes from `agents/recipes.json` (run `node tools/export-recipes.mjs` after changing
+  recipes). Any piece citing a link search didn't return is dropped. The org page draws a
+  branded PNG for each piece (posters get a waitlist QR code); the team posts them.
+  Sonnet 5.5, about 50 to 65 cents a run.
 - **Waitlist**: `join.html` posts to `POST /agents/waitlist/join` (public, rate limited, same
   site only). Each email is one KV key with campus, source and date in its metadata. Students
   can remove their email on the same page. The org page only shows counts.
 - Routes: `GET /agents/status`, `GET /agents/tasks`, `PUT /agents/tasks`, `GET /agents/chief`,
-  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`. Changing tasks or running an agent needs the `X-Team-Key` header
+  `POST /agents/chief/run`, `GET /agents/market`, `POST /agents/market/run`, `GET /agents/watchlist`, `PUT /agents/watchlist`, `GET /agents/growth`, `POST /agents/growth/run`, `GET /agents/groups`, `PUT /agents/groups`, `GET /agents/waitlist`, `POST /agents/waitlist/join`, `GET /agents/content`, `POST /agents/content/run`, `GET /agents/poststatus`, `PUT /agents/poststatus`. Changing tasks or running an agent needs the `X-Team-Key` header
   (the team passcode).
 
 ## Settings (wrangler.toml)

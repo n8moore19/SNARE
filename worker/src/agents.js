@@ -520,6 +520,128 @@ export async function runGrowth(env) {
   });
 }
 
+// ---------- agent 4: Content creation ----------
+// Six pieces a week: Instagram, LinkedIn and campus posters or blurbs. Built
+// from real cited food waste facts, other agents' work and the app's real
+// recipes. Every number must cite a link that search returned; pieces with a
+// bad citation are dropped. The team posts them; the page draws the images.
+
+const SITE_URL = "https://n8moore19.github.io/SNARE";
+const POST_STATUSES = ["draft", "ready", "posted", "skip"];
+
+const CONTENT_SCHEMA = {
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    pieces: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          format: { type: "string", enum: ["instagram", "instagram carousel", "linkedin", "poster", "blurb"] },
+          title: { type: "string" },
+          basedOn: { type: "string", enum: ["fact", "market", "event", "recipe"] },
+          recipeId: { type: "string" },
+          slides: {
+            type: "array",
+            items: { type: "object", properties: { heading: { type: "string" }, body: { type: "string" } }, required: ["heading", "body"], additionalProperties: false },
+          },
+          caption: { type: "string" },
+          hashtags: { type: "array", items: { type: "string" } },
+          facts: {
+            type: "array",
+            items: { type: "object", properties: { claim: { type: "string" }, url: { type: "string" }, source: { type: "string" } }, required: ["claim", "url", "source"], additionalProperties: false },
+          },
+          altText: { type: "string" },
+          postWhen: { type: "string" },
+        },
+        required: ["format", "title", "basedOn", "recipeId", "slides", "caption", "hashtags", "facts", "altText", "postWhen"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["headline", "pieces"],
+  additionalProperties: false,
+};
+
+const CONTENT_RESEARCH_SYSTEM = `You research facts for SNARE's social posts. SNARE is a free digital fridge app for students in London, Ontario that helps them waste less food and earn grocery money; students who opt in feed an anonymous household food waste panel.
+Use web search to find real, recent, well sourced numbers about household food waste and food costs: Canada first (Environment and Climate Change Canada, Second Harvest, National Zero Waste Council, Statistics Canada), then Ontario, students and young adults, and global numbers from the UN Environment Programme. For each fact record the exact number, what it measures, the year, and the page it came from. Skip anything you cannot source.`;
+
+const CONTENT_FORMAT_SYSTEM = `You are SNARE's Content creation agent. Write exactly 6 pieces for this week from the inputs.
+Mix: 2 to 3 Instagram (single "instagram" or "instagram carousel"), 1 to 2 "linkedin", and 1 to 2 campus pieces ("poster" for residence boards, "blurb" for club newsletters or the students' union).
+Sources:
+- Facts: use only facts from the research notes. Every number in a piece must appear in its facts list with a URL copied exactly from the allowed sources. If a piece uses no numbers, facts is [].
+- Market ideas and campus events from the other agents, when given.
+- Recipes: use only recipes from the recipe list, by its exact id in recipeId (otherwise ""). Never state a price for a recipe.
+Never use app metrics or user numbers; SNARE has no real users yet. Never claim SNARE has launched: it is pre launch with a waitlist and a pilot.
+Writing:
+- slides: the text on the image. Single images and posters 1 slide; carousels 3 to 5. heading under 8 words, body under 30 words. A blurb has 1 slide with the headline and the full blurb as body.
+- caption: Instagram under 120 words; LinkedIn 80 to 180 words, aimed at food brands, grocers, cities and the Ivey community; blurb and poster captions are a short note to the club or residence on how to share it.
+- Instagram and poster CTA: join the waitlist at {{JOIN_LINK}}. LinkedIn CTA: follow along or get in touch.
+- hashtags: 0 to 6, none for blurbs. altText describes the image.
+- postWhen: a suggested day this week, like "Thursday".
+- Warm, plain, student voice. No em dashes or hyphens used as dashes. No emoji in slides.
+headline: one sentence on this week's theme.`;
+
+async function getRecipes() {
+  try {
+    const r = await fetch(`${SITE_URL}/agents/recipes.json`);
+    return r.ok ? (await r.json()).recipes : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function runContent(env) {
+  if (!env.ANTHROPIC_API_KEY) throw new Error("NO_KEY");
+  const model = env.CONTENT_MODEL || "claude-sonnet-5-5";
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  const [recipes, market, growth] = await Promise.all([
+    getRecipes(),
+    env.AGENTS ? env.AGENTS.get("latest:market", "json") : null,
+    env.AGENTS ? env.AGENTS.get("latest:growth", "json") : null,
+  ]);
+  const ideas = market ? market.output.items.filter((i) => i.sendTo === "content").map((i) => ({ title: i.title, summary: i.summary, url: i.url })) : [];
+  const events = growth ? growth.output.events : [];
+
+  const r = await research(client, {
+    model, system: CONTENT_RESEARCH_SYSTEM, maxUses: 8,
+    prompt: `Today is ${today()}. Find 6 to 10 strong, current facts for posts this week.`,
+  });
+  // Market ideas carry their own real links; allow those too.
+  for (const i of ideas) if (i.url) r.sources.set(i.url, { url: i.url, title: i.title, age: "" });
+
+  const f = await structure(client, {
+    model, system: CONTENT_FORMAT_SYSTEM, schema: CONTENT_SCHEMA,
+    content: `Today is ${today()}.\n\nResearch notes:\n${r.notes.join("\n\n")}\n\nAllowed sources (JSON):\n${JSON.stringify([...r.sources.values()])}\n\nIdeas from Market intelligence (JSON): ${JSON.stringify(ideas)}\nCampus events from Student acquisition (JSON): ${JSON.stringify(events)}\n\nRecipes (JSON): ${JSON.stringify(recipes.map(({ id, name, minutes, serves, meal, usesUp }) => ({ id, name, minutes, serves, meal, usesUp })))}`,
+  });
+
+  // Drop any piece with a citation search didn't return or a recipe that doesn't exist.
+  const ids = new Set(recipes.map((x) => x.id));
+  const before = f.output.pieces.length;
+  const weekKey = new Date().toISOString().slice(0, 10);
+  const pieces = f.output.pieces
+    .filter((p) => p.facts.every((x) => r.sources.has(x.url)) && (!p.recipeId || ids.has(p.recipeId)))
+    .map((p, n) => {
+      const link = `${env.JOIN_URL || JOIN_URL}?src=${p.format === "poster" ? "poster" : p.format === "blurb" ? "club-blurb" : p.format.split(" ")[0]}`;
+      const fill = (t) => t.split("{{JOIN_LINK}}").join(link);
+      const recipe = p.recipeId ? recipes.find((x) => x.id === p.recipeId) : null;
+      return { ...p, id: `${weekKey}-${n + 1}`, link, caption: fill(p.caption), slides: p.slides.map((x) => ({ heading: fill(x.heading), body: fill(x.body) })), recipe: recipe ? { name: recipe.name, minutes: recipe.minutes, serves: recipe.serves } : null };
+    });
+
+  return save(env, "content", {
+    agent: "content",
+    generatedAt: new Date().toISOString(),
+    output: { headline: f.output.headline, pieces },
+    sources: { searches: r.searches, links: r.sources.size, dropped: before - pieces.length, recipes: recipes.length, ideas: ideas.length, events: events.length },
+    usage: { input: r.inTok + f.inTok, output: r.outTok + f.outTok },
+  });
+}
+
+async function getPostStatus(env) {
+  return (env.AGENTS ? await env.AGENTS.get("postStatus", "json") : null) || {};
+}
+
 // ---------- routes ----------
 
 function teamOk(request, env) {
@@ -550,12 +672,13 @@ export async function handleAgents(request, env, cors) {
   if (request.method === "GET" && path === "/agents/watchlist") return json({ watchlist: await getWatchlist(env) }, 200, cors);
   if (request.method === "GET" && path === "/agents/groups") return json({ groups: await getGroups(env) }, 200, cors);
   if (request.method === "GET" && path === "/agents/waitlist") return json({ summary: await waitlistSummary(env) }, 200, cors);
+  if (request.method === "GET" && path === "/agents/poststatus") return json({ status: await getPostStatus(env) }, 200, cors);
   // Public: the join page posts here. Same site check as everything else.
   if (request.method === "POST" && path === "/agents/waitlist/join") {
     if (tooManyRuns("join:" + (request.headers.get("CF-Connecting-IP") || "unknown"), 10)) return json({ error: "Too many tries, wait a bit" }, 429, cors);
     return joinWaitlist(request, env, cors);
   }
-  const latestMatch = path.match(/^\/agents\/(chief|market|growth)$/);
+  const latestMatch = path.match(/^\/agents\/(chief|market|growth|content)$/);
   if (request.method === "GET" && latestMatch) {
     const latest = env.AGENTS ? await env.AGENTS.get(`latest:${latestMatch[1]}`, "json") : null;
     return json({ latest }, 200, cors);
@@ -594,8 +717,21 @@ export async function handleAgents(request, env, cors) {
     return json({ groups }, 200, cors);
   }
 
-  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth };
-  const runMatch = path.match(/^\/agents\/(chief|market|growth)\/run$/);
+  if (request.method === "PUT" && path === "/agents/poststatus") {
+    if (!env.AGENTS) return json({ error: "Storage is not set up on the worker" }, 500, cors);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400, cors); }
+    if (typeof body.id !== "string" || body.id.length > 40 || !POST_STATUSES.includes(body.status)) return json({ error: "Invalid status" }, 400, cors);
+    const status = await getPostStatus(env);
+    status[body.id] = body.status;
+    const keys = Object.keys(status);
+    if (keys.length > 500) keys.slice(0, keys.length - 500).forEach((k) => delete status[k]);
+    await env.AGENTS.put("postStatus", JSON.stringify(status));
+    return json({ status }, 200, cors);
+  }
+
+  const RUNNERS = { chief: runChief, market: runMarket, growth: runGrowth, content: runContent };
+  const runMatch = path.match(/^\/agents\/(chief|market|growth|content)\/run$/);
   if (request.method === "POST" && runMatch) {
     if (tooManyRuns(request.headers.get("CF-Connecting-IP") || "unknown")) return json({ error: "Too many runs this hour" }, 429, cors);
     try {

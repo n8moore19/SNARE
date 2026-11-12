@@ -14,6 +14,7 @@ MODEL = "claude-opus-5-5"
 AGENT_MODEL = "claude-opus-5-5"      # Chief of Staff
 MARKET_MODEL = "claude-sonnet-5-5"   # Market intelligence (web search heavy, so the cheaper model)
 GROWTH_MODEL = "claude-sonnet-5-5"   # Student acquisition
+CONTENT_MODEL = "claude-sonnet-5-5"  # Content creation
 
 # Storage for the agents: team tasks and each agent's latest output.
 # Create it once with: npx wrangler kv namespace create AGENTS
@@ -23,9 +24,10 @@ binding = "AGENTS"
 id = "PASTE_KV_ID_HERE"
 
 # 13:00 UTC daily: the Chief of Staff's brief (8:00 in Toronto in winter, 9:00 in summer).
-# 12:00 UTC Mondays: Market intelligence. 12:00 UTC Tuesdays: Student acquisition.
+# 12:00 UTC: Mondays Market intelligence, Tuesdays Student acquisition,
+# Wednesdays Content creation.
 [triggers]
-crons = ["0 13 * * *", "0 12 * * 1", "0 12 * * 2"]
+crons = ["0 13 * * *", "0 12 * * 1", "0 12 * * 2", "0 12 * * 3"]
 
 # Secrets (never in this file):
 #   npx wrangler secret put ANTHROPIC_API_KEY

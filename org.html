@@ -272,6 +272,29 @@
     .evs span { display: block; color: var(--muted); font-size: 12.5px; }
     @media (max-width: 900px) { .prow-top { grid-template-columns: 1fr auto; } .prow-top .signups { display: none; } }
 
+
+    /* ---------- agent 4: Content creation ---------- */
+    .pieces { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; }
+    .piece { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); min-width: 0; display: grid; gap: 10px; align-content: start; }
+    .piece.dim { opacity: 0.55; }
+    .thumbs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+    .thumbs img { height: 170px; width: auto; border-radius: 10px; border: 1px solid var(--line); flex: none; background: var(--bg); }
+    .thumbs.wide img { height: 140px; }
+    .ptop { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .fmt { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; background: var(--ink); color: var(--lime); }
+    .fmt.li { background: #0A66C2; color: #fff; }
+    .fmt.camp { background: var(--soft); color: var(--forest); }
+    .ptop .when { font-size: 11.5px; color: var(--muted); }
+    .ptop select { margin-left: auto; font: inherit; font-size: 12px; padding: 4px 8px; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; }
+    .piece h4 { margin: 0; font-size: 15px; }
+    .cap { white-space: pre-wrap; font: inherit; font-size: 12.5px; margin: 0; background: var(--bg); border-radius: 10px; padding: 10px; max-height: 180px; overflow: auto; }
+    .tags { font-size: 12px; color: #0A66C2; }
+    .facts { margin: 0; padding-left: 16px; font-size: 12px; color: var(--muted); }
+    .facts a { color: var(--forest); }
+    .pbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .mix { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    @media (max-width: 900px) { .pieces { grid-template-columns: 1fr; } }
+
     /* ---------- live agents: Chief of Staff brief ---------- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -388,6 +411,7 @@
             <button role="tab" data-ltab="chief" aria-selected="true">Chief of Staff</button>
             <button role="tab" data-ltab="market" aria-selected="false">Market intelligence</button>
             <button role="tab" data-ltab="growth" aria-selected="false">Student acquisition</button>
+            <button role="tab" data-ltab="content" aria-selected="false">Content creation</button>
           </div>
         </div>
         <div id="pass-slot"></div>
@@ -446,6 +470,18 @@
           <div id="pipeline"></div>
         </div>
         </div>
+
+        <div data-pane="content" hidden>
+        <div class="brief-head">
+          <h3 class="pane-title">This week's posts</h3>
+          <span id="c-status" class="pill gate"><i></i>Checking</span>
+          <span id="c-time" class="note" style="margin:0"></span>
+          <button class="btn" id="run-content" type="button" disabled>Run now</button>
+        </div>
+        <p class="sub">Every Wednesday it writes 6 pieces for Instagram, LinkedIn and campus boards from real cited facts, the other agents' ideas and SNARE's recipes. Every number links to its source. Download the image, copy the caption, post it, then mark it posted.</p>
+        <div class="panel" id="content-head"></div>
+        <div class="pieces" id="pieces"></div>
+        </div>
       </section>
 
       <section class="section">
@@ -481,7 +517,7 @@
             <li><span class="n">2</span><div><strong>Money out above the cap</strong><span>Rewards and gift cards pay out automatically up to $500 a week. Anything above waits for approval.</span></div></li>
             <li><span class="n">3</span><div><strong>Privacy flags</strong><span>When the Privacy guard blocks something and can't fix it alone, a person decides.</span></div></li>
           </ul>
-          <p class="everything"><b>Runs alone:</b> research, outreach drafts, posts, student support, reports to existing buyers, offer matching, payouts under the cap. <b>Sent by the team:</b> outreach to student groups.</p>
+          <p class="everything"><b>Runs alone:</b> research, outreach drafts, posts, student support, reports to existing buyers, offer matching, payouts under the cap. <b>Sent by the team:</b> outreach to student groups and social posts.</p>
         </div>
       </section>
 
@@ -544,6 +580,7 @@
 
   <div class="detail" id="detail" role="dialog" aria-modal="true" aria-label="Agent details" hidden></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="config.js"></script>
   <script>
   (function () {
@@ -598,19 +635,18 @@ Why: runs a food waste week every term.
 Draft (Instagram): Hi! We're Ivey students building SNARE, a free app that helps students waste less food and earn grocery money. Would you share our waitlist with your members? {join link}
 Waitlist this week: 12 new sign ups, 5 from this club's link.` },
 
-      { id: 'content', name: 'Content creation', group: 'grow', model: 'sonnet', auto: 'guard', runs: 180, inTok: 30000, outTok: 4000, f: [2, 4],
-        job: 'Makes the posts, videos and recipes students see.',
-        cadence: 'About 30 pieces a week',
-        does: ['Writes TikTok and Instagram scripts and captions', 'Turns real waste totals into posts, like "what London students threw out this month"', 'Writes recipe cards for food that is about to expire', 'Writes copy for sponsored offers'],
-        tools: ['Canva', 'Post scheduler', 'Recipe library', 'Approved insight totals'],
-        gate: 'Autonomous. The Privacy guard checks any post that uses data.',
-        talks: ['growth', 'market', 'privacy'],
-        sample: `TikTok script, 20 seconds
-Hook: "London students threw out 41% of their spinach last month."
-Shot 2: wilted bag in a student fridge.
-Shot 3: SNARE notification: "Still got the spinach?"
-Shot 4: 10 minute spinach pasta.
-End card: "Snap your receipt. Earn grocery money. Waste less."` },
+      { id: 'content', name: 'Content creation', group: 'grow', model: 'sonnet', auto: 'gate', built: true, runs: 4, inTok: 120000, outTok: 16000, extra: 0.3, extraNote: '32 web searches', f: [2, 4],
+        job: 'Writes 6 posts a week and makes the images.',
+        cadence: 'Weekly, Wednesdays, plus Run now',
+        does: ['Finds real food waste facts, each with its source link', 'Turns other agents\' ideas and campus events into posts', 'Makes recipe posts from the app\'s real recipes', 'Writes Instagram posts, LinkedIn posts and campus posters or blurbs', 'Draws a SNARE branded image for each, with a waitlist QR code on posters'],
+        tools: ['Claude web search', 'App recipe library', 'Branded image maker on this page'],
+        gate: 'The team posts what it drafts. Pieces with a number that has no real source are dropped.',
+        talks: ['market', 'growth', 'chief'],
+        sample: `Instagram carousel: "Your fridge, but make it a budget"
+Slide 1: Canadians throw out food every week. Here is how to stop.
+Slide 2: Cook what expires first: Leftover Egg Fried Rice, 15 minutes.
+Caption: Snap your receipt, see what expires first, earn grocery money. Join the waitlist: {link}
+Fact: cited to its source page.` },
 
       { id: 'sales', name: 'B2B sales', group: 'sell', model: 'opus', auto: 'gate', runs: 100, inTok: 40000, outTok: 6000, f: [1.5, 3],
         job: 'Finds and works data buyers: brands, grocers and cities.',
@@ -1268,7 +1304,213 @@ Duplicate receipts blocked: 6` },
       if (sel) needPass(() => saveGroups(live.groups.map(g => g.id === sel.dataset.gstatus ? { ...g, status: sel.value } : g)));
     });
 
-    loadLive().then(() => Promise.all([loadMarket(), loadGrowth()]));
+    // ---------- agent 4: Content creation ----------
+    const PSTAT = ['draft', 'ready', 'posted', 'skip'];
+    const FMT = { instagram: ['Instagram', ''], 'instagram carousel': ['Instagram carousel', ''], linkedin: ['LinkedIn', 'li'], poster: ['Campus poster', 'camp'], blurb: ['Club blurb', 'camp'] };
+    const CONTENT_PREVIEW = {
+      headline: 'Sample posts: real pieces, with cited facts, appear after the first run.',
+      pieces: [
+        { id: 'sample-1', format: 'instagram carousel', title: 'Leftover Egg Fried Rice', basedOn: 'recipe', recipeId: 'friedrice', postWhen: 'Thursday',
+          slides: [{ heading: 'Rice from last night?', body: 'Turn it into dinner in 15 minutes.' }, { heading: 'Leftover Egg Fried Rice', body: 'Cold rice, 2 eggs, frozen veg, soy sauce. Serves 2.' }, { heading: 'Cook what expires first', body: 'SNARE shows you what to use up. Join the waitlist.' }],
+          caption: 'Sample caption. A real run writes this from the recipe and ends with the waitlist link.', hashtags: ['studentmeals', 'foodwaste'], facts: [], altText: 'Recipe slides', link: JOIN + '?src=instagram' },
+        { id: 'sample-2', format: 'poster', title: 'Residence poster', basedOn: 'fact', recipeId: '', postWhen: 'Monday',
+          slides: [{ heading: 'Your fridge is costing you money', body: 'Snap your receipt, cook what expires first, earn grocery money. Free for Western and Fanshawe students.' }],
+          caption: 'Sample note for the residence council.', hashtags: [], facts: [], altText: 'Poster', link: JOIN + '?src=poster' },
+      ],
+    };
+    live.content = null; live.pstat = {}; live.cbusy = false; live.cerror = '';
+    const imgCache = {};
+
+    // ----- branded images, drawn on a canvas -----
+    const SIZES = { instagram: [1080, 1080], 'instagram carousel': [1080, 1080], linkedin: [1200, 627], poster: [1275, 1650] };
+    function wrapLines(ctx, text, max) {
+      const words = String(text).split(/\s+/); const lines = []; let line = '';
+      for (const w of words) { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > max && line) { lines.push(line); line = w; } else line = t; }
+      if (line) lines.push(line);
+      return lines;
+    }
+    function fitText(ctx, text, weight, start, min, max, maxLines) {
+      for (let size = start; size >= min; size -= 2) {
+        ctx.font = `${weight} ${size}px Poppins, Arial, sans-serif`;
+        const lines = wrapLines(ctx, text, max);
+        if (lines.length <= maxLines) return { size, lines };
+      }
+      ctx.font = `${weight} ${min}px Poppins, Arial, sans-serif`;
+      return { size: min, lines: wrapLines(ctx, text, max).slice(0, maxLines) };
+    }
+    function wordmark(ctx, x, y, size, color, dot) {
+      ctx.font = `800 ${size}px Poppins, Arial, sans-serif`; ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('snare', x, y);
+      const w = ctx.measureText('snare').width;
+      ctx.fillStyle = dot; ctx.beginPath(); ctx.arc(x + w + size * 0.2, y - size * 0.1, size * 0.13, 0, Math.PI * 2); ctx.fill();
+    }
+    function qrCanvas(text) {
+      if (!window.QRCode) return null;
+      const div = document.createElement('div');
+      new QRCode(div, { text, width: 360, height: 360, colorDark: '#1F1E1E', colorLight: '#FFFFFF', correctLevel: QRCode.CorrectLevel.M });
+      return div.querySelector('canvas');
+    }
+    const shortLink = l => l.replace(/^https?:\/\//, '');
+
+    function drawSlide(piece, i) {
+      const [W, H] = SIZES[piece.format] || SIZES.instagram;
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const ctx = c.getContext('2d');
+      const slide = piece.slides[i] || { heading: piece.title, body: '' };
+      const pad = Math.round(W * 0.08);
+      const source = piece.facts.length ? 'Source: ' + piece.facts.map(f => f.source).filter((v, k, a) => a.indexOf(v) === k).join(', ') : '';
+      if (piece.format === 'linkedin') {
+        ctx.fillStyle = '#004230'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#A2DC5D'; ctx.fillRect(0, H - 14, W, 14);
+        wordmark(ctx, pad, pad + 30, 44, '#FFFFFF', '#BBD004');
+        const h = fitText(ctx, slide.heading, 800, 66, 40, W - pad * 2, 3);
+        ctx.fillStyle = '#A2DC5D'; let y = pad + 130;
+        h.lines.forEach(l => { ctx.fillText(l, pad, y); y += h.size * 1.12; });
+        const b = fitText(ctx, slide.body, 500, 30, 22, W - pad * 2, 4);
+        ctx.fillStyle = '#E4F0E8'; y += 14;
+        b.lines.forEach(l => { ctx.fillText(l, pad, y); y += b.size * 1.35; });
+        ctx.font = '500 20px Poppins, Arial, sans-serif'; ctx.fillStyle = '#8FB6A3';
+        ctx.fillText(source || 'Team SNARE · Ivey Venturing Field Project', pad, H - 40);
+        return c;
+      }
+      // Lime band look, like the app.
+      const g = ctx.createRadialGradient(W / 2, H, 0, W / 2, H, H * 1.2);
+      g.addColorStop(0, '#EEF9E0'); g.addColorStop(0.4, '#C3EA8E'); g.addColorStop(0.75, '#A2DC5D'); g.addColorStop(1, '#8FD047');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      wordmark(ctx, pad, pad + 40, 58, '#1F1E1E', '#BBD004');
+      if (piece.format === 'instagram carousel') {
+        ctx.font = '700 30px Poppins, Arial, sans-serif'; ctx.fillStyle = '#004230'; ctx.textAlign = 'right';
+        ctx.fillText(`${i + 1}/${piece.slides.length}`, W - pad, pad + 36); ctx.textAlign = 'left';
+      }
+      const poster = piece.format === 'poster';
+      const textW = W - pad * 2;
+      const h = fitText(ctx, slide.heading, 800, poster ? 118 : 96, 54, textW, poster ? 4 : 3);
+      const b = fitText(ctx, slide.body, 500, poster ? 46 : 42, 28, textW, poster ? 6 : 5);
+      let y = pad + (poster ? 230 : 200);
+      ctx.fillStyle = '#1F1E1E'; ctx.font = `800 ${h.size}px Poppins, Arial, sans-serif`;
+      h.lines.forEach(l => { ctx.fillText(l, pad, y); y += h.size * 1.05; });
+      y += 24; ctx.fillStyle = '#004230'; ctx.font = `500 ${b.size}px Poppins, Arial, sans-serif`;
+      b.lines.forEach(l => { ctx.fillText(l, pad, y); y += b.size * 1.35; });
+      if (poster) {
+        const q = qrCanvas(piece.link);
+        const qs = 360, qx = pad, qy = H - pad - qs - 60;
+        ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.roundRect(qx - 20, qy - 20, qs + 40, qs + 40, 24); ctx.fill();
+        if (q) ctx.drawImage(q, qx, qy, qs, qs);
+        ctx.fillStyle = '#1F1E1E'; ctx.font = '800 54px Poppins, Arial, sans-serif';
+        ctx.fillText('Scan to join', qx + qs + 60, qy + 120);
+        ctx.fillText('the waitlist', qx + qs + 60, qy + 184);
+        ctx.font = '500 30px Poppins, Arial, sans-serif'; ctx.fillStyle = '#004230';
+        wrapLines(ctx, 'Free for Western and Fanshawe students', W - qx - qs - 60 - pad).forEach((l, k) => ctx.fillText(l, qx + qs + 60, qy + 250 + k * 40));
+        ctx.font = '500 24px Poppins, Arial, sans-serif'; ctx.fillStyle = '#004230';
+        ctx.fillText(source || shortLink(piece.link), pad, H - pad + 10);
+      } else {
+        ctx.fillStyle = '#1F1E1E'; ctx.beginPath(); ctx.roundRect(pad, H - pad - 70, W - pad * 2, 70, 16); ctx.fill();
+        ctx.fillStyle = '#A2DC5D'; ctx.font = '700 26px Poppins, Arial, sans-serif';
+        ctx.fillText('Join the waitlist · ' + shortLink(piece.link).replace(/\?.*$/, ''), pad + 26, H - pad - 26);
+        if (source) { ctx.fillStyle = '#004230'; ctx.font = '500 22px Poppins, Arial, sans-serif'; ctx.fillText(fitSource(ctx, source, W - pad * 2), pad, H - pad - 96); }
+      }
+      return c;
+    }
+    function fitSource(ctx, text, max) { let t = text; while (ctx.measureText(t).width > max && t.length > 10) t = t.slice(0, -2); return t === text ? t : t + '…'; }
+
+    function images(piece) {
+      if (piece.format === 'blurb') return [];
+      const key = piece.id + JSON.stringify(piece.slides);
+      if (!imgCache[key]) imgCache[key] = piece.slides.map((x, i) => drawSlide(piece, i));
+      return imgCache[key];
+    }
+
+    function renderContent() {
+      const latest = live.content;
+      const [cls, label, banner] = statusOf(latest);
+      const st = document.getElementById('c-status');
+      st.className = 'pill ' + cls; st.innerHTML = '<i></i>' + label;
+      const btn = document.getElementById('run-content');
+      btn.disabled = !API || !live.status || !live.status.hasKey || live.cbusy;
+      btn.textContent = live.cbusy ? 'Writing posts' : 'Run now';
+      document.getElementById('c-time').textContent = latest ? `Written ${fmtTime(latest.generatedAt)}` : '';
+      const c = latest ? latest.output : CONTENT_PREVIEW;
+      const mix = {};
+      c.pieces.forEach(p => { const k = FMT[p.format][0]; mix[k] = (mix[k] || 0) + 1; });
+      document.getElementById('content-head').innerHTML = `
+        ${banner ? `<div class="preview"><div><b>${latest ? '' : 'Preview'}</b>${esc(banner)}</div></div>` : ''}
+        <p class="headline">${esc(c.headline)}</p>
+        <div class="mix">${Object.entries(mix).map(([k, n]) => `<span class="src">${n} ${esc(k)}</span>`).join('')}</div>
+        ${live.cerror ? `<p class="err">${esc(live.cerror)}</p>` : ''}
+        <div class="srcs">${latest
+          ? `<span class="src real">${latest.sources.searches} web searches</span><span class="src real">${latest.sources.recipes} recipes</span><span class="src real">${latest.sources.ideas} market ideas, ${latest.sources.events} events</span>${latest.sources.dropped ? `<span class="src">${latest.sources.dropped} dropped, unsourced number</span>` : ''}`
+          : '<span class="src samp">Sample posts</span>'}</div>`;
+      const edit = canEdit() && !!latest;
+      document.getElementById('pieces').innerHTML = c.pieces.map(p => {
+        const status = live.pstat[p.id] || 'draft';
+        const [fname, fcls] = FMT[p.format];
+        const imgs = images(p);
+        return `<article class="piece ${status === 'skip' ? 'dim' : ''}">
+          ${imgs.length ? `<div class="thumbs ${p.format === 'linkedin' ? 'wide' : ''}">${imgs.map((cv, i) => `<img src="${cv.toDataURL('image/png')}" alt="${esc(p.altText)}${imgs.length > 1 ? `, slide ${i + 1}` : ''}">`).join('')}</div>` : ''}
+          <div class="ptop"><span class="fmt ${fcls}">${fname}</span><span class="when">Post ${esc(p.postWhen || 'this week')}</span>
+            <select data-pstat="${esc(p.id)}" ${edit ? '' : 'disabled'} aria-label="Status">${PSTAT.map(x => `<option ${x === status ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+          <h4>${esc(p.title)}</h4>
+          ${p.format === 'blurb' ? `<pre class="cap">${esc(p.slides.map(x => x.heading + '\n\n' + x.body).join('\n\n'))}</pre>` : ''}
+          <pre class="cap">${esc(p.caption)}</pre>
+          ${p.hashtags.length ? `<div class="tags">${p.hashtags.map(t => '#' + esc(t.replace(/^#/, ''))).join(' ')}</div>` : ''}
+          ${p.facts.length ? `<ul class="facts">${p.facts.map(f => `<li>${esc(f.claim)} <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.source)}</a></li>`).join('')}</ul>` : ''}
+          <div class="pbtns">
+            <button class="btn small" data-copy="${esc(p.format === 'blurb' ? p.slides.map(x => x.heading + '\n\n' + x.body).join('\n\n') : p.caption + (p.hashtags.length ? '\n\n' + p.hashtags.map(t => '#' + t.replace(/^#/, '')).join(' ') : ''))}">Copy ${p.format === 'blurb' ? 'blurb' : 'caption'}</button>
+            ${imgs.length ? `<button class="btn small outline" data-dl="${esc(p.id)}">Download ${imgs.length > 1 ? imgs.length + ' images' : 'image'}</button>` : ''}
+          </div>
+        </article>`;
+      }).join('');
+    }
+
+    function download(id) {
+      const c = (live.content ? live.content.output : CONTENT_PREVIEW).pieces.find(p => p.id === id);
+      if (!c) return;
+      images(c).forEach((cv, i, all) => cv.toBlob(b => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = `snare-${c.format.replace(/\s+/g, '-')}-${c.id}${all.length > 1 ? '-' + (i + 1) : ''}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }, 'image/png'));
+    }
+
+    async function runContentNow() {
+      live.cbusy = true; live.cerror = ''; renderContent();
+      try { live.content = (await call('/agents/content/run', { method: 'POST' })).latest; }
+      catch (e) { if (e.message !== 'PASS') live.cerror = e.message; }
+      live.cbusy = false; renderContent();
+    }
+
+    async function setPostStatus(id, status) {
+      const prev = live.pstat[id];
+      live.pstat[id] = status; renderContent();
+      try { live.pstat = (await call('/agents/poststatus', { method: 'PUT', body: JSON.stringify({ id, status }) })).status; }
+      catch (e) { if (e.message !== 'PASS') { live.pstat[id] = prev; live.cerror = e.message; } }
+      renderContent();
+    }
+
+    async function loadContent() {
+      try { await document.fonts.load('800 60px Poppins'); await document.fonts.load('500 30px Poppins'); } catch (e) { /* fall back to Arial */ }
+      renderContent();
+      if (!API || !live.status) return;
+      try {
+        const [c, ps] = await Promise.all([call('/agents/content'), call('/agents/poststatus')]);
+        live.content = c.latest; live.pstat = ps.status;
+      } catch (e) { /* keep preview */ }
+      renderContent();
+    }
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('#run-content')) needPass(runContentNow);
+      const dl = e.target.closest('[data-dl]');
+      if (dl) download(dl.dataset.dl);
+    });
+    document.addEventListener('change', e => {
+      const sel = e.target.closest('[data-pstat]');
+      if (sel) needPass(() => setPostStatus(sel.dataset.pstat, sel.value));
+    });
+
+    loadLive().then(() => Promise.all([loadMarket(), loadGrowth(), loadContent()]));
     render();
   })();
   </script>
