@@ -528,6 +528,8 @@ export async function runGrowth(env) {
 
 const SITE_URL = "https://n8moore19.github.io/SNARE";
 const POST_STATUSES = ["draft", "ready", "posted", "skip"];
+// Illustrations the org page can draw.
+const SCENES = ["fridge", "spinach", "bread", "eggs", "tomatoes", "groceries", "phone", "pan"];
 
 const CONTENT_SCHEMA = {
   type: "object",
@@ -554,8 +556,20 @@ const CONTENT_SCHEMA = {
           },
           altText: { type: "string" },
           postWhen: { type: "string" },
+          design: {
+            type: "object",
+            properties: {
+              layout: { type: "string", enum: ["big number", "food scene", "receipt"] },
+              scene: { type: "string", enum: SCENES },
+              palette: { type: "string", enum: ["lime", "forest", "cream", "night", "tomato"] },
+              bigNumber: { type: "string" },
+              bigLabel: { type: "string" },
+            },
+            required: ["layout", "scene", "palette", "bigNumber", "bigLabel"],
+            additionalProperties: false,
+          },
         },
-        required: ["format", "title", "basedOn", "recipeId", "slides", "caption", "hashtags", "facts", "altText", "postWhen"],
+        required: ["format", "title", "basedOn", "recipeId", "slides", "caption", "hashtags", "facts", "altText", "postWhen", "design"],
         additionalProperties: false,
       },
     },
@@ -580,6 +594,12 @@ Writing:
 - Instagram and poster CTA: join the waitlist at {{JOIN_LINK}}. LinkedIn CTA: follow along or get in touch.
 - hashtags: 0 to 6, none for blurbs. altText describes the image.
 - postWhen: a suggested day this week, like "Thursday".
+- design: how the image looks. Vary it across the 6 pieces: use at least two layouts and three palettes.
+  - layout "big number": only for a piece with facts. bigNumber is the number exactly as written in one of its fact claims (like "58%" or "2.2 million"), bigLabel says what it measures in under 10 words. Otherwise bigNumber and bigLabel are "".
+  - layout "receipt": text styled as a grocery receipt. Good for recipes, ingredient lists, and "what students buy" posts.
+  - layout "food scene": an illustration with the text. The default.
+  - scene: the illustration that fits best (fridge, spinach, bread, eggs, tomatoes, groceries, phone for receipt snapping, pan for cooking).
+  - palette: lime and forest are SNARE's main colours; cream, night and tomato add variety. LinkedIn usually forest or night.
 - Warm, plain, student voice. No em dashes or hyphens used as dashes. No emoji in slides.
 headline: one sentence on this week's theme.`;
 
@@ -626,6 +646,11 @@ export async function runContent(env) {
       const link = `${env.JOIN_URL || JOIN_URL}?src=${p.format === "poster" ? "poster" : p.format === "blurb" ? "club-blurb" : p.format.split(" ")[0]}`;
       const fill = (t) => t.split("{{JOIN_LINK}}").join(link);
       const recipe = p.recipeId ? recipes.find((x) => x.id === p.recipeId) : null;
+      // A big number must come straight from a cited fact, or the layout falls back.
+      const digits = (t) => t.replace(/[^0-9]/g, "");
+      if (p.design.layout === "big number" && (!digits(p.design.bigNumber) || !p.facts.some((x) => digits(x.claim).includes(digits(p.design.bigNumber))))) {
+        p.design = { ...p.design, layout: "food scene", bigNumber: "", bigLabel: "" };
+      }
       return { ...p, id: `${weekKey}-${n + 1}`, link, caption: fill(p.caption), slides: p.slides.map((x) => ({ heading: fill(x.heading), body: fill(x.body) })), recipe: recipe ? { name: recipe.name, minutes: recipe.minutes, serves: recipe.serves } : null };
     });
 

@@ -8,7 +8,7 @@
   <meta name="description" content="SNARE's human plus AI launch organization: ten mostly autonomous agents, three human gates, and monthly cost estimates.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --forest: #004230; --lime: #A2DC5D; --soft: #EAF6DC; --accent: #BBD004; --ink: #1F1E1E;
@@ -1312,37 +1312,170 @@ Duplicate receipts blocked: 6` },
       pieces: [
         { id: 'sample-1', format: 'instagram carousel', title: 'Leftover Egg Fried Rice', basedOn: 'recipe', recipeId: 'friedrice', postWhen: 'Thursday',
           slides: [{ heading: 'Rice from last night?', body: 'Turn it into dinner in 15 minutes.' }, { heading: 'Leftover Egg Fried Rice', body: 'Cold rice, 2 eggs, frozen veg, soy sauce. Serves 2.' }, { heading: 'Cook what expires first', body: 'SNARE shows you what to use up. Join the waitlist.' }],
-          caption: 'Sample caption. A real run writes this from the recipe and ends with the waitlist link.', hashtags: ['studentmeals', 'foodwaste'], facts: [], altText: 'Recipe slides', link: JOIN + '?src=instagram' },
+          caption: 'Sample caption. A real run writes this from the recipe and ends with the waitlist link.', hashtags: ['studentmeals', 'foodwaste'], facts: [], altText: 'Recipe slides', link: JOIN + '?src=instagram',
+          design: { layout: 'food scene', scene: 'pan', palette: 'cream', bigNumber: '', bigLabel: '' } },
+        { id: 'sample-3', format: 'instagram', title: 'Receipt post', basedOn: 'recipe', recipeId: 'friedrice', postWhen: 'Saturday',
+          slides: [{ heading: 'Tonight: fried rice', body: 'Cold rice from last night. Two eggs. A cup of frozen veg. Soy sauce. Done in 15 minutes.' }],
+          caption: 'Sample caption for a receipt style post.', hashtags: ['cheapeats'], facts: [], altText: 'Receipt', link: JOIN + '?src=instagram',
+          design: { layout: 'receipt', scene: 'eggs', palette: 'tomato', bigNumber: '', bigLabel: '' } },
+        { id: 'sample-4', format: 'linkedin', title: 'LinkedIn post', basedOn: 'market', recipeId: '', postWhen: 'Wednesday',
+          slides: [{ heading: 'What students throw away is data nobody has', body: 'SNARE turns opt in fridge logs into an anonymous household food waste panel for brands, grocers and cities.' }],
+          caption: 'Sample LinkedIn caption.', hashtags: ['foodwaste'], facts: [], altText: 'LinkedIn banner', link: JOIN + '?src=linkedin',
+          design: { layout: 'food scene', scene: 'groceries', palette: 'forest', bigNumber: '', bigLabel: '' } },
         { id: 'sample-2', format: 'poster', title: 'Residence poster', basedOn: 'fact', recipeId: '', postWhen: 'Monday',
           slides: [{ heading: 'Your fridge is costing you money', body: 'Snap your receipt, cook what expires first, earn grocery money. Free for Western and Fanshawe students.' }],
-          caption: 'Sample note for the residence council.', hashtags: [], facts: [], altText: 'Poster', link: JOIN + '?src=poster' },
+          caption: 'Sample note for the residence council.', hashtags: [], facts: [], altText: 'Poster', link: JOIN + '?src=poster',
+          design: { layout: 'food scene', scene: 'fridge', palette: 'lime', bigNumber: '', bigLabel: '' } },
       ],
     };
     live.content = null; live.pstat = {}; live.cbusy = false; live.cerror = '';
     const imgCache = {};
 
     // ----- branded images, drawn on a canvas -----
+    // Three layouts (big number, food scene, receipt), five palettes and eight
+    // flat food illustrations, all drawn in code so they stay on brand.
     const SIZES = { instagram: [1080, 1080], 'instagram carousel': [1080, 1080], linkedin: [1200, 627], poster: [1275, 1650] };
+    const PAL = {
+      lime: { bg: ['#C8EE96', '#A2DC5D', '#8FD047'], head: '#1F1E1E', body: '#004230', accent: '#004230', deco: 'rgba(0,66,48,0.13)', chip: '#1F1E1E', chipText: '#A2DC5D', paper: '#FFFFFF' },
+      forest: { bg: ['#0B5A40', '#004230', '#02281D'], head: '#A2DC5D', body: '#E4F0E8', accent: '#A2DC5D', deco: 'rgba(162,220,93,0.14)', chip: '#A2DC5D', chipText: '#1F1E1E', paper: '#FFFDF7' },
+      cream: { bg: ['#FFFDF5', '#F6F1E3', '#EFE7D2'], head: '#1F1E1E', body: '#004230', accent: '#E8553E', deco: 'rgba(162,220,93,0.22)', chip: '#004230', chipText: '#A2DC5D', paper: '#FFFFFF' },
+      night: { bg: ['#2C2B2B', '#1F1E1E', '#111111'], head: '#FFFFFF', body: '#C9D4CE', accent: '#A2DC5D', deco: 'rgba(162,220,93,0.12)', chip: '#A2DC5D', chipText: '#1F1E1E', paper: '#FFFDF7' },
+      tomato: { bg: ['#FF8A6B', '#F26B4F', '#E2513A'], head: '#1F1E1E', body: '#3A120A', accent: '#1F1E1E', deco: 'rgba(255,255,255,0.22)', chip: '#1F1E1E', chipText: '#FFB59F', paper: '#FFFFFF' },
+    };
+    const INK = '#1F1E1E';
+    const font = (w, px, fam) => `${w} ${px}px ${fam === 'mono' ? "'DM Mono', 'Courier New', monospace" : 'Poppins, Arial, sans-serif'}`;
+
     function wrapLines(ctx, text, max) {
-      const words = String(text).split(/\s+/); const lines = []; let line = '';
+      const words = String(text).split(/\s+/).filter(Boolean); const lines = []; let line = '';
       for (const w of words) { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > max && line) { lines.push(line); line = w; } else line = t; }
       if (line) lines.push(line);
       return lines;
     }
-    function fitText(ctx, text, weight, start, min, max, maxLines) {
+    function fitText(ctx, text, weight, start, min, max, maxLines, fam) {
       for (let size = start; size >= min; size -= 2) {
-        ctx.font = `${weight} ${size}px Poppins, Arial, sans-serif`;
+        ctx.font = font(weight, size, fam);
         const lines = wrapLines(ctx, text, max);
         if (lines.length <= maxLines) return { size, lines };
       }
-      ctx.font = `${weight} ${min}px Poppins, Arial, sans-serif`;
+      ctx.font = font(weight, min, fam);
       return { size: min, lines: wrapLines(ctx, text, max).slice(0, maxLines) };
     }
+    function drawLines(ctx, fit, x, y, lh, color, weight, fam) {
+      ctx.fillStyle = color; ctx.font = font(weight, fit.size, fam);
+      fit.lines.forEach(l => { ctx.fillText(l, x, y); y += fit.size * lh; });
+      return y;
+    }
+    function shorten(ctx, text, max) { let t = text; while (ctx.measureText(t).width > max && t.length > 10) t = t.slice(0, -2); return t === text ? t : t + '…'; }
     function wordmark(ctx, x, y, size, color, dot) {
-      ctx.font = `800 ${size}px Poppins, Arial, sans-serif`; ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
+      ctx.font = font(800, size); ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
       ctx.fillText('snare', x, y);
       const w = ctx.measureText('snare').width;
       ctx.fillStyle = dot; ctx.beginPath(); ctx.arc(x + w + size * 0.2, y - size * 0.1, size * 0.13, 0, Math.PI * 2); ctx.fill();
+    }
+    // Seeded random so a piece always draws the same decorations.
+    function rng(seed) { let h = 2166136261; for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296; }
+
+    function background(ctx, W, H, pal, seed) {
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, pal.bg[0]); g.addColorStop(0.55, pal.bg[1]); g.addColorStop(1, pal.bg[2]);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const r = rng(seed);
+      ctx.fillStyle = pal.deco; ctx.strokeStyle = pal.deco;
+      // Two soft blobs, then small dots, rings and plus signs.
+      for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.arc(r() * W, r() * H, (0.18 + r() * 0.22) * Math.max(W, H), 0, Math.PI * 2); ctx.fill(); }
+      for (let i = 0; i < 26; i++) {
+        const x = r() * W, y = r() * H, s = 6 + r() * 12, k = r();
+        ctx.lineWidth = 4;
+        if (k < 0.4) { ctx.beginPath(); ctx.arc(x, y, s / 2, 0, Math.PI * 2); ctx.fill(); }
+        else if (k < 0.7) { ctx.beginPath(); ctx.arc(x, y, s, 0, Math.PI * 2); ctx.stroke(); }
+        else { ctx.beginPath(); ctx.moveTo(x - s, y); ctx.lineTo(x + s, y); ctx.moveTo(x, y - s); ctx.lineTo(x, y + s); ctx.stroke(); }
+      }
+    }
+
+    // ----- illustrations, drawn in a 400 x 400 box -----
+    function shape(ctx, fill, path, lw = 7) { ctx.beginPath(); path(); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke(); }
+    function rr(ctx, x, y, w, h, r) { ctx.roundRect(x, y, w, h, r); }
+    function line(ctx, pts, lw = 7) { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.lineCap = 'round'; ctx.stroke(); }
+    function leaf(ctx, x, y, w, h, rot, fill) { ctx.save(); ctx.translate(x, y); ctx.rotate(rot); shape(ctx, fill, () => ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2)); line(ctx, [-w * 0.8, 0, w * 0.8, 0], 5); ctx.restore(); }
+    function egg(ctx, x, y, s) { shape(ctx, '#FFF8E8', () => ctx.ellipse(x, y, 30 * s, 40 * s, 0, 0, Math.PI * 2)); }
+    function tomato(ctx, x, y, r) {
+      shape(ctx, '#E8553E', () => ctx.arc(x, y, r, 0, Math.PI * 2));
+      ctx.save(); ctx.translate(x, y - r * 0.92);
+      shape(ctx, '#5BA35B', () => { for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 5; ctx.lineTo(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.24 + 4); ctx.lineTo(Math.cos(a + 0.6) * r * 0.12, Math.sin(a + 0.6) * r * 0.08 + 4); } ctx.closePath(); }, 5);
+      ctx.restore();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.ellipse(x - r * 0.4, y - r * 0.25, r * 0.16, r * 0.1, -0.6, 0, Math.PI * 2); ctx.fill();
+    }
+    const SCENE = {
+      fridge(ctx) {
+        shape(ctx, '#FFFFFF', () => rr(ctx, 110, 30, 180, 340, 28));
+        line(ctx, [110, 150, 290, 150]);
+        line(ctx, [134, 80, 134, 120], 10); line(ctx, [134, 175, 134, 235], 10);
+        shape(ctx, '#A2DC5D', () => rr(ctx, 205, 180, 70, 64, 6), 5);
+        ctx.fillStyle = INK; ctx.font = font(700, 15); ctx.fillText('USE', 222, 207); ctx.fillText('FIRST', 216, 228);
+        shape(ctx, '#E8553E', () => ctx.arc(250, 75, 13, 0, Math.PI * 2), 5);
+        shape(ctx, '#F2C14E', () => ctx.arc(215, 100, 11, 0, Math.PI * 2), 5);
+        line(ctx, [140, 370, 140, 386]); line(ctx, [260, 370, 260, 386]);
+      },
+      spinach(ctx) {
+        leaf(ctx, 165, 110, 60, 30, -0.9, '#5BA35B'); leaf(ctx, 235, 100, 62, 30, 0.8, '#7BC26B'); leaf(ctx, 200, 80, 58, 28, -0.05, '#4E9A4E');
+        shape(ctx, '#EAF6DC', () => { ctx.moveTo(110, 140); ctx.lineTo(290, 140); ctx.lineTo(270, 360); ctx.lineTo(130, 360); ctx.closePath(); });
+        shape(ctx, '#A2DC5D', () => rr(ctx, 142, 210, 116, 70, 10), 5);
+        ctx.fillStyle = INK; ctx.font = font(800, 22); ctx.textAlign = 'center'; ctx.fillText('SPINACH', 200, 252); ctx.textAlign = 'left';
+        line(ctx, [150, 160, 250, 160], 5);
+      },
+      bread(ctx) {
+        shape(ctx, '#E8B66B', () => { ctx.moveTo(70, 300); ctx.lineTo(70, 200); ctx.bezierCurveTo(70, 110, 330, 110, 330, 200); ctx.lineTo(330, 300); ctx.closePath(); });
+        shape(ctx, '#D99A45', () => rr(ctx, 70, 290, 260, 34, 12));
+        line(ctx, [140, 175, 165, 225], 6); line(ctx, [195, 160, 220, 215], 6); line(ctx, [250, 170, 270, 215], 6);
+        shape(ctx, '#F8E3B6', () => rr(ctx, 290, 200, 70, 120, 14));
+      },
+      eggs(ctx) {
+        egg(ctx, 140, 175, 1.1); egg(ctx, 205, 160, 1.15); egg(ctx, 270, 178, 1.05);
+        shape(ctx, '#C9B79A', () => { ctx.moveTo(60, 210); ctx.lineTo(340, 210); ctx.lineTo(320, 320); ctx.lineTo(80, 320); ctx.closePath(); });
+        for (let i = 0; i < 4; i++) line(ctx, [110 + i * 60, 225, 110 + i * 60, 305], 5);
+        shape(ctx, '#FFFFFF', () => ctx.ellipse(200, 345, 70, 18, 0, 0, Math.PI * 2), 5);
+        shape(ctx, '#F2C14E', () => ctx.arc(200, 345, 10, 0, Math.PI * 2), 4);
+      },
+      tomatoes(ctx) { tomato(ctx, 150, 230, 85); tomato(ctx, 270, 270, 70); leaf(ctx, 300, 140, 42, 18, 0.5, '#5BA35B'); },
+      groceries(ctx) {
+        ctx.save(); ctx.translate(200, 120); ctx.rotate(0.35); shape(ctx, '#E8B66B', () => rr(ctx, -22, -120, 44, 200, 22)); ctx.restore();
+        leaf(ctx, 140, 125, 50, 22, -0.8, '#5BA35B'); leaf(ctx, 170, 110, 46, 20, -0.3, '#7BC26B');
+        shape(ctx, '#F28C38', () => { ctx.moveTo(250, 160); ctx.lineTo(300, 60); ctx.lineTo(275, 170); ctx.closePath(); }, 6);
+        shape(ctx, '#D9C3A0', () => { ctx.moveTo(95, 160); ctx.lineTo(305, 160); ctx.lineTo(320, 370); ctx.lineTo(80, 370); ctx.closePath(); });
+        line(ctx, [95, 200, 305, 200], 5);
+        shape(ctx, '#A2DC5D', () => ctx.arc(200, 280, 40, 0, Math.PI * 2), 5);
+        line(ctx, [182, 280, 196, 294, 220, 266], 7);
+      },
+      phone(ctx) {
+        shape(ctx, INK, () => rr(ctx, 115, 30, 170, 340, 30));
+        ctx.fillStyle = '#A2DC5D'; ctx.beginPath(); rr(ctx, 128, 58, 144, 284, 14); ctx.fill();
+        shape(ctx, '#FFFDF7', () => { ctx.moveTo(158, 92); ctx.lineTo(242, 92); ctx.lineTo(242, 290); for (let x = 242; x > 158; x -= 14) { ctx.lineTo(x - 7, 280); ctx.lineTo(x - 14, 290); } ctx.closePath(); }, 5);
+        for (let i = 0; i < 6; i++) line(ctx, [172, 120 + i * 24, 172 + (i % 2 ? 40 : 56), 120 + i * 24], 5);
+        ctx.lineWidth = 7; ctx.strokeStyle = '#FFFFFF';
+        [[140, 70, 1, 1], [260, 70, -1, 1], [140, 330, 1, -1], [260, 330, -1, -1]].forEach(([x, y, dx, dy]) => { ctx.beginPath(); ctx.moveTo(x, y + dy * 26); ctx.lineTo(x, y); ctx.lineTo(x + dx * 26, y); ctx.stroke(); });
+      },
+      pan(ctx) {
+        shape(ctx, INK, () => rr(ctx, 255, 205, 130, 26, 13));
+        shape(ctx, '#3A3A3A', () => ctx.arc(170, 218, 125, 0, Math.PI * 2));
+        ctx.fillStyle = '#4A4A4A'; ctx.beginPath(); ctx.arc(170, 218, 100, 0, Math.PI * 2); ctx.fill();
+        shape(ctx, '#FFFFFF', () => { ctx.moveTo(110, 220); ctx.bezierCurveTo(100, 150, 200, 140, 225, 180); ctx.bezierCurveTo(260, 230, 220, 285, 170, 278); ctx.bezierCurveTo(130, 275, 115, 250, 110, 220); }, 5);
+        shape(ctx, '#F2C14E', () => ctx.arc(170, 212, 26, 0, Math.PI * 2), 5);
+        line(ctx, [120, 70, 112, 40], 5); line(ctx, [170, 64, 170, 30], 5); line(ctx, [220, 70, 228, 40], 5);
+      },
+    };
+    function scene(ctx, name, x, y, size, rot = 0) {
+      ctx.save(); ctx.translate(x + size / 2, y + size / 2); ctx.rotate(rot); ctx.scale(size / 400, size / 400); ctx.translate(-200, -200);
+      (SCENE[name] || SCENE.fridge)(ctx);
+      ctx.restore();
+    }
+
+    function footer(ctx, piece, W, H, pad, pal, source) {
+      ctx.font = font(700, Math.round(W * 0.024));
+      const label = 'Join the waitlist · ' + shortLink(piece.link).replace(/\?.*$/, '');
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = pal.chip; ctx.beginPath(); rr(ctx, pad, H - pad - 64, tw + 52, 64, 32); ctx.fill();
+      ctx.fillStyle = pal.chipText; ctx.fillText(label, pad + 26, H - pad - 22);
+      if (source) { ctx.font = font(500, Math.round(W * 0.019)); ctx.fillStyle = pal.body; ctx.fillText(shorten(ctx, source, W - pad * 2), pad, H - pad - 88); }
     }
     function qrCanvas(text) {
       if (!window.QRCode) return null;
@@ -1351,67 +1484,121 @@ Duplicate receipts blocked: 6` },
       return div.querySelector('canvas');
     }
     const shortLink = l => l.replace(/^https?:\/\//, '');
+    const designOf = p => p.design || { layout: 'food scene', scene: 'fridge', palette: p.format === 'linkedin' ? 'forest' : 'lime', bigNumber: '', bigLabel: '' };
+    const ALT_SCENES = ['groceries', 'pan', 'phone', 'fridge', 'spinach', 'eggs', 'bread', 'tomatoes'];
 
     function drawSlide(piece, i) {
       const [W, H] = SIZES[piece.format] || SIZES.instagram;
       const c = document.createElement('canvas'); c.width = W; c.height = H;
-      const ctx = c.getContext('2d');
+      const ctx = c.getContext('2d'); ctx.textBaseline = 'alphabetic';
+      const d = designOf(piece);
+      const pal = PAL[d.palette] || PAL.lime;
       const slide = piece.slides[i] || { heading: piece.title, body: '' };
-      const pad = Math.round(W * 0.08);
+      const pad = Math.round(Math.min(W, H) * 0.075);
       const source = piece.facts.length ? 'Source: ' + piece.facts.map(f => f.source).filter((v, k, a) => a.indexOf(v) === k).join(', ') : '';
-      if (piece.format === 'linkedin') {
-        ctx.fillStyle = '#004230'; ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = '#A2DC5D'; ctx.fillRect(0, H - 14, W, 14);
-        wordmark(ctx, pad, pad + 30, 44, '#FFFFFF', '#BBD004');
-        const h = fitText(ctx, slide.heading, 800, 66, 40, W - pad * 2, 3);
-        ctx.fillStyle = '#A2DC5D'; let y = pad + 130;
-        h.lines.forEach(l => { ctx.fillText(l, pad, y); y += h.size * 1.12; });
-        const b = fitText(ctx, slide.body, 500, 30, 22, W - pad * 2, 4);
-        ctx.fillStyle = '#E4F0E8'; y += 14;
-        b.lines.forEach(l => { ctx.fillText(l, pad, y); y += b.size * 1.35; });
-        ctx.font = '500 20px Poppins, Arial, sans-serif'; ctx.fillStyle = '#8FB6A3';
-        ctx.fillText(source || 'Team SNARE · Ivey Venturing Field Project', pad, H - 40);
-        return c;
-      }
-      // Lime band look, like the app.
-      const g = ctx.createRadialGradient(W / 2, H, 0, W / 2, H, H * 1.2);
-      g.addColorStop(0, '#EEF9E0'); g.addColorStop(0.4, '#C3EA8E'); g.addColorStop(0.75, '#A2DC5D'); g.addColorStop(1, '#8FD047');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      wordmark(ctx, pad, pad + 40, 58, '#1F1E1E', '#BBD004');
+      // Later carousel slides keep the palette and switch to a food scene.
+      const layout = i > 0 && d.layout === 'big number' ? 'food scene' : d.layout;
+      const sceneName = i === 0 ? d.scene : ALT_SCENES[(ALT_SCENES.indexOf(d.scene) + i) % ALT_SCENES.length];
+      background(ctx, W, H, pal, piece.id + i);
+      const wide = W / H > 1.4, poster = piece.format === 'poster';
+      wordmark(ctx, pad, pad + 44, wide ? 44 : 56, pal.head, '#BBD004');
       if (piece.format === 'instagram carousel') {
-        ctx.font = '700 30px Poppins, Arial, sans-serif'; ctx.fillStyle = '#004230'; ctx.textAlign = 'right';
-        ctx.fillText(`${i + 1}/${piece.slides.length}`, W - pad, pad + 36); ctx.textAlign = 'left';
+        ctx.font = font(700, 30); ctx.fillStyle = pal.body; ctx.textAlign = 'right';
+        ctx.fillText(`${i + 1}/${piece.slides.length}`, W - pad, pad + 40); ctx.textAlign = 'left';
       }
-      const poster = piece.format === 'poster';
-      const textW = W - pad * 2;
-      const h = fitText(ctx, slide.heading, 800, poster ? 118 : 96, 54, textW, poster ? 4 : 3);
-      const b = fitText(ctx, slide.body, 500, poster ? 46 : 42, 28, textW, poster ? 6 : 5);
-      let y = pad + (poster ? 230 : 200);
-      ctx.fillStyle = '#1F1E1E'; ctx.font = `800 ${h.size}px Poppins, Arial, sans-serif`;
-      h.lines.forEach(l => { ctx.fillText(l, pad, y); y += h.size * 1.05; });
-      y += 24; ctx.fillStyle = '#004230'; ctx.font = `500 ${b.size}px Poppins, Arial, sans-serif`;
-      b.lines.forEach(l => { ctx.fillText(l, pad, y); y += b.size * 1.35; });
+
+      if (layout === 'big number') {
+        const num = d.bigNumber;
+        if (wide) {
+          const n = fitText(ctx, num, 800, 230, 90, W * 0.5, 1);
+          drawLines(ctx, n, pad, pad + 90 + n.size * 0.85, 1, pal.accent === '#E8553E' ? '#E8553E' : pal.head, 800);
+          const lab = fitText(ctx, d.bigLabel || slide.heading, 700, 40, 26, W * 0.5, 3);
+          drawLines(ctx, lab, pad, pad + 140 + n.size, 1.2, pal.body, 700);
+          scene(ctx, d.scene, W * 0.6, H * 0.12, H * 0.72, 0.08);
+        } else {
+          scene(ctx, d.scene, W * 0.55, H * (poster ? 0.5 : 0.42), W * 0.42, 0.12);
+          const n = fitText(ctx, num, 800, poster ? 330 : 300, 120, W - pad * 2, 1);
+          let y = drawLines(ctx, n, pad, pad + 120 + n.size * 0.8, 1, pal.accent === '#E8553E' ? '#E8553E' : pal.head, 800);
+          const lab = fitText(ctx, d.bigLabel || slide.heading, 700, 54, 32, W * 0.5, 4);
+          y = drawLines(ctx, lab, pad, y + 10, 1.15, pal.head, 700);
+          const b = fitText(ctx, slide.body, 500, 34, 24, W * 0.5, 4);
+          drawLines(ctx, b, pad, y + 20, 1.35, pal.body, 500);
+        }
+      } else if (layout === 'receipt') {
+        const pw = wide ? W * 0.42 : W * 0.66, px = wide ? W - pad - pw : (W - pw) / 2, py = wide ? pad * 0.6 : pad + 90;
+        const ph = wide ? H - pad * 1.2 : H - py - pad - (poster ? 470 : 120);
+        ctx.save(); ctx.translate(px + pw / 2, py + ph / 2); ctx.rotate(wide ? 0.03 : -0.035); ctx.translate(-pw / 2, -ph / 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(12, 16, pw, ph);
+        ctx.fillStyle = pal.paper; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(pw, 0); ctx.lineTo(pw, ph);
+        for (let x = pw; x > 0; x -= 28) { ctx.lineTo(x - 14, ph - 16); ctx.lineTo(x - 28, ph); }
+        ctx.closePath(); ctx.fill();
+        const ip = pw * 0.09; let y = ip + 30;
+        ctx.textAlign = 'center'; ctx.fillStyle = INK; ctx.font = font(500, Math.round(pw * 0.06), 'mono');
+        ctx.fillText('SNARE FRIDGE CHECK', pw / 2, y); y += pw * 0.07;
+        ctx.font = font(400, Math.round(pw * 0.04), 'mono'); ctx.fillText('London, ON · ' + new Date().toLocaleDateString('en-CA'), pw / 2, y); ctx.textAlign = 'left';
+        y += pw * 0.05; ctx.setLineDash([8, 8]); line(ctx, [ip, y, pw - ip, y], 3); ctx.setLineDash([]); y += pw * 0.09;
+        const h = fitText(ctx, slide.heading.toUpperCase(), 500, Math.round(pw * 0.075), Math.round(pw * 0.045), pw - ip * 2, 3, 'mono');
+        y = drawLines(ctx, h, ip, y, 1.2, INK, 500, 'mono');
+        y += pw * 0.03;
+        // Each sentence is a receipt line; shrink the type until every line fits.
+        const parts = slide.body.split(/(?<=[.!?:])\s+/).filter(Boolean);
+        const room = ph - pw * 0.27 - y;
+        let size = Math.round(pw * 0.05), rows = [];
+        for (; size >= Math.round(pw * 0.026); size -= 1) {
+          ctx.font = font(400, size, 'mono');
+          rows = parts.flatMap(part => wrapLines(ctx, '* ' + part, pw - ip * 2).map((l, k) => k ? '  ' + l : l));
+          if (rows.length * size * 1.45 <= room) break;
+        }
+        ctx.fillStyle = INK;
+        rows.forEach(l => { if (y + size <= ph - pw * 0.27) ctx.fillText(l, ip, y); y += size * 1.45; });
+        ctx.setLineDash([8, 8]); line(ctx, [ip, ph - pw * 0.22, pw - ip, ph - pw * 0.22], 3); ctx.setLineDash([]);
+        ctx.font = font(500, Math.round(pw * 0.05), 'mono'); ctx.fillStyle = INK;
+        ctx.fillText('FOOD WASTED', ip, ph - pw * 0.13); ctx.textAlign = 'right'; ctx.fillText('0', pw - ip, ph - pw * 0.13); ctx.textAlign = 'center';
+        ctx.font = font(400, Math.round(pw * 0.038), 'mono'); ctx.fillText('THANK YOU FOR NOT WASTING', pw / 2, ph - pw * 0.06); ctx.textAlign = 'left';
+        ctx.restore();
+        if (wide) {
+          const hh = fitText(ctx, piece.title, 800, 52, 32, W * 0.46, 3);
+          drawLines(ctx, hh, pad, pad + 130, 1.1, pal.head, 800);
+        } else {
+          scene(ctx, sceneName, W - pad - W * 0.24, py + ph - W * 0.12, W * 0.26, 0.15);
+        }
+      } else {
+        // Food scene: illustration on one side, text on the other.
+        if (wide) {
+          scene(ctx, sceneName, W * 0.6, H * 0.1, H * 0.78, -0.05);
+          const h = fitText(ctx, slide.heading, 800, 66, 38, W * 0.52, 3);
+          let y = drawLines(ctx, h, pad, pad + 140, 1.1, pal.head, 800);
+          const b = fitText(ctx, slide.body, 500, 30, 22, W * 0.5, 4);
+          drawLines(ctx, b, pad, y + 14, 1.35, pal.body, 500);
+        } else {
+          const sz = W * (poster ? 0.5 : 0.46);
+          ctx.fillStyle = pal.deco; ctx.beginPath(); ctx.arc(W - pad - sz / 2, (poster ? H * 0.47 : H * 0.6), sz * 0.62, 0, Math.PI * 2); ctx.fill();
+          scene(ctx, sceneName, W - pad - sz, (poster ? H * 0.47 : H * 0.6) - sz / 2, sz, 0.08);
+          const h = fitText(ctx, slide.heading, 800, poster ? 118 : 92, 52, W - pad * 2, poster ? 3 : 3);
+          let y = drawLines(ctx, h, pad, pad + (poster ? 220 : 190), 1.05, pal.head, 800);
+          const b = fitText(ctx, slide.body, 500, poster ? 44 : 38, 26, W * 0.46, poster ? 6 : 6);
+          drawLines(ctx, b, pad, y + 24, 1.35, pal.body, 500);
+        }
+      }
+
       if (poster) {
         const q = qrCanvas(piece.link);
-        const qs = 360, qx = pad, qy = H - pad - qs - 60;
-        ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.roundRect(qx - 20, qy - 20, qs + 40, qs + 40, 24); ctx.fill();
+        const qs = 330, qx = pad, qy = H - pad - qs - 40;
+        ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); rr(ctx, qx - 20, qy - 20, qs + 40, qs + 40, 24); ctx.fill();
         if (q) ctx.drawImage(q, qx, qy, qs, qs);
-        ctx.fillStyle = '#1F1E1E'; ctx.font = '800 54px Poppins, Arial, sans-serif';
-        ctx.fillText('Scan to join', qx + qs + 60, qy + 120);
-        ctx.fillText('the waitlist', qx + qs + 60, qy + 184);
-        ctx.font = '500 30px Poppins, Arial, sans-serif'; ctx.fillStyle = '#004230';
-        wrapLines(ctx, 'Free for Western and Fanshawe students', W - qx - qs - 60 - pad).forEach((l, k) => ctx.fillText(l, qx + qs + 60, qy + 250 + k * 40));
-        ctx.font = '500 24px Poppins, Arial, sans-serif'; ctx.fillStyle = '#004230';
-        ctx.fillText(source || shortLink(piece.link), pad, H - pad + 10);
+        ctx.fillStyle = pal.head; ctx.font = font(800, 54);
+        ctx.fillText('Scan to join', qx + qs + 60, qy + 110); ctx.fillText('the waitlist', qx + qs + 60, qy + 174);
+        ctx.font = font(500, 30); ctx.fillStyle = pal.body;
+        wrapLines(ctx, 'Free for Western and Fanshawe students', W - qx - qs - 60 - pad).forEach((l, k) => ctx.fillText(l, qx + qs + 60, qy + 240 + k * 40));
+        ctx.font = font(500, 24); ctx.fillText(shorten(ctx, source || shortLink(piece.link), W - pad * 2), pad, H - pad + 18);
+      } else if (wide) {
+        ctx.font = font(500, 20); ctx.fillStyle = pal.body;
+        ctx.fillText(shorten(ctx, source || 'Team SNARE · Ivey Venturing Field Project', W * 0.5), pad, H - pad * 0.8);
       } else {
-        ctx.fillStyle = '#1F1E1E'; ctx.beginPath(); ctx.roundRect(pad, H - pad - 70, W - pad * 2, 70, 16); ctx.fill();
-        ctx.fillStyle = '#A2DC5D'; ctx.font = '700 26px Poppins, Arial, sans-serif';
-        ctx.fillText('Join the waitlist · ' + shortLink(piece.link).replace(/\?.*$/, ''), pad + 26, H - pad - 26);
-        if (source) { ctx.fillStyle = '#004230'; ctx.font = '500 22px Poppins, Arial, sans-serif'; ctx.fillText(fitSource(ctx, source, W - pad * 2), pad, H - pad - 96); }
+        footer(ctx, piece, W, H, pad, pal, source);
       }
       return c;
     }
-    function fitSource(ctx, text, max) { let t = text; while (ctx.measureText(t).width > max && t.length > 10) t = t.slice(0, -2); return t === text ? t : t + '…'; }
 
     function images(piece) {
       if (piece.format === 'blurb') return [];
@@ -1490,7 +1677,7 @@ Duplicate receipts blocked: 6` },
     }
 
     async function loadContent() {
-      try { await document.fonts.load('800 60px Poppins'); await document.fonts.load('500 30px Poppins'); } catch (e) { /* fall back to Arial */ }
+      try { await Promise.all(['800 60px Poppins', '700 30px Poppins', '500 30px Poppins', "400 30px 'DM Mono'", "500 30px 'DM Mono'"].map(f => document.fonts.load(f))); } catch (e) { /* fall back to Arial */ }
       renderContent();
       if (!API || !live.status) return;
       try {
